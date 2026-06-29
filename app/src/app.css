@@ -1,0 +1,61 @@
+:root {
+  /* Material Design 3 inspired tokens. Existing components consume these vars,
+     so re-theming here restyles the whole app. */
+  --md-primary: #4255c5;
+  --md-primary-hover: #3447b0;
+  --md-on-primary: #ffffff;
+  --md-secondary: #5a6acb;
+
+  --bg: #eceef6;
+  --panel: #ffffff;
+  --surface-2: #f3f4fb;
+  --border: #d6d9e8;
+  --text: #1b1c22;
+  --muted: #5b5e6e;
+  --accent: #4255c5;
+
+  /* Material elevation */
+  --elev-1: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.10);
+  --elev-2: 0 2px 6px rgba(16, 24, 40, 0.10), 0 6px 16px rgba(16, 24, 40, 0.08);
+  --elev-3: 0 8px 24px rgba(16, 24, 40, 0.14);
+  --radius: 12px;
+
+  font-family: Roboto, "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body { background: var(--bg); }
+
+/* Material text/outlined button: pill shape, primary text, state-layer hover. */
+button {
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--accent);
+  padding: 7px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 9%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+button:active:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+}
+button:disabled { opacity: 0.45; cursor: default; }
+
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
