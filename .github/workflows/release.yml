@@ -1,12 +1,15 @@
 name: Release
 
-# Heavy cross-OS build. Runs ONLY when you push a version tag (e.g. v0.1.0) or
-# trigger it manually from the Actions tab — not on every push — to keep usage
-# minimal. Produces native installers for all three desktop OSes.
+# Builds native installers for Windows, macOS, and Linux and publishes them to a
+# public GitHub Release. Runs only on a version tag (e.g. v0.1.1) or manual
+# dispatch — not on every push.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+
+permissions:
+  contents: write # required to create the GitHub Release
 
 jobs:
   build:
@@ -45,19 +48,17 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      - name: Build app + installers
-        run: npm run app:build
-
-      - name: Upload installers
-        uses: actions/upload-artifact@v4
+      - name: Build & publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # For signed silent auto-updates, add these repo secrets and they will
+          # be picked up automatically (also add the pubkey to tauri.conf.json):
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          name: vynmindmap-${{ matrix.os }}
-          path: |
-            src-tauri/target/release/bundle/**/*.dmg
-            src-tauri/target/release/bundle/**/*.msi
-            src-tauri/target/release/bundle/**/*-setup.exe
-            src-tauri/target/release/bundle/**/*.deb
-            src-tauri/target/release/bundle/**/*.AppImage
-            src-tauri/target/release/bundle/**/*.rpm
-          retention-days: 14
-          if-no-files-found: ignore
+          tagName: ${{ github.ref_name }}
+          releaseName: "VynMindMap ${{ github.ref_name }}"
+          releaseBody: "Download the installer for your operating system below."
+          releaseDraft: false
+          prerelease: false

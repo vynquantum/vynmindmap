@@ -52,6 +52,65 @@ export async function onOpenFile(cb: (path: string) => void): Promise<() => void
   return listen<string>("open-file", (e) => cb(e.payload));
 }
 
+/** Open a URL in the user's default browser (native) or a new tab (browser). */
+export async function openExternal(url: string): Promise<void> {
+  if (isTauri()) await invoke("open_external", { url });
+  else window.open(url, "_blank", "noopener");
+}
+
+// ---------------------------------------------------------------------------
+// Update check against GitHub Releases
+// ---------------------------------------------------------------------------
+
+const REPO = "vynquantum/vynmindmap";
+
+export interface UpdateInfo {
+  version: string;
+  url: string;
+}
+
+/** Compare dotted numeric versions; true if `a` is newer than `b`. */
+export function isNewer(a: string, b: string): boolean {
+  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d > 0;
+  }
+  return false;
+}
+
+async function currentVersion(): Promise<string> {
+  try {
+    const { getVersion } = await import("@tauri-apps/api/app");
+    return await getVersion();
+  } catch {
+    return "0.0.0";
+  }
+}
+
+/**
+ * Ask GitHub for the latest published release and return it if it's newer than
+ * the running app. Only meaningful in the native app; returns null on any error
+ * (offline, no releases yet, rate-limited).
+ */
+export async function checkForUpdate(): Promise<UpdateInfo | null> {
+  if (!isTauri()) return null;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { tag_name?: string; html_url?: string };
+    const latest = (data.tag_name ?? "").replace(/^v/i, "");
+    if (!latest) return null;
+    const current = await currentVersion();
+    return isNewer(latest, current) ? { version: latest, url: data.html_url ?? `https://github.com/${REPO}/releases/latest` } : null;
+  } catch {
+    return null;
+  }
+}
+
 // --- browser File System Access API (Chromium) ----------------------------
 interface SaveablePicker {
   showSaveFilePicker?: (opts: unknown) => Promise<FileSystemFileHandle>;

@@ -28,6 +28,21 @@ fn vmm_from_args() -> Option<String> {
         .find(|a| a.to_lowercase().ends_with(".vmm") && std::path::Path::new(a).is_file())
 }
 
+/// Open a URL (e.g. the GitHub release page) in the user's default browser.
+#[tauri::command]
+fn open_external(url: String) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("refused to open non-http url".into());
+    }
+    #[cfg(target_os = "windows")]
+    let res = std::process::Command::new("cmd").args(["/C", "start", "", &url]).spawn();
+    #[cfg(target_os = "macos")]
+    let res = std::process::Command::new("open").arg(&url).spawn();
+    #[cfg(target_os = "linux")]
+    let res = std::process::Command::new("xdg-open").arg(&url).spawn();
+    res.map(|_| ()).map_err(|e| e.to_string())
+}
+
 /// The `.vmm` the app was launched to open, if any. On Windows/Linux the path
 /// arrives as a launch argument; on macOS it comes via the Opened event and is
 /// stashed in `OpenedFile`.
@@ -65,7 +80,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_file_bytes,
             write_file_bytes,
-            get_opened_file
+            get_opened_file,
+            open_external
         ])
         .build(tauri::generate_context!())
         .expect("error while building VynMindMap");

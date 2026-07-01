@@ -6,6 +6,7 @@
   import {
     isTauri, basename, nativeSaveDialog, nativeOpenDialog, nativeWrite, nativeRead,
     getOpenedFile, onOpenFile, hasFilePicker, browserSavePicker, browserDownload,
+    checkForUpdate, openExternal, type UpdateInfo,
   } from "./lib/platform.js";
   import MindMapView from "./lib/MindMapView.svelte";
   import Inspector from "./lib/Inspector.svelte";
@@ -77,6 +78,7 @@
   function redo() { if (canRedo) restore(histIndex + 1); }
 
   let selectedId = $state<string | null>(null);
+  let update = $state<UpdateInfo | null>(null);
 
   const sheet = $derived<Sheet | null>(
     workbook && workbook.sheets[activeSheet] ? workbook.sheets[activeSheet]! : null,
@@ -282,6 +284,11 @@
     if (name) loadExample(name.endsWith(".vmm") ? name : `${name}.vmm`);
   });
 
+  // Check GitHub for a newer release (native app only).
+  onMount(() => {
+    checkForUpdate().then((u) => { if (u) update = u; });
+  });
+
   $effect(() => {
     function warnUnsaved(e: BeforeUnloadEvent) {
       if (dirty) { e.preventDefault(); e.returnValue = ""; }
@@ -357,6 +364,15 @@
     {#if fileName}<span class="file">{#if dirty}<span class="dot" title="Unsaved changes"></span>{/if}{fileName}</span>{/if}
   </header>
 
+  {#if update}
+    <div class="banner update">
+      <span><strong>Update available</strong> — VynMindMap v{update.version} is out.</span>
+      <span class="update-actions">
+        <button class="update-btn" onclick={() => update && openExternal(update.url)}>Download</button>
+        <button class="update-dismiss" onclick={() => (update = null)} aria-label="Dismiss">✕</button>
+      </span>
+    </div>
+  {/if}
   {#if warning}<div class="banner warn">{warning}</div>{/if}
   {#if error}<div class="banner err">⚠ {error}</div>{/if}
 
@@ -468,6 +484,16 @@
   .banner { padding: 8px 14px; font-size: 13px; }
   .banner.warn { background: #fff7e6; color: #8a5a00; border-bottom: 1px solid #f0e0b8; }
   .banner.err { background: #fdecea; color: #a02018; border-bottom: 1px solid #f3c6c0; }
+  .banner.update {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: color-mix(in srgb, var(--accent) 12%, #fff); color: var(--text);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  }
+  .update-actions { display: flex; align-items: center; gap: 6px; }
+  .update-btn { background: var(--md-primary); color: #fff; border-color: transparent; border-radius: 18px; padding: 5px 16px; font-size: 12px; }
+  .update-btn:hover:not(:disabled) { background: var(--md-primary-hover); }
+  .update-dismiss { border: none; background: transparent; color: var(--muted); padding: 4px 6px; border-radius: 6px; }
+  .update-dismiss:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
   /* Material tabs: surface bar with a primary active indicator. */
   .tabs { display: flex; align-items: stretch; gap: 2px; padding: 0 10px; background: var(--panel); box-shadow: var(--elev-1); z-index: 4; }
