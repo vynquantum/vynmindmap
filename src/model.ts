@@ -181,7 +181,8 @@ function removeChildRef(parent: Topic, id: string): void {
 /**
  * Reparent/reorder a topic. `index` inserts at that position among the new
  * parent's children (appends if omitted). Rejects moving a node into its own
- * subtree.
+ * subtree. A floating root may be moved too: it is detached from
+ * `floatingTopics` and attached under the new parent.
  */
 export function moveTopic(
   sheet: Sheet,
@@ -191,7 +192,11 @@ export function moveTopic(
 ): void {
   const node = findWithParent(sheet, id);
   if (!node) throw new ModelError(`Move failed: topic "${id}" not found.`);
-  if (!node.parent) throw new ModelError("Cannot move a root/floating-root topic.");
+  const floats = sheet.floatingTopics ?? [];
+  const floatIdx = node.parent ? -1 : floats.findIndex((t) => t.id === id);
+  if (!node.parent && floatIdx === -1) {
+    throw new ModelError("Cannot move the central root topic.");
+  }
 
   const target = findTopic(sheet, newParentId);
   if (!target) throw new ModelError(`Move failed: new parent "${newParentId}" not found.`);
@@ -199,10 +204,39 @@ export function moveTopic(
     throw new ModelError("Cannot move a topic into itself or its own descendant.");
   }
 
-  removeChildRef(node.parent, id);
+  if (node.parent) {
+    removeChildRef(node.parent, id);
+  } else {
+    floats.splice(floatIdx, 1);
+    delete node.topic.position; // attached topics are laid out automatically
+  }
   const siblings = (target.children ??= []);
   const at = index === undefined ? siblings.length : Math.max(0, Math.min(index, siblings.length));
   siblings.splice(at, 0, node.topic);
+}
+
+/**
+ * Detach a topic from its parent and make it a floating topic at the given
+ * canvas position (the inverse of attaching via `moveTopic`). Roots and
+ * already-floating topics are rejected.
+ */
+export function detachTopic(
+  sheet: Sheet,
+  id: string,
+  position: { x: number; y: number },
+): Topic {
+  const node = findWithParent(sheet, id);
+  if (!node) throw new ModelError(`Detach failed: topic "${id}" not found.`);
+  if (!node.parent) throw new ModelError("Topic is already a root/floating topic.");
+  removeChildRef(node.parent, id);
+  node.topic.position = { ...position };
+  (sheet.floatingTopics ??= []).push(node.topic);
+  // Boundaries/summaries listing this topic as a direct child are no longer
+  // valid (it left that sibling range), even though the id still resolves.
+  if (sheet.boundaries) sheet.boundaries = sheet.boundaries.filter((b) => !b.childIds.includes(id));
+  if (sheet.summaries) sheet.summaries = sheet.summaries.filter((s) => !s.childIds.includes(id));
+  pruneDanglingConnectors(sheet);
+  return node.topic;
 }
 
 function isDescendant(topic: Topic, candidateId: string): boolean {

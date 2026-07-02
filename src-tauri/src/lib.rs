@@ -17,9 +17,33 @@ fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
 }
 
 /// Write raw bytes to an absolute path (chosen via the native save dialog).
+///
+/// Atomic: writes to a sibling temp file first and renames it over the target,
+/// so a crash or full disk mid-write can never leave a corrupt half-written
+/// `.vmm` behind. `std::fs::rename` replaces an existing destination on both
+/// Unix and Windows when source and target share a filesystem — guaranteed
+/// here because the temp file sits next to the target.
 #[tauri::command]
 fn write_file_bytes(path: String, contents: Vec<u8>) -> Result<(), String> {
-    std::fs::write(&path, &contents).map_err(|e| e.to_string())
+    let tmp = format!("{path}.tmp-{}", std::process::id());
+    std::fs::write(&tmp, &contents).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp); // best-effort cleanup
+        e.to_string()
+    })
+}
+
+/// Last-modified time of a file in milliseconds since the Unix epoch. Used by
+/// the frontend to detect external edits to the open `.vmm` (e.g. by the CLI
+/// or an LLM through the MCP server).
+#[tauri::command]
+fn file_modified_ms(path: String) -> Result<u64, String> {
+    let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+    let mtime = meta.modified().map_err(|e| e.to_string())?;
+    mtime
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .map_err(|e| e.to_string())
 }
 
 fn vmm_from_args() -> Option<String> {
@@ -80,6 +104,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_file_bytes,
             write_file_bytes,
+            file_modified_ms,
             get_opened_file,
             open_external
         ])

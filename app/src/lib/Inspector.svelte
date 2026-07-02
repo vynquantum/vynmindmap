@@ -205,7 +205,7 @@
   textarea, select, input[type="url"], input:not([type]) {
     width: 100%; margin-top: 4px; padding: 7px 9px;
     border: 1px solid var(--border); border-radius: 8px; font: inherit; color: var(--text);
-    background: #fff; resize: vertical; transition: border-color 0.15s, box-shadow 0.15s;
+    background: var(--panel); resize: vertical; transition: border-color 0.15s, box-shadow 0.15s;
   }
   textarea:focus, select:focus, input:focus {
     outline: none; border-color: var(--accent);
@@ -214,7 +214,7 @@
   .row { display: flex; gap: 10px; align-items: flex-end; }
   .col { flex: 1; }
   .colorline { display: flex; align-items: center; gap: 6px; }
-  input[type="color"] { width: 100%; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+  input[type="color"] { width: 100%; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
   .link { border: none; background: none; color: var(--accent); padding: 0; font-size: 12px; }
   .fontbtns { display: flex; gap: 4px; }
   .ff { width: 30px; height: 30px; padding: 0; }
@@ -225,9 +225,9 @@
   .ff.on { background: var(--accent); color: #fff; border-color: var(--accent); }
   .markers { display: flex; flex-wrap: wrap; gap: 4px; }
   .markers button { width: 30px; height: 30px; padding: 0; font-size: 14px; }
-  .markers button.on { background: #dbeafe; border-color: var(--accent); }
+  .markers button.on { background: color-mix(in srgb, var(--accent) 20%, var(--panel)); border-color: var(--accent); }
   .emojis { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
   .emojis button { padding: 0; height: 26px; font-size: 15px; border-color: transparent; background: none; }
-  .emojis button:hover { background: #eef1f6; border-color: var(--border); }
+  .emojis button:hover { background: var(--surface-2); border-color: var(--border); }
   .hint { color: var(--muted); }
 </style>

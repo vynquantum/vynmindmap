@@ -14,6 +14,14 @@
   --muted: #5b5e6e;
   --accent: #4255c5;
 
+  /* Status banners */
+  --warn-bg: #fff7e6;
+  --warn-fg: #8a5a00;
+  --warn-border: #f0e0b8;
+  --err-bg: #fdecea;
+  --err-fg: #a02018;
+  --err-border: #f3c6c0;
+
   /* Material elevation */
   --elev-1: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.10);
   --elev-2: 0 2px 6px rgba(16, 24, 40, 0.10), 0 6px 16px rgba(16, 24, 40, 0.08);
@@ -23,6 +31,36 @@
   font-family: Roboto, "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+}
+
+/* App-wide dark theme (toolbar, panels, menus — the canvas keeps the sheet's
+   own background, which is document content, not chrome). */
+:root[data-theme="dark"] {
+  --md-primary: #303a85;
+  --md-primary-hover: #3d4aa5;
+  --md-on-primary: #eef0ff;
+  --md-secondary: #5a6acb;
+
+  --bg: #14161d;
+  --panel: #1d2029;
+  --surface-2: #262a36;
+  --border: #363b4c;
+  --text: #e6e8f0;
+  --muted: #9aa1b5;
+  --accent: #8b9cf5;
+
+  --warn-bg: #33290f;
+  --warn-fg: #e8c377;
+  --warn-border: #4d3f19;
+  --err-bg: #391b1b;
+  --err-fg: #f0a29a;
+  --err-border: #542626;
+
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.40);
+  --elev-2: 0 2px 6px rgba(0, 0, 0, 0.40), 0 6px 16px rgba(0, 0, 0, 0.35);
+  --elev-3: 0 8px 24px rgba(0, 0, 0, 0.55);
+
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }

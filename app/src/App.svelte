@@ -5,12 +5,16 @@
   import { readVmmFromFile, readVmmFromUrl } from "./lib/loadVmm.js";
   import {
     isTauri, basename, nativeSaveDialog, nativeOpenDialog, nativeWrite, nativeRead,
-    getOpenedFile, onOpenFile, hasFilePicker, hasOpenPicker, browserSavePicker,
-    browserOpenPicker, browserWriteHandle, browserDownload,
+    nativeModifiedMs, getOpenedFile, onOpenFile, hasFilePicker, hasOpenPicker,
+    browserSavePicker, browserOpenPicker, browserWriteHandle, browserDownload,
     checkForUpdate, openExternal, type UpdateInfo, type FsFileHandle,
   } from "./lib/platform.js";
+  import {
+    getRecents, addRecentPath, addRecentHandle, removeRecent, type RecentEntry,
+  } from "./lib/recents.js";
   import MindMapView from "./lib/MindMapView.svelte";
   import Inspector from "./lib/Inspector.svelte";
+  import OutlinePanel from "./lib/OutlinePanel.svelte";
   import Icon from "./lib/Icon.svelte";
   import logoUrl from "../../app-icon.png";
 
@@ -37,15 +41,24 @@
   let viewportEl = $state<HTMLDivElement | null>(null);
 
   // --- undo / redo history (snapshots of the whole workbook) ---------------
-  let history = $state<Workbook[]>([]);
+  // Snapshots are JSON strings in a plain (non-reactive) array: strings are
+  // compact, never get wrapped in reactivity proxies, and each entry GCs as
+  // one unit — much lighter than 100 live deep-cloned object graphs.
+  let history: string[] = [];
   let histIndex = $state(-1);
+  let histLen = $state(0);
   let lastPush = 0;
   const canUndo = $derived(histIndex > 0);
-  const canRedo = $derived(histIndex >= 0 && histIndex < history.length - 1);
+  const canRedo = $derived(histIndex >= 0 && histIndex < histLen - 1);
+
+  function snapshotStr(): string {
+    return JSON.stringify($state.snapshot(workbook));
+  }
 
   function resetHistory() {
-    history = workbook ? [structuredClone($state.snapshot(workbook) as Workbook)] : [];
+    history = workbook ? [snapshotStr()] : [];
     histIndex = workbook ? 0 : -1;
+    histLen = history.length;
     lastPush = 0;
   }
 
@@ -57,7 +70,7 @@
   function markDirty() {
     dirty = true;
     if (!workbook) return;
-    const snap = structuredClone($state.snapshot(workbook) as Workbook);
+    const snap = snapshotStr();
     const now = Date.now();
     // Coalesce a burst of rapid edits into one step — but only at the head of
     // the history (never clobber redo states) and never over the baseline
@@ -70,20 +83,119 @@
       if (history.length > 100) history.shift();
       histIndex = history.length - 1;
     }
+    histLen = history.length;
     lastPush = now;
+    scheduleAutosave();
   }
 
   function restore(index: number) {
     const snap = history[index];
     if (!snap) return;
-    workbook = structuredClone($state.snapshot(snap) as Workbook);
+    workbook = JSON.parse(snap) as Workbook;
     histIndex = index;
     activeSheet = Math.min(activeSheet, workbook.sheets.length - 1);
     selectedId = null;
     dirty = true;
+    scheduleAutosave();
   }
   function undo() { if (canUndo) restore(histIndex - 1); }
   function redo() { if (canRedo) restore(histIndex + 1); }
+
+  // --- preferences (persisted) ----------------------------------------------
+  let theme = $state(localStorage.getItem("vynmm.theme") === "dark" ? "dark" : "light");
+  $effect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("vynmm.theme", theme);
+  });
+
+  let showOutline = $state(localStorage.getItem("vynmm.outline") === "1");
+  $effect(() => { localStorage.setItem("vynmm.outline", showOutline ? "1" : "0"); });
+
+  // --- autosave ---------------------------------------------------------------
+  let autosave = $state(localStorage.getItem("vynmm.autosave") === "1");
+  $effect(() => { localStorage.setItem("vynmm.autosave", autosave ? "1" : "0"); });
+  let autosaveTimer: ReturnType<typeof setTimeout> | undefined;
+  function scheduleAutosave() {
+    if (!autosave) return;
+    if (!currentPath && !fileHandle) return; // nowhere to save silently yet
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => { if (dirty && workbook) save(); }, 1200);
+  }
+
+  // --- external-change watch (Tauri) -----------------------------------------
+  // The CLI and MCP server edit .vmm files directly; poll the open file's
+  // mtime so those edits show up instead of being silently overwritten.
+  let extChange = $state(false);
+  let watchTimer: ReturnType<typeof setInterval> | undefined;
+  let watchedPath: string | null = null;
+  let lastMtime: number | null = null;
+
+  function stopWatch() {
+    if (watchTimer) clearInterval(watchTimer);
+    watchTimer = undefined;
+    watchedPath = null;
+    lastMtime = null;
+    extChange = false;
+  }
+
+  function startWatch() {
+    if (!isTauri() || !currentPath) { stopWatch(); return; }
+    if (watchedPath === currentPath) return; // already watching this file
+    stopWatch();
+    const path = currentPath;
+    watchedPath = path;
+    nativeModifiedMs(path).then((m) => { if (watchedPath === path) lastMtime = m; });
+    watchTimer = setInterval(async () => {
+      if (watchedPath !== path) return;
+      const m = await nativeModifiedMs(path);
+      if (m === null || lastMtime === null || m <= lastMtime) return;
+      lastMtime = m;
+      if (dirty) { extChange = true; return; } // don't clobber unsaved edits
+      await openNativePath(path); // clean → just pick up the external changes
+    }, 2000);
+  }
+
+  // --- recent files -----------------------------------------------------------
+  let recents = $state<RecentEntry[]>([]);
+  async function refreshRecents() { recents = await getRecents(); }
+
+  function relTime(when: number): string {
+    const s = Math.max(0, (Date.now() - when) / 1000);
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+    return `${Math.floor(s / 86400)} d ago`;
+  }
+
+  async function openRecent(r: RecentEntry) {
+    error = "";
+    try {
+      if (r.kind === "path" && r.path) {
+        const bytes = await nativeRead(r.path);
+        await load(async () => readVmm(bytes), basename(r.path!), r.path);
+      } else if (r.kind === "handle" && r.handle) {
+        const h = r.handle;
+        // Ask for readwrite up front (we're inside the click gesture) so later
+        // saves are silent; settle for read-only if the user declines.
+        if (h.requestPermission && (await h.requestPermission({ mode: "readwrite" })) !== "granted") {
+          if ((await h.requestPermission({ mode: "read" })) !== "granted") {
+            throw new Error("permission denied");
+          }
+        }
+        const file = await h.getFile();
+        await load(() => readVmmFromFile(file), file.name, null, h);
+      }
+    } catch (e) {
+      error = `Open failed: ${(e as Error).message}`;
+      await removeRecent(r);
+      refreshRecents();
+    }
+  }
+
+  async function dropRecent(r: RecentEntry) {
+    await removeRecent(r);
+    refreshRecents();
+  }
 
   let selectedId = $state<string | null>(null);
   let update = $state<UpdateInfo | null>(null);
@@ -118,10 +230,19 @@
       activeSheet = 0;
       selectedId = null;
       dirty = false;
+      extChange = false;
       resetHistory();
       if (res.newerMinor) warning = "Opened a file from a newer minor format version (loaded leniently).";
       if (res.migrated) warning = "File was migrated from an older format version.";
       queueFit();
+      // Remember where this map lives (recents + external-change watch).
+      if (path) {
+        addRecentPath(path, name).then(refreshRecents);
+        startWatch();
+      } else {
+        stopWatch();
+        if (handle) addRecentHandle(handle, name).then(refreshRecents);
+      }
     } catch (err) {
       workbook = null;
       error = (err as Error).message;
@@ -138,6 +259,7 @@
     activeSheet = 0;
     selectedId = null;
     dirty = false;
+    stopWatch();
     resetHistory();
     queueFit();
   }
@@ -158,6 +280,9 @@
     dirty = false;
     history = [];
     histIndex = -1;
+    histLen = 0;
+    clearTimeout(autosaveTimer);
+    stopWatch();
   }
 
   // Read and load a .vmm at a native path (open dialog, launch arg, or file event).
@@ -225,8 +350,14 @@
   async function save(forceDialog = false) {
     if (!workbook) return;
     error = "";
+    // Best-effort sheet preview for file managers / recents (never blocks).
+    const thumbnail = (await view?.thumbnail()) ?? undefined;
     // $state.snapshot unwraps Svelte's reactive proxy to a plain object.
-    const bytes = writeVmm($state.snapshot(workbook) as Workbook, $state.snapshot(resources) as Record<string, Uint8Array>);
+    const bytes = writeVmm(
+      $state.snapshot(workbook) as Workbook,
+      $state.snapshot(resources) as Record<string, Uint8Array>,
+      { thumbnail },
+    );
     const name = defaultSaveName();
 
     if (isTauri()) {
@@ -244,6 +375,10 @@
       currentPath = path;
       fileName = basename(path);
       dirty = false;
+      // Our own write bumped the mtime — sync the watcher so it doesn't fire.
+      lastMtime = (await nativeModifiedMs(path)) ?? lastMtime;
+      startWatch();
+      addRecentPath(path, fileName).then(refreshRecents);
     } else if (hasFilePicker()) {
       let handle = forceDialog ? null : fileHandle;
       const remembered = handle !== null;
@@ -267,6 +402,7 @@
       fileHandle = handle;
       fileName = handle.name; // the name the user actually chose in the dialog
       dirty = false;
+      addRecentHandle(handle, handle.name).then(refreshRecents);
     } else {
       browserDownload(name, bytes);
       dirty = false;
@@ -302,6 +438,7 @@
       activeSheet = 0;
       selectedId = null;
       dirty = true;
+      stopWatch();
       resetHistory();
       queueFit();
     } catch (err) {
@@ -342,6 +479,7 @@
   // Check GitHub for a newer release (native app only).
   onMount(() => {
     checkForUpdate().then((u) => { if (u) update = u; });
+    refreshRecents();
   });
 
   $effect(() => {
@@ -415,6 +553,18 @@
       </div>
     </div>
 
+    <div class="divider"></div>
+    <div class="group">
+      <button class="ic" class:on={showOutline} onclick={() => (showOutline = !showOutline)} disabled={!workbook}
+        title="Toggle outline panel" aria-label="Outline" aria-pressed={showOutline}><Icon name="list" /></button>
+      <button class="ic" class:on={autosave} onclick={() => { autosave = !autosave; if (autosave && dirty) scheduleAutosave(); }}
+        title={autosave ? "Autosave is on (saves shortly after each change once a file is set)" : "Autosave is off"}
+        aria-label="Autosave" aria-pressed={autosave}><Icon name="autosave" /></button>
+      <button class="ic" onclick={() => (theme = theme === "dark" ? "light" : "dark")}
+        title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+        aria-label="Theme"><Icon name={theme === "dark" ? "sun" : "moon"} /></button>
+    </div>
+
     <input bind:this={fileInput} type="file" accept=".vmm" onchange={onPick} hidden />
     <input bind:this={mdInput} type="file" accept=".md,.markdown,text/markdown" onchange={onPickMarkdown} hidden />
 
@@ -432,6 +582,15 @@
   {/if}
   {#if warning}<div class="banner warn">{warning}</div>{/if}
   {#if error}<div class="banner err">⚠ {error}</div>{/if}
+  {#if extChange}
+    <div class="banner warn extchange">
+      <span><strong>File changed on disk</strong> — this map was edited outside the app.</span>
+      <span class="update-actions">
+        <button class="update-btn" onclick={() => { if (currentPath) openNativePath(currentPath); }}>Reload from disk</button>
+        <button class="update-dismiss" onclick={() => (extChange = false)}>Keep my version</button>
+      </span>
+    </div>
+  {/if}
 
   {#if workbook}
     <nav class="tabs">
@@ -458,6 +617,9 @@
       <button class="tab-add" title="Add sheet" onclick={addNewSheet}>+</button>
     </nav>
     <div class="workspace">
+      {#if showOutline && sheet}
+        <OutlinePanel {sheet} bind:selectedId {markDirty} reveal={(id) => view?.centerOn(id)} />
+      {/if}
       <div class="viewport" bind:this={viewportEl}>
         {#if sheet}
           <MindMapView bind:this={view} {sheet} {resources} {markDirty} bind:selectedId />
@@ -478,6 +640,27 @@
           <button class="outlined" onclick={openFile}><Icon name="folder-open" size={18} /> Open file…</button>
         </div>
       </div>
+      {#if recents.length}
+        <div class="samples">
+          <div class="samples-label">Recent files</div>
+          <div class="recent-list">
+            {#each recents as r (r.kind + (r.path ?? r.name) + r.when)}
+              <div class="recent">
+                <button class="recent-main" onclick={() => openRecent(r)} title={r.path ?? r.name}>
+                  <span class="recent-icon"><Icon name="clock" size={17} /></span>
+                  <span class="recent-text">
+                    <strong>{r.name}</strong>
+                    <small>{r.kind === "path" ? r.path : "browser file"} · {relTime(r.when)}</small>
+                  </span>
+                </button>
+                <button class="recent-x" title="Remove from recent files" aria-label="Remove"
+                  onclick={() => dropRecent(r)}>×</button>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+
       <div class="samples">
         <div class="samples-label">Sample maps</div>
         <div class="sample-grid">
@@ -519,6 +702,7 @@
     background: transparent; color: rgba(255, 255, 255, 0.92);
   }
   header button.chev { width: auto; padding: 0 7px; }
+  header button.on { background: rgba(255, 255, 255, 0.26); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
   header button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
   header button:active:not(:disabled) { background: rgba(255, 255, 255, 0.30); }
   header button:disabled { color: rgba(255, 255, 255, 0.4); opacity: 1; }
@@ -539,11 +723,12 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; background: #ffd166; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25); }
 
   .banner { padding: 8px 14px; font-size: 13px; }
-  .banner.warn { background: #fff7e6; color: #8a5a00; border-bottom: 1px solid #f0e0b8; }
-  .banner.err { background: #fdecea; color: #a02018; border-bottom: 1px solid #f3c6c0; }
+  .banner.warn { background: var(--warn-bg); color: var(--warn-fg); border-bottom: 1px solid var(--warn-border); }
+  .banner.err { background: var(--err-bg); color: var(--err-fg); border-bottom: 1px solid var(--err-border); }
+  .banner.extchange { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .banner.update {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    background: color-mix(in srgb, var(--accent) 12%, #fff); color: var(--text);
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel)); color: var(--text);
     border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
   }
   .update-actions { display: flex; align-items: center; gap: 6px; }
@@ -604,4 +789,31 @@
   .sample-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .sample-text strong { font-size: 14px; }
   .sample-text small { color: var(--muted); font-size: 12px; }
+
+  /* Recent files on the welcome screen */
+  .recent-list { display: flex; flex-direction: column; gap: 8px; }
+  .recent {
+    display: flex; align-items: stretch; gap: 0;
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--panel); box-shadow: var(--elev-1); overflow: hidden;
+    transition: box-shadow 0.15s, border-color 0.15s;
+  }
+  .recent:hover { box-shadow: var(--elev-2); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+  .recent-main {
+    flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0;
+    border: none; border-radius: 0; background: transparent; color: var(--text);
+    padding: 10px 12px; text-align: left;
+  }
+  .recent-icon {
+    width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+    color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); flex: none;
+  }
+  .recent-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .recent-text strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recent-text small { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recent-x {
+    border: none; border-radius: 0; background: transparent; color: var(--muted);
+    padding: 0 14px; font-size: 16px; line-height: 1;
+  }
+  .recent-x:hover:not(:disabled) { color: #c0392b; background: color-mix(in srgb, #c0392b 8%, transparent); }
 </style>

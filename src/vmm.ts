@@ -30,6 +30,7 @@ import { findDuplicateIds } from "./model.js";
 const MANIFEST_PATH = "manifest.json";
 const CONTENT_PATH = "content.json";
 const RESOURCE_PREFIX = "resources/";
+export const THUMBNAIL_PATH = "thumbnails/thumbnail.png";
 
 export class VmmFormatError extends Error {
   constructor(message: string) {
@@ -148,6 +149,11 @@ export interface WriteOptions {
   created?: string;
   /** Pretty-print JSON (default true; the format is meant to be human-diffable). */
   pretty?: boolean;
+  /**
+   * PNG preview written to thumbnails/thumbnail.png (DESIGN.md §4.1), used by
+   * file managers and recent-file lists. Omitted = no thumbnail entry.
+   */
+  thumbnail?: Uint8Array;
 }
 
 /** Serialize a workbook (+ resources) into `.vmm` bytes. */
@@ -184,6 +190,7 @@ export function writeVmm(
     const normalized = path.startsWith(RESOURCE_PREFIX) ? path : RESOURCE_PREFIX + path;
     files[normalized] = data;
   }
+  if (options.thumbnail) files[THUMBNAIL_PATH] = options.thumbnail;
 
   return zipSync(files, { level: 6 });
 }

@@ -35,6 +35,24 @@ See [DESIGN.md](DESIGN.md) for the full design.
 - **Context menu**: right-click a topic (add child/sibling, rename, relate,
   copy/cut/paste, duplicate, collapse, delete) or empty canvas (new floating
   topic, paste here, fit view).
+- **Outline panel** (toolbar toggle): a synced tree sidebar — click to select
+  and center, chevrons collapse/expand, double-click renames inline.
+- **Detach / reattach**: drag a topic onto empty canvas to detach its subtree
+  into a floating topic; drag a floating topic onto a node to attach it back.
+- **Relationship editing**: double-click a relationship to edit its label;
+  select it and drag the blue handle to reshape the curve (persisted in the
+  file's `controlPoints`).
+- **Autosave** (toolbar toggle): once the map has a file, changes save
+  automatically ~1 s after you stop editing.
+- **Recent files** on the welcome screen — native paths in the Tauri app,
+  writable file handles (IndexedDB) in the browser.
+- **Dark mode** (toolbar toggle) for the whole app chrome; the canvas keeps
+  the sheet's own theme.
+- **Safety**: native saves are atomic (temp file + rename — a crash can't
+  corrupt the map); the Tauri app watches the open file and reloads it (or
+  warns, if you have unsaved edits) when the CLI / an LLM edits it on disk.
+- **Thumbnails**: every save embeds a PNG preview at
+  `thumbnails/thumbnail.png` inside the `.vmm`.
 - **Inspector** (right panel): edit text, shape, fill/border/text color, full
   **fonts** (family, size, **bold / italic / underline / strikethrough**),
   markers, an **emoji picker**, note, link, labels, the sheet's **structure**,

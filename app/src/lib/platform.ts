@@ -41,6 +41,19 @@ export async function nativeRead(path: string): Promise<Uint8Array> {
   return new Uint8Array(arr);
 }
 
+/**
+ * Last-modified time (ms since epoch) of a file, for external-change detection.
+ * Returns null when the command isn't available (older shell build) or the
+ * file is gone — callers should treat null as "cannot watch".
+ */
+export async function nativeModifiedMs(path: string): Promise<number | null> {
+  try {
+    return await invoke<number>("file_modified_ms", { path });
+  } catch {
+    return null;
+  }
+}
+
 /** Path of a `.vmm` the app was launched with (file association), or null. */
 export async function getOpenedFile(): Promise<string | null> {
   return (await invoke<string | null>("get_opened_file")) ?? null;

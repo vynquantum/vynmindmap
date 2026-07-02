@@ -10,6 +10,7 @@ import {
   addSummary,
   createWorkbook,
   deleteTopic,
+  detachTopic,
   findDuplicateIds,
   findTopic,
   ModelError,
@@ -185,5 +186,53 @@ describe("cloneTopicWithNewIds", () => {
     const before = a.id;
     cloneTopicWithNewIds(a);
     expect(a.id).toBe(before);
+  });
+});
+
+describe("detach & reattach", () => {
+  it("detaches a topic into a floating topic at a position", () => {
+    const { sheet } = fixture();
+    const a = sheet.rootTopic.children![0]!;
+    const detached = detachTopic(sheet, a.id, { x: 100, y: 50 });
+    expect(sheet.rootTopic.children!.map((c) => c.title)).toEqual(["B"]);
+    expect(sheet.floatingTopics?.map((t) => t.id)).toContain(a.id);
+    expect(detached.position).toEqual({ x: 100, y: 50 });
+    // Subtree comes along.
+    expect(detached.children!.map((c) => c.title)).toEqual(["A1", "A2"]);
+  });
+
+  it("refuses to detach the central root or a floating topic", () => {
+    const { sheet } = fixture();
+    expect(() => detachTopic(sheet, sheet.rootTopic.id, { x: 0, y: 0 })).toThrow(ModelError);
+    const a = sheet.rootTopic.children![0]!;
+    detachTopic(sheet, a.id, { x: 0, y: 0 });
+    expect(() => detachTopic(sheet, a.id, { x: 0, y: 0 })).toThrow(ModelError);
+  });
+
+  it("drops boundaries/summaries that referenced the detached topic", () => {
+    const { sheet } = fixture();
+    const a = sheet.rootTopic.children![0]!;
+    addBoundary(sheet, sheet.rootTopic.id, [a.id]);
+    addSummary(sheet, sheet.rootTopic.id, [a.id], "sum");
+    detachTopic(sheet, a.id, { x: 0, y: 0 });
+    expect(sheet.boundaries).toHaveLength(0);
+    expect(sheet.summaries).toHaveLength(0);
+  });
+
+  it("moveTopic reattaches a floating topic under a parent", () => {
+    const { sheet } = fixture();
+    const a = sheet.rootTopic.children![0]!;
+    detachTopic(sheet, a.id, { x: 100, y: 50 });
+    const b = sheet.rootTopic.children![0]!; // B is now the only child
+    moveTopic(sheet, a.id, b.id);
+    expect(sheet.floatingTopics ?? []).toHaveLength(0);
+    expect(b.children!.map((c) => c.id)).toContain(a.id);
+    expect(a.position).toBeUndefined(); // auto-layout again
+  });
+
+  it("still refuses to move the central root", () => {
+    const { sheet } = fixture();
+    const b = sheet.rootTopic.children![1]!;
+    expect(() => moveTopic(sheet, sheet.rootTopic.id, b.id)).toThrow(/central root/);
   });
 });

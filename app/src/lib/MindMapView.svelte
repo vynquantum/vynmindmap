@@ -9,8 +9,9 @@
   import type { Sheet, Topic } from "../../../src/index.js";
   import {
     addChild, addSibling, addBoundary, addFloatingTopic, addRelationship, addSummary,
-    cloneTopicWithNewIds, deleteTopic, editText, findTopic, findWithParent, moveTopic,
-    toggleCollapse, removeBoundary, removeRelationship, removeSummary, walkSheetTopics,
+    cloneTopicWithNewIds, deleteTopic, detachTopic, editText, findTopic, findWithParent,
+    moveTopic, toggleCollapse, removeBoundary, removeRelationship, removeSummary,
+    walkSheetTopics,
   } from "../../../src/index.js";
   import { layoutSheet, edgePath, summaryPath, type Layout, type LaidOutNode } from "./layout.js";
 
@@ -58,6 +59,13 @@
   let searchQ = $state("");
   let searchIdx = $state(0);
   let searchInput = $state<HTMLInputElement | null>(null);
+
+  // Relationship editing (inline label rename + curve control-point drag).
+  let editingRelId = $state<string | null>(null);
+  let relEditValue = $state("");
+  let relEditInput = $state<HTMLInputElement | null>(null);
+  let relDragId: string | null = null;
+  let relDragged = false;
 
   // Drag-to-reparent state.
   let dragId = $state<string | null>(null);
@@ -177,6 +185,18 @@
   }
 
   function onContainerPointerMove(e: PointerEvent) {
+    if (relDragId) {
+      // Reshape the relationship curve: store the control point in layout
+      // coordinates minus the normalization shift (same space as floating
+      // topic positions), so it survives re-layouts.
+      const p = canvasPoint(e, e.currentTarget as HTMLElement);
+      const rel = (sheet.relationships ?? []).find((r) => r.id === relDragId);
+      if (rel) {
+        rel.controlPoints = [{ x: p.x - layout.shiftX, y: p.y - layout.shiftY }];
+        relDragged = true;
+      }
+      return;
+    }
     if (pressed) {
       // Promote a press into a drag once the pointer moves enough.
       const moved = Math.hypot(e.clientX - pressed.sx, e.clientY - pressed.sy);
@@ -203,6 +223,11 @@
   }
 
   function onContainerPointerUp() {
+    if (relDragId) {
+      if (relDragged) notify();
+      relDragId = null; relDragged = false;
+      return;
+    }
     if (dragId) {
       if (!dragOverId && isFloatingRoot(dragId)) {
         // Reposition a floating topic to where it was dropped.
@@ -214,6 +239,27 @@
             y: lastPoint.y - layout.shiftY - node.h / 2,
           };
           notify();
+        }
+        dragId = null; dragOverId = null; pressed = null; panning = false;
+        return;
+      }
+      if (!dragOverId) {
+        // Dropped on empty canvas: detach the subtree into a floating topic —
+        // but only for a real fling, not a tiny slip near where it started.
+        const node = nodeById.get(dragId);
+        const hasParent = !!findWithParent(sheet, dragId)?.parent;
+        const farEnough = node
+          ? lastPoint.x < node.x - 24 || lastPoint.x > node.x + node.w + 24 ||
+            lastPoint.y < node.y - 24 || lastPoint.y > node.y + node.h + 24
+          : false;
+        if (hasParent && farEnough && node) {
+          try {
+            detachTopic(sheet, dragId, {
+              x: lastPoint.x - layout.shiftX - node.w / 2,
+              y: lastPoint.y - layout.shiftY - node.h / 2,
+            });
+            notify();
+          } catch { /* central root — ignore */ }
         }
         dragId = null; dragOverId = null; pressed = null; panning = false;
         return;
@@ -685,6 +731,29 @@
     r.canvas.toBlob((blob) => { if (blob) download(blob, `${sheet.title || "mindmap"}.png`); }, "image/png");
   }
 
+  /**
+   * Small PNG preview of the sheet for the .vmm's thumbnails/ entry
+   * (DESIGN.md §4.1). Returns null when rendering fails — thumbnails are
+   * best-effort and must never block a save.
+   */
+  export async function thumbnail(maxW = 320): Promise<Uint8Array | null> {
+    try {
+      const r = await renderCanvas();
+      if (!r) return null;
+      const s = Math.min(1, maxW / r.canvas.width);
+      const tw = Math.max(1, Math.round(r.canvas.width * s));
+      const th = Math.max(1, Math.round(r.canvas.height * s));
+      const small = document.createElement("canvas");
+      small.width = tw; small.height = th;
+      small.getContext("2d")!.drawImage(r.canvas, 0, 0, tw, th);
+      const blob = await new Promise<Blob | null>((res) => small.toBlob(res, "image/png"));
+      if (!blob) return null;
+      return new Uint8Array(await blob.arrayBuffer());
+    } catch {
+      return null;
+    }
+  }
+
   /** Export the current sheet as a single-page PDF (embedded JPEG). */
   export async function exportPdf() {
     const r = await renderCanvas();
@@ -806,6 +875,8 @@
   }
 
   // Relationship cross-links (curved, bowed connectors between any two topics).
+  // A user-dragged control point (rel.controlPoints[0], stored shift-free)
+  // overrides the default perpendicular bow.
   const relationships = $derived.by(() => {
     const out: { id: string; d: string; lx: number; ly: number; title?: string }[] = [];
     for (const rel of sheet.relationships ?? []) {
@@ -814,14 +885,54 @@
       if (!a || !b) continue;
       const ax = a.x + a.w / 2, ay = a.y + a.h / 2;
       const bx = b.x + b.w / 2, by = b.y + b.h / 2;
-      const mx = (ax + bx) / 2, my = (ay + by) / 2;
-      const dx = bx - ax, dy = by - ay;
-      const len = Math.hypot(dx, dy) || 1;
-      const off = 44;
-      const cx = mx + (-dy / len) * off, cy = my + (dx / len) * off;
+      let cx: number, cy: number;
+      const cp = rel.controlPoints?.[0];
+      if (cp) {
+        cx = cp.x + layout.shiftX;
+        cy = cp.y + layout.shiftY;
+      } else {
+        const mx = (ax + bx) / 2, my = (ay + by) / 2;
+        const dx = bx - ax, dy = by - ay;
+        const len = Math.hypot(dx, dy) || 1;
+        const off = 44;
+        cx = mx + (-dy / len) * off;
+        cy = my + (dx / len) * off;
+      }
       out.push({ id: rel.id, d: `M ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`, lx: cx, ly: cy, title: rel.title });
     }
     return out;
+  });
+
+  // --- relationship label editing -------------------------------------------
+  function beginRelEdit(id: string) {
+    const rel = (sheet.relationships ?? []).find((r) => r.id === id);
+    if (!rel) return;
+    relEditValue = rel.title ?? "";
+    editingRelId = id;
+    requestAnimationFrame(() => { relEditInput?.focus(); relEditInput?.select(); });
+  }
+  function commitRelEdit() {
+    if (editingRelId) {
+      const rel = (sheet.relationships ?? []).find((r) => r.id === editingRelId);
+      const v = relEditValue.trim();
+      if (rel && (rel.title ?? "") !== v) {
+        rel.title = v || undefined;
+        notify();
+      }
+    }
+    editingRelId = null;
+  }
+  function onRelEditKey(e: KeyboardEvent) {
+    if (e.key === "Enter") { e.preventDefault(); commitRelEdit(); }
+    else if (e.key === "Escape") { e.preventDefault(); editingRelId = null; }
+  }
+
+  // Screen-space geometry for the relationship label editor.
+  const relEditBox = $derived.by(() => {
+    if (!editingRelId) return null;
+    const r = relationships.find((x) => x.id === editingRelId);
+    if (!r) return null;
+    return { left: r.lx * scale + tx - 70, top: r.ly * scale + ty - 14 };
   });
 
   // Geometry for the inline edit overlay (screen coordinates).
@@ -894,14 +1005,22 @@
       {#each relationships as r (r.id)}
         <path d={r.d} fill="none" stroke="transparent" stroke-width="12"
           style="cursor:pointer" role="button" tabindex={-1}
-          onpointerdown={(e) => { e.stopPropagation(); selectDeco("rel", r.id); }} />
+          onpointerdown={(e) => { e.stopPropagation(); selectDeco("rel", r.id); }}
+          ondblclick={(e) => { e.stopPropagation(); beginRelEdit(r.id); }} />
         <path d={r.d} fill="none"
           stroke={selectedDeco?.id === r.id ? "#1d4ed8" : "#94a3b8"}
           stroke-width={selectedDeco?.id === r.id ? 3 : 2}
           stroke-dasharray="6 4" marker-end="url(#rel-arrow)" pointer-events="none" />
-        {#if r.title}
+        {#if r.title && r.id !== editingRelId}
           <text x={r.lx} y={r.ly} font-size="11" text-anchor="middle"
             dominant-baseline="central" fill="#64748b" pointer-events="none">{r.title}</text>
+        {/if}
+        {#if selectedDeco?.type === "rel" && selectedDeco.id === r.id}
+          <!-- Drag this handle to reshape the curve. -->
+          <circle cx={r.lx} cy={r.ly} r={7 / scale} fill="#1d4ed8" fill-opacity="0.25"
+            stroke="#1d4ed8" stroke-width={1.5 / scale} style="cursor:move"
+            role="button" tabindex={-1} aria-label="Reshape relationship"
+            onpointerdown={(e) => { e.stopPropagation(); relDragId = r.id; relDragged = false; }} />
         {/if}
       {/each}
 
@@ -1007,6 +1126,19 @@
     </g>
   </svg>
 
+  {#if relEditBox}
+    <input
+      class="rel-edit"
+      bind:this={relEditInput}
+      bind:value={relEditValue}
+      placeholder="Label…"
+      style={`left:${relEditBox.left}px; top:${relEditBox.top}px;`}
+      onkeydown={onRelEditKey}
+      onblur={commitRelEdit}
+      onpointerdown={(e) => e.stopPropagation()}
+    />
+  {/if}
+
   {#if editBox}
     <textarea
       class="edit"
@@ -1082,6 +1214,9 @@
   {:else if selectedDeco}
     <div class="actionbar" role="toolbar" tabindex={-1} onpointerdown={(e) => e.stopPropagation()}>
       <span>{selectedDeco.type} selected</span>
+      {#if selectedDeco.type === "rel"}
+        <button onclick={() => beginRelEdit(selectedDeco!.id)}>Edit label</button>
+      {/if}
       <button onclick={deleteSelected}>Delete</button>
     </div>
   {/if}
@@ -1097,7 +1232,7 @@
     <svg class="minimap" width={mini.w} height={mini.h} viewBox={`0 0 ${mini.w} ${mini.h}`}
       role="application" onpointerdown={onMinimapDown} onpointermove={onMinimapMove}
       onpointerup={onMinimapUp} onpointercancel={onMinimapUp}>
-      <rect x="0" y="0" width={mini.w} height={mini.h} fill="#ffffff" />
+      <rect x="0" y="0" width={mini.w} height={mini.h} fill="var(--panel)" />
       {#each layout.nodes as n (n.id)}
         <rect x={n.x * mini.s} y={n.y * mini.s} width={Math.max(1, n.w * mini.s)}
           height={Math.max(1, n.h * mini.s)} fill={n.color} rx="1" />
@@ -1140,12 +1275,26 @@
     padding: 4px 8px;
     text-align: center;
     outline: none;
-    background: #fff;
-    color: #1c2230;
+    background: var(--panel);
+    color: var(--text);
     font-family: inherit;
     line-height: 1.35;
     resize: none;
     overflow: hidden;
+  }
+  .rel-edit {
+    position: absolute;
+    width: 140px;
+    box-sizing: border-box;
+    border: 2px solid #1d4ed8;
+    border-radius: 8px;
+    padding: 3px 8px;
+    text-align: center;
+    outline: none;
+    background: var(--panel);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
   }
   .hint {
     position: absolute;
@@ -1158,8 +1307,8 @@
     position: absolute;
     left: 50%; top: 12px; transform: translateX(-50%);
     display: flex; align-items: center; gap: 8px;
-    background: #fff; border: 1px solid var(--border); border-radius: 10px;
-    padding: 6px 10px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 6px 10px; font-size: 13px; box-shadow: var(--elev-2);
   }
   .actionbar span { color: var(--muted); }
   .actionbar button { padding: 4px 10px; font-size: 12px; }
@@ -1167,20 +1316,20 @@
   .zoombar {
     position: absolute; left: 10px; bottom: 10px;
     display: flex; align-items: center; gap: 2px;
-    background: #fff; border: 1px solid var(--border); border-radius: 10px;
-    padding: 3px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 3px; box-shadow: var(--elev-1);
   }
   .zoombar button {
     width: 30px; height: 28px; padding: 0; border: none; border-radius: 7px;
     background: transparent; color: var(--text); font-size: 15px; line-height: 1;
   }
   .zoombar button.pct { width: 48px; font-size: 12px; font-weight: 600; color: var(--muted); }
-  .zoombar button:hover:not(:disabled) { background: #eef1f6; }
+  .zoombar button:hover:not(:disabled) { background: var(--surface-2); }
   .searchbar {
     position: absolute; right: 10px; top: 10px;
     display: flex; align-items: center; gap: 4px;
-    background: #fff; border: 1px solid var(--border); border-radius: 10px;
-    padding: 5px 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10);
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 5px 6px; box-shadow: var(--elev-2);
   }
   .searchbar input {
     width: 180px; border: none; outline: none; font: inherit; font-size: 13px;
@@ -1191,11 +1340,11 @@
     width: 26px; height: 26px; padding: 0; border: none; border-radius: 6px;
     background: transparent; color: var(--muted); font-size: 13px;
   }
-  .searchbar button:hover:not(:disabled) { background: #eef1f6; color: var(--text); }
+  .searchbar button:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
   .ctxmenu {
     position: absolute; z-index: 30; min-width: 200px;
-    background: #fff; border: 1px solid var(--border); border-radius: 10px;
-    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.16); padding: 5px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: var(--elev-3); padding: 5px;
   }
   .ctxmenu button {
     display: flex; align-items: center; justify-content: space-between; gap: 14px;
@@ -1208,12 +1357,12 @@
   .ctxmenu button.danger:hover:not(:disabled) { background: #fdecea; }
   .ctxmenu kbd {
     font-family: inherit; font-size: 11px; color: var(--muted);
-    background: #f1f3f8; border: 1px solid var(--border); border-radius: 4px; padding: 0 5px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px;
   }
   .ctxmenu hr { border: none; border-top: 1px solid var(--border); margin: 4px 6px; }
   .minimap {
     position: absolute; right: 10px; bottom: 10px;
     border: 1px solid var(--border); border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); background: #fff; cursor: pointer;
+    box-shadow: var(--elev-1); background: var(--panel); cursor: pointer;
   }
 </style>
