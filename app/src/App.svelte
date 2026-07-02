@@ -33,6 +33,11 @@
   // writes back silently; only "Save As" re-prompts. Not reactive — no UI
   // reads it directly.
   let fileHandle: FsFileHandle | null = null;
+  // Set when the browser refuses to write even a freshly picked file (the
+  // site's "edit files" permission is blocked). While set, plain Save skips
+  // the picker (which would create junk empty files) and downloads instead;
+  // Save As still tries the picker so the user can test after unblocking.
+  let directWriteBlocked = false;
   let activeSheet = $state(0);
   let dirty = $state(false);
   let error = $state<string>("");
@@ -342,30 +347,37 @@
     return fileName && fileName.endsWith(".vmm") ? fileName : "Untitled.vmm";
   }
 
+  /** Serialize the workbook (+ a best-effort thumbnail) to .vmm bytes. */
+  async function buildVmmBytes(): Promise<Uint8Array> {
+    const thumbnail = (await view?.thumbnail()) ?? undefined;
+    // $state.snapshot unwraps Svelte's reactive proxy to a plain object.
+    return writeVmm(
+      $state.snapshot(workbook!) as Workbook,
+      $state.snapshot(resources) as Record<string, Uint8Array>,
+      { thumbnail },
+    );
+  }
+
   /**
    * Save the workbook. If it has no known path yet (new map, or one opened from
    * an example / Markdown), prompt for a location and name first. `forceDialog`
    * is the "Save As" behaviour.
+   *
+   * Ordering matters in the browser: pickers must run first, while the click's
+   * transient user activation is still live — serializing the map (thumbnail
+   * rendering can take a moment on big sheets) happens after the dialog.
    */
   async function save(forceDialog = false) {
     if (!workbook) return;
     error = "";
-    // Best-effort sheet preview for file managers / recents (never blocks).
-    const thumbnail = (await view?.thumbnail()) ?? undefined;
-    // $state.snapshot unwraps Svelte's reactive proxy to a plain object.
-    const bytes = writeVmm(
-      $state.snapshot(workbook) as Workbook,
-      $state.snapshot(resources) as Record<string, Uint8Array>,
-      { thumbnail },
-    );
-    const name = defaultSaveName();
 
     if (isTauri()) {
       let path = forceDialog ? null : currentPath;
       if (!path) {
-        try { path = await nativeSaveDialog(name); } catch (e) { error = (e as Error).message; return; }
+        try { path = await nativeSaveDialog(defaultSaveName()); } catch (e) { error = (e as Error).message; return; }
         if (!path) return; // user cancelled
       }
+      const bytes = await buildVmmBytes();
       try {
         await nativeWrite(path, bytes);
       } catch (e) {
@@ -379,36 +391,61 @@
       lastMtime = (await nativeModifiedMs(path)) ?? lastMtime;
       startWatch();
       addRecentPath(path, fileName).then(refreshRecents);
-    } else if (hasFilePicker()) {
+    } else if (hasFilePicker() && (!directWriteBlocked || forceDialog)) {
       let handle = forceDialog ? null : fileHandle;
       const remembered = handle !== null;
       if (!handle) {
-        try { handle = await browserSavePicker(name); } catch (e) { error = (e as Error).message; return; }
+        try { handle = await browserSavePicker(defaultSaveName()); } catch (e) { error = (e as Error).message; return; }
         if (!handle) return; // user cancelled
       }
+      const bytes = await buildVmmBytes();
       try {
         await browserWriteHandle(handle, bytes);
       } catch (e) {
-        if (!remembered) { error = `Save failed: ${(e as Error).message}`; return; }
-        // The remembered handle went stale (file moved/deleted, permission
-        // revoked) — fall back to asking for a location, like a first save.
-        try { handle = await browserSavePicker(name); } catch (e2) { error = (e2 as Error).message; return; }
-        if (!handle) return;
-        try { await browserWriteHandle(handle, bytes); } catch (e3) {
-          error = `Save failed: ${(e3 as Error).message}`;
+        if (remembered) {
+          // The remembered handle went stale (file moved/deleted, permission
+          // revoked) — re-prompt for a location, like a first save.
+          try { handle = await browserSavePicker(defaultSaveName()); } catch (e2) { error = (e2 as Error).message; return; }
+          if (!handle) return;
+          try {
+            await browserWriteHandle(handle, bytes);
+          } catch {
+            downloadFallback(handle.name, bytes);
+            return;
+          }
+        } else {
+          // The browser refused to write even a freshly picked file — its
+          // "file editing" permission for this site is blocked. Don't dead-end:
+          // deliver the map as a download and tell the user how to fix it.
+          downloadFallback(handle.name, bytes);
           return;
         }
       }
       fileHandle = handle;
       fileName = handle.name; // the name the user actually chose in the dialog
       dirty = false;
+      directWriteBlocked = false; // a write went through — permission is fine
       addRecentHandle(handle, handle.name).then(refreshRecents);
     } else {
-      browserDownload(name, bytes);
+      const bytes = await buildVmmBytes();
+      browserDownload(defaultSaveName(), bytes);
       dirty = false;
     }
   }
   const saveAs = () => save(true);
+
+  /** Browser denied direct file writes → save via the Downloads folder. */
+  function downloadFallback(name: string, bytes: Uint8Array) {
+    directWriteBlocked = true;
+    browserDownload(name || defaultSaveName(), bytes);
+    fileName = name || defaultSaveName();
+    fileHandle = null; // writes don't work; don't pretend we can save silently
+    dirty = false;
+    warning = "The browser blocked writing to the file, so the map was saved to your "
+      + "Downloads folder instead. To save in place, allow file editing for this site: "
+      + "click the icon left of the address bar → Site settings → \"Edit files\" → Allow "
+      + "(or Chrome Settings → Privacy → Site settings → Additional permissions → Edit files).";
+  }
 
   function download(name: string, content: string, mime: string) {
     const blob = new Blob([content], { type: mime });

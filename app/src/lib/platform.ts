@@ -196,12 +196,16 @@ export async function browserWriteHandle(handle: FsFileHandle, bytes: Uint8Array
   try {
     await write();
   } catch (e) {
-    if ((e as DOMException)?.name === "NotAllowedError" && handle.requestPermission) {
+    const name = (e as DOMException)?.name;
+    if ((name === "NotAllowedError" || name === "SecurityError") && handle.requestPermission) {
+      // Re-request and retry once. Note: without live user activation the
+      // browser auto-denies this, so callers should treat a second failure
+      // as "this site isn't allowed to edit files" and fall back.
       if ((await handle.requestPermission({ mode: "readwrite" })) === "granted") {
         await write();
         return;
       }
-      throw new Error("write permission to the file was denied");
+      throw new Error(`write permission to the file was denied (${name})`);
     }
     throw e;
   }
