@@ -23,6 +23,18 @@ See [DESIGN.md](DESIGN.md) for the full design.
 - **Rendering**: per-topic fill/border/shape/font, markers, note/link/image badges,
   labels, cross-topic **relationships** (curved arrows), **boundaries** (group
   outlines), **summaries** (braces + summary topic), and **floating topics**.
+  Long titles **word-wrap** into multi-line nodes (explicit newlines supported —
+  `Shift+Enter` while renaming); priority markers render as numbered chips.
+- **Navigation**: zoom bar (bottom-left) with `Ctrl+=` / `Ctrl+-` / `Ctrl+0`
+  shortcuts, a draggable minimap, auto-panning that keeps the keyboard selection
+  in view, and **find** (`Ctrl+F`) — type to match topics, `Enter` / `Shift+Enter`
+  cycles matches and centers them (expanding collapsed branches).
+- **Clipboard**: `Ctrl+C` / `Ctrl+X` / `Ctrl+V` copy/cut/paste whole subtrees
+  (fresh ids on paste; paste targets the selected topic, or lands as a floating
+  topic), `Ctrl+D` duplicates in place. Works across sheets.
+- **Context menu**: right-click a topic (add child/sibling, rename, relate,
+  copy/cut/paste, duplicate, collapse, delete) or empty canvas (new floating
+  topic, paste here, fit view).
 - **Inspector** (right panel): edit text, shape, fill/border/text color, full
   **fonts** (family, size, **bold / italic / underline / strikethrough**),
   markers, an **emoji picker**, note, link, labels, the sheet's **structure**,

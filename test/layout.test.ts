@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { addChild, createWorkbook, readVmm } from "../src/index.js";
-import { layoutBalanced, edgePath } from "../app/src/lib/layout.js";
+import { layoutBalanced, layoutSheet, edgePath, sizeOf } from "../app/src/lib/layout.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const examples = join(here, "..", "examples");
@@ -53,6 +53,32 @@ describe("layoutBalanced", () => {
     const layout = layoutBalanced(wb.sheets[0]!);
     expect(layout.nodes.find((n) => n.topic.title === "hidden")).toBeUndefined();
     expect(layout.nodes.find((n) => n.id === a.id)!.hasHiddenChildren).toBe(true);
+  });
+
+  it("wraps long titles and grows the node instead of overflowing", () => {
+    const short = sizeOf({ id: "a", title: "Hi", children: [] });
+    const long = sizeOf({
+      id: "b",
+      title: "A very long topic title that must wrap across several lines instead of overflowing the box",
+      children: [],
+    });
+    expect(short.lines).toHaveLength(1);
+    expect(long.lines.length).toBeGreaterThan(1);
+    expect(long.w).toBeLessThanOrEqual(260);
+    expect(long.h).toBeGreaterThan(short.h);
+    // Explicit newlines become separate lines too.
+    expect(sizeOf({ id: "c", title: "one\ntwo", children: [] }).lines).toEqual(["one", "two"]);
+  });
+
+  it("keeps multi-line siblings from overlapping vertically", () => {
+    const wb = createWorkbook("Root");
+    const root = wb.sheets[0]!.rootTopic;
+    addChild(root, "A very long topic title that must wrap across several lines to get tall enough");
+    addChild(root, "Second");
+    wb.sheets[0]!.structure = "map.right";
+    const layout = layoutSheet(wb.sheets[0]!);
+    const kids = layout.nodes.filter((n) => n.depth === 1).sort((a, b) => a.y - b.y);
+    expect(kids[0]!.y + kids[0]!.h).toBeLessThanOrEqual(kids[1]!.y);
   });
 
   it("lays out the rich example without errors", () => {

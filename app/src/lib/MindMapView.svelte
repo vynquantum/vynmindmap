@@ -1,9 +1,16 @@
+<script lang="ts" module>
+  import type { Topic as ClipTopic } from "../../../src/index.js";
+  // Session-wide clipboard for topic subtrees: survives sheet switches and
+  // lets users copy across sheets in the same workbook.
+  let clipboard = $state<ClipTopic[]>([]);
+</script>
+
 <script lang="ts">
   import type { Sheet, Topic } from "../../../src/index.js";
   import {
     addChild, addSibling, addBoundary, addFloatingTopic, addRelationship, addSummary,
-    deleteTopic, editText, findTopic, findWithParent, moveTopic, toggleCollapse,
-    removeBoundary, removeRelationship, removeSummary,
+    cloneTopicWithNewIds, deleteTopic, editText, findTopic, findWithParent, moveTopic,
+    toggleCollapse, removeBoundary, removeRelationship, removeSummary, walkSheetTopics,
   } from "../../../src/index.js";
   import { layoutSheet, edgePath, summaryPath, type Layout, type LaidOutNode } from "./layout.js";
 
@@ -26,6 +33,7 @@
   let scale = $state(1);
   let tx = $state(0);
   let ty = $state(0);
+  const MIN_SCALE = 0.15, MAX_SCALE = 4;
 
   // Interaction state.
   let selection = $state<string[]>([]); // multi-select (primary = last)
@@ -35,11 +43,21 @@
   let editingId = $state<string | null>(null);
   let editValue = $state("");
   let panning = $state(false);
-  let editInput = $state<HTMLInputElement | null>(null);
+  let editInput = $state<HTMLTextAreaElement | null>(null);
   let svgEl = $state<SVGSVGElement | null>(null);
   let canvasEl = $state<HTMLDivElement | null>(null);
   let viewW = $state(0);
   let viewH = $state(0);
+
+  // Context menu (canvas-relative pixel position + canvas point for inserts).
+  let ctxMenu = $state<{ x: number; y: number; nodeId: string | null } | null>(null);
+  let ctxPoint = { x: 0, y: 0 };
+
+  // Search (Ctrl+F).
+  let searchOpen = $state(false);
+  let searchQ = $state("");
+  let searchIdx = $state(0);
+  let searchInput = $state<HTMLInputElement | null>(null);
 
   // Drag-to-reparent state.
   let dragId = $state<string | null>(null);
@@ -55,7 +73,7 @@
   // --- helpers --------------------------------------------------------------
   function notify() { markDirty(); }
 
-  function canvasPoint(e: PointerEvent, el: HTMLElement) {
+  function canvasPoint(e: PointerEvent | MouseEvent, el: HTMLElement) {
     const r = el.getBoundingClientRect();
     return { x: (e.clientX - r.left - tx) / scale, y: (e.clientY - r.top - ty) / scale };
   }
@@ -82,20 +100,28 @@
   }
 
   // --- pan & zoom -----------------------------------------------------------
+  function zoomAt(factor: number, cx = viewW / 2, cy = viewH / 2) {
+    const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * factor));
+    tx = cx - (cx - tx) * (next / scale);
+    ty = cy - (cy - ty) * (next / scale);
+    scale = next;
+  }
+  function zoomIn() { zoomAt(1.2); }
+  function zoomOut() { zoomAt(1 / 1.2); }
+  function zoomReset() { zoomAt(1 / scale); }
+  function fitView() { if (viewW > 0) fit(viewW, viewH); }
+
   function onWheel(e: WheelEvent) {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-    const next = Math.min(4, Math.max(0.15, scale * factor));
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-    tx = mx - (mx - tx) * (next / scale);
-    ty = my - (my - ty) * (next / scale);
-    scale = next;
+    zoomAt(factor, e.clientX - rect.left, e.clientY - rect.top);
   }
 
   function onBgPointerDown(e: PointerEvent) {
     // Background press → pan + clear selection.
+    ctxMenu = null;
+    if (e.button === 2) return; // right-click opens the context menu instead
     panning = true;
     clearSelection();
     relMode = false; relSourceId = null;
@@ -122,15 +148,32 @@
   function inSelection(id: string) { return selection.includes(id); }
   function isFloatingRoot(id: string) { return (sheet.floatingTopics ?? []).some((f) => f.id === id); }
 
-  function onCanvasDblClick(e: MouseEvent) {
-    // Reaches here only for empty canvas (node/decoration dblclicks stop propagation).
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const cx = (e.clientX - r.left - tx) / scale;
-    const cy = (e.clientY - r.top - ty) / scale;
-    const pos = { x: cx - layout.shiftX - 50, y: cy - layout.shiftY - 17 };
-    const t = addFloatingTopic(sheet, "Floating topic", pos);
+  function addFloatingAt(pt: { x: number; y: number }, title = "Floating topic") {
+    const t = addFloatingTopic(sheet, title, { x: pt.x - 50, y: pt.y - 17 });
     notify();
     beginEdit(t.id);
+    return t;
+  }
+
+  function onCanvasDblClick(e: MouseEvent) {
+    // Reaches here only for empty canvas (node/decoration dblclicks stop propagation).
+    const p = canvasPoint(e, e.currentTarget as HTMLElement);
+    addFloatingAt({ x: p.x - layout.shiftX, y: p.y - layout.shiftY });
+  }
+
+  function onContextMenu(e: MouseEvent) {
+    e.preventDefault();
+    if (!canvasEl) return;
+    const r = canvasEl.getBoundingClientRect();
+    const p = canvasPoint(e, canvasEl);
+    const node = nodeAt(p.x, p.y);
+    if (node && !inSelection(node.id)) selectOnly(node.id);
+    ctxPoint = { x: p.x - layout.shiftX, y: p.y - layout.shiftY };
+    ctxMenu = {
+      x: Math.min(e.clientX - r.left, Math.max(0, viewW - 210)),
+      y: Math.min(e.clientY - r.top, Math.max(0, viewH - 320)),
+      nodeId: node?.id ?? null,
+    };
   }
 
   function onContainerPointerMove(e: PointerEvent) {
@@ -202,6 +245,8 @@
   // --- node interaction -----------------------------------------------------
   function onNodePointerDown(e: PointerEvent, id: string) {
     e.stopPropagation();
+    ctxMenu = null;
+    if (e.button === 2) return; // handled by oncontextmenu
     if (relMode && relSourceId && id !== relSourceId) {
       try { addRelationship(sheet, relSourceId, id); notify(); } catch { /* ignore */ }
       relMode = false; relSourceId = null;
@@ -228,13 +273,18 @@
     selectedId = id;
     editValue = t.title;
     editingId = id;
-    requestAnimationFrame(() => { editInput?.focus(); editInput?.select(); });
+    requestAnimationFrame(() => {
+      ensureVisible(id);
+      editInput?.focus();
+      editInput?.select();
+    });
   }
 
   function commitEdit() {
     if (editingId) {
       const t = findTopic(sheet, editingId);
-      if (t && t.title !== editValue) { editText(t, editValue); notify(); }
+      const v = editValue.replace(/\s+$/, "");
+      if (t && t.title !== v) { editText(t, v); notify(); }
     }
     editingId = null;
   }
@@ -242,7 +292,7 @@
   function cancelEdit() { editingId = null; }
 
   function onEditKey(e: KeyboardEvent) {
-    if (e.key === "Enter") { e.preventDefault(); commitEdit(); }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitEdit(); }
     else if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
     else if (e.key === "Tab") { e.preventDefault(); commitEdit(); }
   }
@@ -296,6 +346,125 @@
     if (t && (t.children?.length ?? 0) > 0) { toggleCollapse(t); notify(); }
   }
 
+  // --- clipboard (copy / cut / paste / duplicate) ---------------------------
+  /** Selected ids minus any that sit inside another selected subtree. */
+  function topLevelSelection(): string[] {
+    const ids = selection.length ? [...selection] : selectedId ? [selectedId] : [];
+    return ids.filter((id) => !ids.some((other) => other !== id && isDescendant(other, id)));
+  }
+
+  function copySelected(): boolean {
+    const topics = topLevelSelection()
+      .map((id) => findTopic(sheet, id))
+      .filter((t): t is Topic => !!t);
+    if (!topics.length) return false;
+    clipboard = topics.map((t) => structuredClone($state.snapshot(t)) as Topic);
+    return true;
+  }
+
+  function cutSelected() {
+    if (copySelected()) deleteSelected();
+  }
+
+  /** Paste into a parent topic, or as floating topics at a canvas point. */
+  function pasteClipboard(parentId?: string | null, floatAt?: { x: number; y: number }) {
+    if (!clipboard.length) return;
+    let lastId: string | null = null;
+    if (parentId) {
+      const parent = findTopic(sheet, parentId);
+      if (!parent) return;
+      if (parent.collapsed) toggleCollapse(parent);
+      for (const t of clipboard) {
+        const clone = cloneTopicWithNewIds(t);
+        delete clone.position;
+        (parent.children ??= []).push(clone);
+        lastId = clone.id;
+      }
+    } else {
+      const at = floatAt ?? {
+        x: (viewW / 2 - tx) / scale - layout.shiftX,
+        y: (viewH / 2 - ty) / scale - layout.shiftY,
+      };
+      clipboard.forEach((t, i) => {
+        const clone = cloneTopicWithNewIds(t);
+        clone.position = { x: at.x + i * 24, y: at.y + i * 24 };
+        (sheet.floatingTopics ??= []).push(clone);
+        lastId = clone.id;
+      });
+    }
+    notify();
+    if (lastId) selectOnly(lastId);
+  }
+
+  function pasteIntoSelected() {
+    pasteClipboard(selectedId ?? null);
+  }
+
+  function duplicateSelected() {
+    let lastId: string | null = null;
+    for (const id of topLevelSelection()) {
+      const fp = findWithParent(sheet, id);
+      if (!fp) continue;
+      const clone = cloneTopicWithNewIds(structuredClone($state.snapshot(fp.topic)) as Topic);
+      if (fp.parent) {
+        delete clone.position;
+        const sibs = fp.parent.children!;
+        const idx = sibs.findIndex((c) => c.id === id);
+        sibs.splice(idx + 1, 0, clone);
+      } else if (isFloatingRoot(id)) {
+        clone.position = { x: (fp.topic.position?.x ?? 0) + 24, y: (fp.topic.position?.y ?? 0) + 24 };
+        (sheet.floatingTopics ??= []).push(clone);
+      } else {
+        continue; // the central root can't be duplicated in place
+      }
+      lastId = clone.id;
+    }
+    if (lastId) { notify(); selectOnly(lastId); }
+  }
+
+  // --- search ----------------------------------------------------------------
+  const searchMatches = $derived.by(() => {
+    const q = searchQ.trim().toLowerCase();
+    if (!q) return [] as Topic[];
+    const out: Topic[] = [];
+    for (const t of walkSheetTopics(sheet)) {
+      if (t.title.toLowerCase().includes(q)) out.push(t);
+    }
+    return out;
+  });
+
+  function openSearch() {
+    searchOpen = true;
+    requestAnimationFrame(() => { searchInput?.focus(); searchInput?.select(); });
+  }
+  function closeSearch() { searchOpen = false; }
+
+  function expandAncestors(id: string) {
+    let cur = findWithParent(sheet, id);
+    let changed = false;
+    while (cur?.parent) {
+      if (cur.parent.collapsed) { cur.parent.collapsed = false; changed = true; }
+      cur = findWithParent(sheet, cur.parent.id);
+    }
+    if (changed) notify();
+  }
+
+  function gotoMatch(i: number) {
+    const m = searchMatches;
+    if (!m.length) return;
+    const idx = ((i % m.length) + m.length) % m.length;
+    searchIdx = idx;
+    const t = m[idx]!;
+    expandAncestors(t.id);
+    selectOnly(t.id);
+    centerOn(t.id);
+  }
+
+  function onSearchKey(e: KeyboardEvent) {
+    if (e.key === "Enter") { e.preventDefault(); gotoMatch(e.shiftKey ? searchIdx - 1 : searchIdx + 1); }
+    else if (e.key === "Escape") { e.preventDefault(); closeSearch(); }
+  }
+
   // --- keyboard navigation --------------------------------------------------
   function navigate(key: string) {
     if (!selectedId) return;
@@ -307,7 +476,7 @@
 
     if (key === goInward) {
       const first = findTopic(sheet, selectedId)?.children?.[0];
-      if (first) selectedId = first.id;
+      if (first && !findTopic(sheet, selectedId)?.collapsed) selectedId = first.id;
     } else if (key === goOutward) {
       if (fp?.parent) selectedId = fp.parent.id;
     } else if (key === "ArrowUp" || key === "ArrowDown") {
@@ -317,16 +486,56 @@
       const nextIdx = key === "ArrowUp" ? idx - 1 : idx + 1;
       if (idx !== -1 && sibs[nextIdx]) selectedId = sibs[nextIdx]!.id;
     }
+    if (selectedId) { selection = [selectedId]; ensureVisible(selectedId); }
+  }
+
+  /** Nudge the view so the node stays inside the viewport (with a margin). */
+  function ensureVisible(id: string) {
+    const n = nodeById.get(id);
+    if (!n || viewW === 0) return;
+    const pad = 48;
+    const l = n.x * scale + tx, t = n.y * scale + ty;
+    const r = l + n.w * scale, b = t + n.h * scale;
+    if (l < pad) tx += pad - l;
+    else if (r > viewW - pad) tx -= r - (viewW - pad);
+    if (t < pad) ty += pad - t;
+    else if (b > viewH - pad) ty -= b - (viewH - pad);
+  }
+
+  /** Center the view on a topic (used by search and external callers). */
+  export function centerOn(id: string) {
+    const n = layout.nodes.find((x) => x.id === id);
+    if (!n || viewW === 0) return;
+    tx = viewW / 2 - (n.x + n.w / 2) * scale;
+    ty = viewH / 2 - (n.y + n.h / 2) * scale;
   }
 
   // --- global keyboard ------------------------------------------------------
   $effect(() => {
     function onKey(e: KeyboardEvent) {
-      if (editingId) return; // the edit input owns keys while editing
+      if (editingId) return; // the edit textarea owns keys while editing
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault(); openSearch(); return;
+      }
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.ctrlKey || e.metaKey) {
+        const k = e.key;
+        if (k === "=" || k === "+") { e.preventDefault(); zoomIn(); }
+        else if (k === "-") { e.preventDefault(); zoomOut(); }
+        else if (k === "0") { e.preventDefault(); zoomReset(); }
+        else if (k.toLowerCase() === "c") { e.preventDefault(); copySelected(); }
+        else if (k.toLowerCase() === "x") { e.preventDefault(); cutSelected(); }
+        else if (k.toLowerCase() === "v") { e.preventDefault(); pasteIntoSelected(); }
+        else if (k.toLowerCase() === "d") { e.preventDefault(); duplicateSelected(); }
+        return;
+      }
       if (e.key === "Escape") {
-        e.preventDefault(); relMode = false; relSourceId = null; clearSelection(); return;
+        e.preventDefault();
+        if (ctxMenu) { ctxMenu = null; return; }
+        if (dragId || pressed) { dragId = null; dragOverId = null; pressed = null; return; }
+        relMode = false; relSourceId = null; clearSelection();
+        return;
       }
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault(); deleteSelected(); return;
@@ -334,6 +543,7 @@
       if (!selectedId) return;
       switch (e.key) {
         case "Tab": e.preventDefault(); addChildToSelected(); break;
+        case "Insert": e.preventDefault(); addChildToSelected(); break;
         case "Enter": e.preventDefault(); addSiblingToSelected(); break;
         case "F2": e.preventDefault(); beginEdit(selectedId); break;
         case " ": e.preventDefault(); collapseSelected(); break;
@@ -400,14 +610,22 @@
     const s = Math.min(MM_W / Math.max(1, layout.width), MM_H / Math.max(1, layout.height));
     return { s, w: layout.width * s, h: layout.height * s };
   });
-  function onMinimapDown(e: PointerEvent) {
-    e.stopPropagation();
+  let miniDragging = false;
+  function miniMoveTo(e: PointerEvent) {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const lx = (e.clientX - r.left) / mini.s;
     const ly = (e.clientY - r.top) / mini.s;
     tx = viewW / 2 - lx * scale;
     ty = viewH / 2 - ly * scale;
   }
+  function onMinimapDown(e: PointerEvent) {
+    e.stopPropagation();
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    miniDragging = true;
+    miniMoveTo(e);
+  }
+  function onMinimapMove(e: PointerEvent) { if (miniDragging) miniMoveTo(e); }
+  function onMinimapUp() { miniDragging = false; }
 
   // --- public ---------------------------------------------------------------
   export function fit(vw: number, vh: number) {
@@ -416,6 +634,8 @@
     tx = (vw - layout.width * s) / 2;
     ty = (vh - layout.height * s) / 2;
   }
+
+  const EXPORT_FONT = "Inter, 'Segoe UI', system-ui, -apple-system, sans-serif";
 
   /** Rasterize the current sheet to a canvas (white background, 2× scale). */
   async function renderCanvas(): Promise<{ canvas: HTMLCanvasElement; W: number; H: number } | null> {
@@ -427,6 +647,9 @@
     clone.setAttribute("width", String(W));
     clone.setAttribute("height", String(H));
     clone.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    // The live SVG inherits its font from the page CSS; a serialized SVG does
+    // not, so pin the family explicitly or the export falls back to serif.
+    clone.setAttribute("font-family", EXPORT_FONT);
     const ns = "http://www.w3.org/2000/svg";
     const bg = document.createElementNS(ns, "rect");
     bg.setAttribute("width", String(W));
@@ -568,8 +791,10 @@
     "task-done": "✅", "task-start": "🔵", "task-25%": "◔", "task-50%": "◑", "task-75%": "◕",
     idea: "💡", question: "❓", people: "👤", smiley: "🙂",
   };
+  const PRIORITY_COLORS: Record<string, string> = {
+    "1": "#e5484d", "2": "#e98a3a", "3": "#3f7fd0",
+  };
   function markerIcon(id: string): string {
-    if (id.startsWith("priority-")) return id.slice("priority-".length);
     return MARKER_ICONS[id] ?? "●";
   }
   function badges(t: Topic): string {
@@ -606,6 +831,8 @@
     if (!n) return null;
     return { left: n.x * scale + tx, top: n.y * scale + ty, w: n.w * scale, h: n.h * scale };
   });
+
+  const ctxTopic = $derived(ctxMenu?.nodeId ? findTopic(sheet, ctxMenu.nodeId) ?? null : null);
 </script>
 
 <div
@@ -614,6 +841,7 @@
   role="application"
   style={`background-color:${sheet.background?.color ?? "#f5f6f8"}`}
   ondblclick={onCanvasDblClick}
+  oncontextmenu={onContextMenu}
   onwheel={onWheel}
   onpointerdown={onBgPointerDown}
   onpointermove={onContainerPointerMove}
@@ -704,16 +932,21 @@
               fill={nodeFill(n)} stroke={nodeStroke(n)} stroke-width={nodeStrokeWidth(n)} />
           {/if}
 
-          <text
-            x={n.w / 2} y={n.h / 2}
-            dominant-baseline="central" text-anchor="middle"
-            font-family={n.topic.style?.font?.family ?? "inherit"}
-            font-size={n.topic.style?.font?.size ?? (n.depth === 0 ? 15 : 13)}
-            font-weight={n.topic.style?.font?.weight ?? (n.depth === 0 ? "700" : n.depth === 1 ? "600" : "400")}
-            font-style={n.topic.style?.font?.style ?? "normal"}
-            text-decoration={n.topic.style?.font?.decoration ?? "none"}
-            fill={textFill(n)}
-          >{n.id === editingId ? "" : n.topic.title}</text>
+          {#if n.id !== editingId}
+            <text
+              dominant-baseline="central" text-anchor="middle"
+              font-family={n.topic.style?.font?.family ?? "inherit"}
+              font-size={n.topic.style?.font?.size ?? (n.depth === 0 ? 15 : 13)}
+              font-weight={n.topic.style?.font?.weight ?? (n.depth === 0 ? "700" : n.depth === 1 ? "600" : "400")}
+              font-style={n.topic.style?.font?.style ?? "normal"}
+              text-decoration={n.topic.style?.font?.decoration ?? "none"}
+              fill={textFill(n)}
+            >
+              {#each n.lines as line, li (li)}
+                <tspan x={n.w / 2} y={n.h / 2 + (li - (n.lines.length - 1) / 2) * n.lineH}>{line}</tspan>
+              {/each}
+            </text>
+          {/if}
 
           {#if n.topic.image && imgUrl(n.topic.image.resource)}
             {@const sz = imgSize(n)}
@@ -722,9 +955,18 @@
           {/if}
 
           {#if n.topic.markers?.length}
-            <g transform={`translate(2 -6)`}>
+            <g transform={`translate(6 -8)`}>
               {#each n.topic.markers as mk, mi (mk)}
-                <text x={mi * 16} y="0" font-size="13" text-anchor="start">{markerIcon(mk)}</text>
+                {#if mk.startsWith("priority-")}
+                  {@const p = mk.slice("priority-".length)}
+                  <g transform={`translate(${mi * 19} 0)`}>
+                    <circle r="8" fill={PRIORITY_COLORS[p] ?? "#64748b"} />
+                    <text dominant-baseline="central" text-anchor="middle" font-size="10.5"
+                      font-weight="700" fill="#fff">{p}</text>
+                  </g>
+                {:else}
+                  <text x={mi * 19} dominant-baseline="central" text-anchor="middle" font-size="13">{markerIcon(mk)}</text>
+                {/if}
               {/each}
             </g>
           {/if}
@@ -766,15 +1008,63 @@
   </svg>
 
   {#if editBox}
-    <input
+    <textarea
       class="edit"
       bind:this={editInput}
       bind:value={editValue}
-      style={`left:${editBox.left}px; top:${editBox.top}px; width:${Math.max(80, editBox.w)}px; height:${editBox.h}px; font-size:${13 * scale}px;`}
+      rows="1"
+      style={`left:${editBox.left}px; top:${editBox.top}px; width:${Math.max(90, editBox.w)}px; height:${Math.max(30, editBox.h)}px; font-size:${13 * scale}px;`}
       onkeydown={onEditKey}
       onblur={commitEdit}
       onpointerdown={(e) => e.stopPropagation()}
-    />
+    ></textarea>
+  {/if}
+
+  {#if ctxMenu}
+    <div class="ctxmenu" role="menu" tabindex={-1}
+      style={`left:${ctxMenu.x}px; top:${ctxMenu.y}px;`}
+      onpointerdown={(e) => e.stopPropagation()}>
+      {#if ctxMenu.nodeId}
+        {@const id = ctxMenu.nodeId}
+        <button role="menuitem" onclick={() => { ctxMenu = null; selectOnly(id); addChildToSelected(); }}>Add child <kbd>Tab</kbd></button>
+        <button role="menuitem" onclick={() => { ctxMenu = null; selectOnly(id); addSiblingToSelected(); }}>Add sibling <kbd>Enter</kbd></button>
+        <button role="menuitem" onclick={() => { ctxMenu = null; beginEdit(id); }}>Rename <kbd>F2</kbd></button>
+        <button role="menuitem" onclick={() => { ctxMenu = null; selectOnly(id); startRelate(); }}>Relate →</button>
+        <hr />
+        <button role="menuitem" onclick={() => { ctxMenu = null; copySelected(); }}>Copy <kbd>Ctrl+C</kbd></button>
+        <button role="menuitem" onclick={() => { ctxMenu = null; cutSelected(); }}>Cut <kbd>Ctrl+X</kbd></button>
+        <button role="menuitem" disabled={!clipboard.length} onclick={() => { ctxMenu = null; pasteClipboard(id); }}>Paste as child <kbd>Ctrl+V</kbd></button>
+        <button role="menuitem" onclick={() => { ctxMenu = null; duplicateSelected(); }}>Duplicate <kbd>Ctrl+D</kbd></button>
+        <hr />
+        {#if ctxTopic && hasChildren(ctxTopic)}
+          <button role="menuitem" onclick={() => { ctxMenu = null; selectOnly(id); collapseSelected(); }}>
+            {ctxTopic.collapsed ? "Expand" : "Collapse"} <kbd>Space</kbd>
+          </button>
+        {/if}
+        <button role="menuitem" class="danger" onclick={() => { ctxMenu = null; selectOnly(id); deleteSelected(); }}>Delete <kbd>Del</kbd></button>
+      {:else}
+        <button role="menuitem" onclick={() => { const p = ctxPoint; ctxMenu = null; addFloatingAt(p); }}>New floating topic</button>
+        <button role="menuitem" disabled={!clipboard.length} onclick={() => { const p = ctxPoint; ctxMenu = null; pasteClipboard(null, p); }}>Paste here</button>
+        <hr />
+        <button role="menuitem" onclick={() => { ctxMenu = null; fitView(); }}>Fit map to view</button>
+        <button role="menuitem" onclick={() => { ctxMenu = null; zoomReset(); }}>Zoom 100%</button>
+      {/if}
+    </div>
+  {/if}
+
+  {#if searchOpen}
+    <div class="searchbar" role="search" onpointerdown={(e) => e.stopPropagation()}>
+      <input
+        bind:this={searchInput}
+        bind:value={searchQ}
+        placeholder="Find topics…"
+        onkeydown={onSearchKey}
+      />
+      <span class="count">{searchQ.trim() ? `${searchMatches.length ? searchIdx + 1 : 0}/${searchMatches.length}` : ""}</span>
+      <button title="Previous (Shift+Enter)" disabled={!searchMatches.length} onclick={() => gotoMatch(searchIdx - 1)}>↑</button>
+      <button title="Next (Enter)" disabled={!searchMatches.length} onclick={() => gotoMatch(searchIdx + 1)}>↓</button>
+      <button title="Close (Esc)" onclick={closeSearch}>✕</button>
+    </div>
   {/if}
 
   {#if relMode}
@@ -796,9 +1086,17 @@
     </div>
   {/if}
 
+  <div class="zoombar" role="toolbar" tabindex={-1} onpointerdown={(e) => e.stopPropagation()}>
+    <button title="Zoom out (Ctrl+-)" onclick={zoomOut}>−</button>
+    <button class="pct" title="Reset to 100% (Ctrl+0)" onclick={zoomReset}>{Math.round(scale * 100)}%</button>
+    <button title="Zoom in (Ctrl+=)" onclick={zoomIn}>+</button>
+    <button title="Fit map to view" onclick={fitView}>⛶</button>
+  </div>
+
   {#if layout.nodes.length > 1}
     <svg class="minimap" width={mini.w} height={mini.h} viewBox={`0 0 ${mini.w} ${mini.h}`}
-      role="application" onpointerdown={onMinimapDown}>
+      role="application" onpointerdown={onMinimapDown} onpointermove={onMinimapMove}
+      onpointerup={onMinimapUp} onpointercancel={onMinimapUp}>
       <rect x="0" y="0" width={mini.w} height={mini.h} fill="#ffffff" />
       {#each layout.nodes as n (n.id)}
         <rect x={n.x * mini.s} y={n.y * mini.s} width={Math.max(1, n.w * mini.s)}
@@ -813,7 +1111,7 @@
   {/if}
 
   <div class="hint">
-    Tab: child · Enter: sibling · F2: rename · Del: delete · Ctrl-click: multi-select · drag: move
+    Tab: child · Enter: sibling · F2: rename · Del: delete · Ctrl+C/V: copy/paste · Ctrl+F: find · right-click: menu
   </div>
 </div>
 
@@ -839,11 +1137,15 @@
     box-sizing: border-box;
     border: 2px solid #1d4ed8;
     border-radius: 8px;
-    padding: 0 8px;
+    padding: 4px 8px;
     text-align: center;
     outline: none;
     background: #fff;
     color: #1c2230;
+    font-family: inherit;
+    line-height: 1.35;
+    resize: none;
+    overflow: hidden;
   }
   .hint {
     position: absolute;
@@ -862,6 +1164,53 @@
   .actionbar span { color: var(--muted); }
   .actionbar button { padding: 4px 10px; font-size: 12px; }
   .actionbar.rel { background: #faf5ff; border-color: #d8b4fe; color: #6b21a8; }
+  .zoombar {
+    position: absolute; left: 10px; bottom: 10px;
+    display: flex; align-items: center; gap: 2px;
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    padding: 3px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+  }
+  .zoombar button {
+    width: 30px; height: 28px; padding: 0; border: none; border-radius: 7px;
+    background: transparent; color: var(--text); font-size: 15px; line-height: 1;
+  }
+  .zoombar button.pct { width: 48px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .zoombar button:hover:not(:disabled) { background: #eef1f6; }
+  .searchbar {
+    position: absolute; right: 10px; top: 10px;
+    display: flex; align-items: center; gap: 4px;
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    padding: 5px 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10);
+  }
+  .searchbar input {
+    width: 180px; border: none; outline: none; font: inherit; font-size: 13px;
+    padding: 3px 6px; background: transparent; color: var(--text);
+  }
+  .searchbar .count { font-size: 11px; color: var(--muted); min-width: 32px; text-align: center; }
+  .searchbar button {
+    width: 26px; height: 26px; padding: 0; border: none; border-radius: 6px;
+    background: transparent; color: var(--muted); font-size: 13px;
+  }
+  .searchbar button:hover:not(:disabled) { background: #eef1f6; color: var(--text); }
+  .ctxmenu {
+    position: absolute; z-index: 30; min-width: 200px;
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.16); padding: 5px;
+  }
+  .ctxmenu button {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    width: 100%; border: none; border-radius: 7px; background: transparent;
+    padding: 7px 10px; font-size: 13px; font-weight: 500; color: var(--text); text-align: left;
+  }
+  .ctxmenu button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .ctxmenu button:disabled { color: var(--muted); opacity: 0.55; }
+  .ctxmenu button.danger { color: #c0392b; }
+  .ctxmenu button.danger:hover:not(:disabled) { background: #fdecea; }
+  .ctxmenu kbd {
+    font-family: inherit; font-size: 11px; color: var(--muted);
+    background: #f1f3f8; border: 1px solid var(--border); border-radius: 4px; padding: 0 5px;
+  }
+  .ctxmenu hr { border: none; border-top: 1px solid var(--border); margin: 4px 6px; }
   .minimap {
     position: absolute; right: 10px; bottom: 10px;
     border: 1px solid var(--border); border-radius: 6px;

@@ -5,8 +5,9 @@
   import { readVmmFromFile, readVmmFromUrl } from "./lib/loadVmm.js";
   import {
     isTauri, basename, nativeSaveDialog, nativeOpenDialog, nativeWrite, nativeRead,
-    getOpenedFile, onOpenFile, hasFilePicker, browserSavePicker, browserDownload,
-    checkForUpdate, openExternal, type UpdateInfo,
+    getOpenedFile, onOpenFile, hasFilePicker, hasOpenPicker, browserSavePicker,
+    browserOpenPicker, browserWriteHandle, browserDownload,
+    checkForUpdate, openExternal, type UpdateInfo, type FsFileHandle,
   } from "./lib/platform.js";
   import MindMapView from "./lib/MindMapView.svelte";
   import Inspector from "./lib/Inspector.svelte";
@@ -24,6 +25,10 @@
   let resources = $state<Record<string, Uint8Array>>({});
   let fileName = $state<string>("");
   let currentPath = $state<string | null>(null); // native path of the open file, if any
+  // Browser (File System Access API) handle of the open file. Held so "Save"
+  // writes back silently; only "Save As" re-prompts. Not reactive — no UI
+  // reads it directly.
+  let fileHandle: FsFileHandle | null = null;
   let activeSheet = $state(0);
   let dirty = $state(false);
   let error = $state<string>("");
@@ -54,8 +59,11 @@
     if (!workbook) return;
     const snap = structuredClone($state.snapshot(workbook) as Workbook);
     const now = Date.now();
-    if (now - lastPush < 400 && histIndex >= 0) {
-      history[histIndex] = snap; // coalesce a burst of rapid edits into one step
+    // Coalesce a burst of rapid edits into one step — but only at the head of
+    // the history (never clobber redo states) and never over the baseline
+    // snapshot at index 0, or undo-to-original would be lost.
+    if (now - lastPush < 400 && histIndex === history.length - 1 && histIndex > 0) {
+      history[histIndex] = snap;
     } else {
       history = history.slice(0, histIndex + 1);
       history.push(snap);
@@ -98,7 +106,7 @@
     await load(() => readVmmFromUrl(`/${name}`), name);
   }
 
-  async function load(fn: () => Promise<{ workbook: Workbook; resources: Record<string, Uint8Array>; newerMinor: boolean; migrated: boolean }>, name: string, path: string | null = null) {
+  async function load(fn: () => Promise<{ workbook: Workbook; resources: Record<string, Uint8Array>; newerMinor: boolean; migrated: boolean }>, name: string, path: string | null = null, handle: FsFileHandle | null = null) {
     error = ""; warning = "";
     try {
       const res = await fn();
@@ -106,6 +114,7 @@
       resources = res.resources ?? {};
       fileName = name;
       currentPath = path;
+      fileHandle = handle;
       activeSheet = 0;
       selectedId = null;
       dirty = false;
@@ -125,11 +134,30 @@
     resources = {};
     fileName = "untitled.vmm";
     currentPath = null;
+    fileHandle = null;
     activeSheet = 0;
     selectedId = null;
     dirty = false;
     resetHistory();
     queueFit();
+  }
+
+  // Close the current map and return to the welcome screen. Warns if there are
+  // unsaved changes.
+  function closeMap() {
+    if (!workbook) return;
+    if (dirty && !confirm("Close this map? Unsaved changes will be lost.")) return;
+    error = ""; warning = "";
+    workbook = null;
+    resources = {};
+    fileName = "";
+    currentPath = null;
+    fileHandle = null;
+    activeSheet = 0;
+    selectedId = null;
+    dirty = false;
+    history = [];
+    histIndex = -1;
   }
 
   // Read and load a .vmm at a native path (open dialog, launch arg, or file event).
@@ -143,12 +171,20 @@
     }
   }
 
-  // Open via the native dialog (Tauri) or the file input (browser).
+  // Open via the native dialog (Tauri), the File System Access picker
+  // (Chromium — keeps a writable handle so Save writes straight back), or the
+  // plain file input (fallback; read-only, first Save prompts for a location).
   async function openFile() {
     if (isTauri()) {
       let path: string | null;
       try { path = await nativeOpenDialog(); } catch (e) { error = (e as Error).message; return; }
       if (path) await openNativePath(path);
+    } else if (hasOpenPicker()) {
+      let handle: FsFileHandle | null;
+      try { handle = await browserOpenPicker(); } catch (e) { error = (e as Error).message; return; }
+      if (!handle) return; // user cancelled
+      const file = await handle.getFile();
+      await load(() => readVmmFromFile(file), file.name, null, handle);
     } else {
       fileInput.click();
     }
@@ -209,9 +245,27 @@
       fileName = basename(path);
       dirty = false;
     } else if (hasFilePicker()) {
-      const saved = await browserSavePicker(name, bytes);
-      if (!saved) return;
-      fileName = name;
+      let handle = forceDialog ? null : fileHandle;
+      const remembered = handle !== null;
+      if (!handle) {
+        try { handle = await browserSavePicker(name); } catch (e) { error = (e as Error).message; return; }
+        if (!handle) return; // user cancelled
+      }
+      try {
+        await browserWriteHandle(handle, bytes);
+      } catch (e) {
+        if (!remembered) { error = `Save failed: ${(e as Error).message}`; return; }
+        // The remembered handle went stale (file moved/deleted, permission
+        // revoked) — fall back to asking for a location, like a first save.
+        try { handle = await browserSavePicker(name); } catch (e2) { error = (e2 as Error).message; return; }
+        if (!handle) return;
+        try { await browserWriteHandle(handle, bytes); } catch (e3) {
+          error = `Save failed: ${(e3 as Error).message}`;
+          return;
+        }
+      }
+      fileHandle = handle;
+      fileName = handle.name; // the name the user actually chose in the dialog
       dirty = false;
     } else {
       browserDownload(name, bytes);
@@ -244,6 +298,7 @@
       resources = {};
       fileName = f.name.replace(/\.md$/i, ".vmm");
       currentPath = null;
+      fileHandle = null; // a fresh document — Save must ask where to put it
       activeSheet = 0;
       selectedId = null;
       dirty = true;
@@ -318,6 +373,7 @@
       else if (k === "s") { e.preventDefault(); if (e.shiftKey) saveAs(); else save(); }
       else if (k === "n") { e.preventDefault(); newMap(); }
       else if (k === "o") { e.preventDefault(); openFile(); }
+      else if (k === "w") { e.preventDefault(); closeMap(); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -333,6 +389,7 @@
       <button class="ic" onclick={openFile} title="Open…  (Ctrl+O)" aria-label="Open"><Icon name="folder-open" /></button>
       <button class="ic" onclick={() => save()} disabled={!workbook} title="Save (Ctrl+S)" aria-label="Save"><Icon name="save" /></button>
       <button class="ic" onclick={saveAs} disabled={!workbook} title="Save As… (Ctrl+Shift+S)" aria-label="Save As"><Icon name="save-as" /></button>
+      <button class="ic" onclick={closeMap} disabled={!workbook} title="Close map — back to home (Ctrl+W)" aria-label="Close map"><Icon name="x" /></button>
     </div>
 
     <div class="divider"></div>

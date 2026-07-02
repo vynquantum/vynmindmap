@@ -3,6 +3,8 @@ import { describe, it, expect } from "vitest";
 import {
   addBoundary,
   addChild,
+  cloneTopicWithNewIds,
+  walkTopic,
   addRelationship,
   addSibling,
   addSummary,
@@ -149,5 +151,39 @@ describe("connectors & groupings", () => {
     // The summary topic should be discoverable in the sheet walk.
     const allIds = [...walkSheetTopics(sheet)].map((t) => t.id);
     expect(allIds).toContain(summary.summaryTopic.id);
+  });
+});
+
+describe("cloneTopicWithNewIds", () => {
+  it("deep-copies the subtree with fresh ids everywhere", () => {
+    const wb = createWorkbook("Root");
+    const root = wb.sheets[0]!.rootTopic;
+    const a = addChild(root, "A", { markers: ["star"] });
+    const a1 = addChild(a, "A1");
+    addChild(a1, "A1a");
+
+    const clone = cloneTopicWithNewIds(a);
+
+    // Same shape and content…
+    expect([...walkTopic(clone)].map((t) => t.title)).toEqual(
+      [...walkTopic(a)].map((t) => t.title),
+    );
+    expect(clone.markers).toEqual(["star"]);
+
+    // …but no id collides with the original subtree.
+    const origIds = new Set([...walkTopic(a)].map((t) => t.id));
+    for (const t of walkTopic(clone)) expect(origIds.has(t.id)).toBe(false);
+
+    // Pasting the clone back keeps the workbook free of duplicate ids.
+    root.children!.push(clone);
+    expect(findDuplicateIds(wb)).toEqual([]);
+  });
+
+  it("does not mutate the source topic", () => {
+    const wb = createWorkbook("Root");
+    const a = addChild(wb.sheets[0]!.rootTopic, "A");
+    const before = a.id;
+    cloneTopicWithNewIds(a);
+    expect(a.id).toBe(before);
   });
 });

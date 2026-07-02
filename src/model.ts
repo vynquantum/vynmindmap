@@ -210,6 +210,17 @@ function isDescendant(topic: Topic, candidateId: string): boolean {
   return false;
 }
 
+/**
+ * Deep-copy a topic subtree, assigning fresh ids throughout. The input must be
+ * a plain (non-proxied) topic; the copy is safe to insert anywhere in any sheet
+ * without id collisions — the basis for copy/paste and duplicate.
+ */
+export function cloneTopicWithNewIds(topic: Topic): Topic {
+  const copy = structuredClone(topic);
+  for (const t of walkTopic(copy)) t.id = newId("t");
+  return copy;
+}
+
 export function toggleCollapse(topic: Topic): boolean {
   topic.collapsed = !topic.collapsed;
   return topic.collapsed;

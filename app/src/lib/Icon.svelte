@@ -15,6 +15,8 @@
     "chevron-down": '<path d="m6 9 6 6 6-6"/>',
     plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
     sitemap: '<rect width="8" height="6" x="8" y="2" rx="1"/><rect width="6" height="5" x="2" y="16" rx="1"/><rect width="6" height="5" x="16" y="16" rx="1"/><path d="M12 8v4"/><path d="M5 16v-1a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v1"/>',
+    home: '<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/><path d="M9 21v-6h6v6"/>',
+    x: '<path d="M18 6 6 18"/><path d="M6 6l12 12"/>',
   };
 </script>
 

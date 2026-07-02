@@ -112,27 +112,84 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
 }
 
 // --- browser File System Access API (Chromium) ----------------------------
-interface SaveablePicker {
-  showSaveFilePicker?: (opts: unknown) => Promise<FileSystemFileHandle>;
-}
-export function hasFilePicker(): boolean {
-  return typeof (window as unknown as SaveablePicker).showSaveFilePicker === "function";
+
+/**
+ * Minimal FileSystemFileHandle surface we rely on. Keeping the handle around
+ * is what lets "Save" write back to the same file without re-prompting.
+ */
+export interface FsFileHandle {
+  readonly name: string;
+  getFile(): Promise<File>;
+  createWritable(): Promise<{ write(data: BlobPart): Promise<void>; close(): Promise<void> }>;
+  queryPermission?(opts: { mode: "read" | "readwrite" }): Promise<PermissionState>;
+  requestPermission?(opts: { mode: "read" | "readwrite" }): Promise<PermissionState>;
 }
 
-/** Returns true if it saved, false if the user cancelled. */
-export async function browserSavePicker(defaultName: string, bytes: Uint8Array): Promise<boolean> {
-  const picker = (window as unknown as SaveablePicker).showSaveFilePicker!;
+interface PickerWindow {
+  showSaveFilePicker?: (opts: unknown) => Promise<FsFileHandle>;
+  showOpenFilePicker?: (opts: unknown) => Promise<FsFileHandle[]>;
+}
+
+const VMM_PICKER_TYPES = [
+  { description: "VynMindMap mind map", accept: { "application/octet-stream": [".vmm"] } },
+];
+
+export function hasFilePicker(): boolean {
+  return typeof (window as unknown as PickerWindow).showSaveFilePicker === "function";
+}
+export function hasOpenPicker(): boolean {
+  return typeof (window as unknown as PickerWindow).showOpenFilePicker === "function";
+}
+
+/** Prompt for a save location. Returns the handle (keep it!), or null if cancelled. */
+export async function browserSavePicker(defaultName: string): Promise<FsFileHandle | null> {
   try {
-    const handle = await picker({
+    return await (window as unknown as PickerWindow).showSaveFilePicker!({
       suggestedName: defaultName,
-      types: [{ description: "VynMindMap mind map", accept: { "application/octet-stream": [".vmm"] } }],
+      types: VMM_PICKER_TYPES,
     });
+  } catch (e) {
+    if ((e as DOMException)?.name === "AbortError") return null;
+    throw e;
+  }
+}
+
+/** Prompt for a file to open. Returns the handle (writable later), or null if cancelled. */
+export async function browserOpenPicker(): Promise<FsFileHandle | null> {
+  try {
+    const [handle] = await (window as unknown as PickerWindow).showOpenFilePicker!({
+      multiple: false,
+      types: VMM_PICKER_TYPES,
+    });
+    return handle ?? null;
+  } catch (e) {
+    if ((e as DOMException)?.name === "AbortError") return null;
+    throw e;
+  }
+}
+
+/**
+ * Write to a previously-obtained handle. Tries the write directly — a handle
+ * fresh from a picker is always writable, and pre-checking permissions can
+ * spuriously deny (requestPermission needs user activation that async work may
+ * have consumed). Only on an actual NotAllowedError do we re-request and retry.
+ */
+export async function browserWriteHandle(handle: FsFileHandle, bytes: Uint8Array): Promise<void> {
+  const write = async () => {
     const w = await handle.createWritable();
     await w.write(bytes as BlobPart);
     await w.close();
-    return true;
+  };
+  try {
+    await write();
   } catch (e) {
-    if ((e as DOMException)?.name === "AbortError") return false;
+    if ((e as DOMException)?.name === "NotAllowedError" && handle.requestPermission) {
+      if ((await handle.requestPermission({ mode: "readwrite" })) === "granted") {
+        await write();
+        return;
+      }
+      throw new Error("write permission to the file was denied");
+    }
     throw e;
   }
 }

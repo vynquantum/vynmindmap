@@ -19,6 +19,10 @@ export interface LaidOutNode {
   side: "root" | "left" | "right" | "down" | "up";
   color: string;
   hasHiddenChildren: boolean;
+  /** Title split into rendered lines (explicit \n plus word wrap). */
+  lines: string[];
+  /** Vertical distance between rendered lines. */
+  lineH: number;
   floating?: boolean;
 }
 
@@ -72,6 +76,7 @@ const COL_GAP = 26;
 const LEVEL_GAP = 56;
 const CHAR_W = 7.6;
 const PAD_X = 26;
+const PAD_Y = 8;
 const MIN_W = 56;
 const MAX_W = 260;
 const MARGIN = 56;
@@ -84,11 +89,58 @@ const ROOT_COLOR = "#33415c";
 const FLOAT_COLOR = "#7a8699";
 const SUMMARY_COLOR = "#64748b";
 
-export function widthOf(t: Topic): number {
-  const longest = t.title.split("\n").reduce((m, l) => Math.max(m, l.length), 0);
+// Sizing / wrapping ----------------------------------------------------------
+
+export interface TopicSize { w: number; h: number; lines: string[]; lineH: number }
+
+/**
+ * Measure a topic box: wraps the title (explicit newlines + greedy word wrap)
+ * to at most MAX_W, and grows the box height to fit all lines.
+ */
+export function sizeOf(t: Topic): TopicSize {
   const size = t.style?.font?.size ?? 13;
   const cw = CHAR_W * (size / 13) * (t.style?.font?.weight === "bold" ? 1.05 : 1);
-  return Math.max(MIN_W, Math.min(MAX_W, longest * cw + PAD_X));
+  const maxChars = Math.max(4, Math.floor((MAX_W - PAD_X) / cw));
+
+  const lines: string[] = [];
+  for (const raw of (t.title ?? "").split("\n")) {
+    if (raw.length <= maxChars) { lines.push(raw); continue; }
+    let cur = "";
+    for (let word of raw.split(/ +/)) {
+      while (word.length > maxChars) {
+        // A single over-long word: flush and hard-break it.
+        if (cur) { lines.push(cur); cur = ""; }
+        lines.push(word.slice(0, maxChars));
+        word = word.slice(maxChars);
+      }
+      if (!cur) cur = word;
+      else if (cur.length + 1 + word.length <= maxChars) cur += " " + word;
+      else { lines.push(cur); cur = word; }
+    }
+    lines.push(cur);
+  }
+  if (!lines.length) lines.push("");
+
+  const longest = lines.reduce((m, l) => Math.max(m, l.length), 0);
+  const lineH = Math.max(18, size + 5);
+  const w = Math.max(MIN_W, Math.min(MAX_W, longest * cw + PAD_X));
+  const h = Math.max(NODE_H, lines.length * lineH + PAD_Y * 2);
+  return { w, h, lines, lineH };
+}
+
+/** Back-compat width-only measure. */
+export function widthOf(t: Topic): number {
+  return sizeOf(t).w;
+}
+
+function mkNode(
+  t: Topic, x: number, y: number, s: TopicSize, depth: number,
+  side: LaidOutNode["side"], color: string,
+): LaidOutNode {
+  return {
+    id: t.id, topic: t, x, y, w: s.w, h: s.h, depth, side, color,
+    hasHiddenChildren: hidden(t), lines: s.lines, lineH: s.lineH,
+  };
 }
 
 function visibleChildren(t: Topic): Topic[] {
@@ -104,20 +156,22 @@ function placeH(
   t: Topic, depth: number, side: "left" | "right", dir: 1 | -1,
   nearX: number, color: string, cursor: Cursor, nodes: LaidOutNode[],
 ): number {
-  const w = widthOf(t);
-  const boxLeft = dir > 0 ? nearX : nearX - w;
-  const farX = dir > 0 ? nearX + w : nearX - w;
+  const s = sizeOf(t);
+  const boxLeft = dir > 0 ? nearX : nearX - s.w;
+  const farX = dir > 0 ? nearX + s.w : nearX - s.w;
   const kids = visibleChildren(t);
   let cy: number;
   if (kids.length === 0) {
-    cy = cursor.v + NODE_H / 2;
-    cursor.v += NODE_H + ROW_GAP;
+    cy = cursor.v + s.h / 2;
+    cursor.v += s.h + ROW_GAP;
   } else {
     const childNearX = farX + dir * LEVEL_GAP;
     const cys = kids.map((k) => placeH(k, depth + 1, side, dir, childNearX, color, cursor, nodes));
     cy = (cys[0]! + cys[cys.length - 1]!) / 2;
+    // A parent taller than its children's span must still claim its own room.
+    cursor.v = Math.max(cursor.v, cy + s.h / 2 + ROW_GAP);
   }
-  nodes.push({ id: t.id, topic: t, x: boxLeft, y: cy - NODE_H / 2, w, h: NODE_H, depth, side, color, hasHiddenChildren: hidden(t) });
+  nodes.push(mkNode(t, boxLeft, cy - s.h / 2, s, depth, side, color));
   return cy;
 }
 
@@ -125,20 +179,21 @@ function placeV(
   t: Topic, depth: number, side: "down" | "up", dir: 1 | -1,
   nearY: number, color: string, cursor: Cursor, nodes: LaidOutNode[],
 ): number {
-  const w = widthOf(t);
-  const boxTop = dir > 0 ? nearY : nearY - NODE_H;
-  const farY = dir > 0 ? nearY + NODE_H : nearY - NODE_H;
+  const s = sizeOf(t);
+  const boxTop = dir > 0 ? nearY : nearY - s.h;
+  const farY = dir > 0 ? nearY + s.h : nearY - s.h;
   const kids = visibleChildren(t);
   let cx: number;
   if (kids.length === 0) {
-    cx = cursor.v + w / 2;
-    cursor.v += w + COL_GAP;
+    cx = cursor.v + s.w / 2;
+    cursor.v += s.w + COL_GAP;
   } else {
     const childNearY = farY + dir * LEVEL_GAP;
     const cxs = kids.map((k) => placeV(k, depth + 1, side, dir, childNearY, color, cursor, nodes));
     cx = (cxs[0]! + cxs[cxs.length - 1]!) / 2;
+    cursor.v = Math.max(cursor.v, cx + s.w / 2 + COL_GAP);
   }
-  nodes.push({ id: t.id, topic: t, x: cx - w / 2, y: boxTop, w, h: NODE_H, depth, side, color, hasHiddenChildren: hidden(t) });
+  nodes.push(mkNode(t, cx - s.w / 2, boxTop, s, depth, side, color));
   return cx;
 }
 
@@ -151,7 +206,7 @@ const colorFor = (i: number) => PALETTE[i % PALETTE.length]!;
 function horizontal(sheet: Sheet, mode: "balanced" | "right" | "left"): LaidOutNode[] {
   const nodes: LaidOutNode[] = [];
   const root = sheet.rootTopic;
-  const rootW = widthOf(root);
+  const rootS = sizeOf(root);
   const kids = visibleChildren(root);
 
   const right: { t: Topic; i: number }[] = [];
@@ -164,31 +219,31 @@ function horizontal(sheet: Sheet, mode: "balanced" | "right" | "left"): LaidOutN
 
   const rStart = nodes.length;
   const rc: Cursor = { v: 0 };
-  for (const { t, i } of right) placeH(t, 1, "right", 1, rootW / 2 + LEVEL_GAP, colorFor(i), rc, nodes);
+  for (const { t, i } of right) placeH(t, 1, "right", 1, rootS.w / 2 + LEVEL_GAP, colorFor(i), rc, nodes);
   shiftRange(nodes, rStart, 0, -Math.max(0, rc.v - ROW_GAP) / 2);
 
   const lStart = nodes.length;
   const lc: Cursor = { v: 0 };
-  for (const { t, i } of left) placeH(t, 1, "left", -1, -rootW / 2 - LEVEL_GAP, colorFor(i), lc, nodes);
+  for (const { t, i } of left) placeH(t, 1, "left", -1, -rootS.w / 2 - LEVEL_GAP, colorFor(i), lc, nodes);
   shiftRange(nodes, lStart, 0, -Math.max(0, lc.v - ROW_GAP) / 2);
 
-  nodes.push({ id: root.id, topic: root, x: -rootW / 2, y: -NODE_H / 2, w: rootW, h: NODE_H, depth: 0, side: "root", color: ROOT_COLOR, hasHiddenChildren: hidden(root) });
+  nodes.push(mkNode(root, -rootS.w / 2, -rootS.h / 2, rootS, 0, "root", ROOT_COLOR));
   return nodes;
 }
 
 function vertical(sheet: Sheet, dir: "down" | "up"): LaidOutNode[] {
   const nodes: LaidOutNode[] = [];
   const root = sheet.rootTopic;
-  const rootW = widthOf(root);
+  const rootS = sizeOf(root);
   const d: 1 | -1 = dir === "down" ? 1 : -1;
   const kids = visibleChildren(root);
 
   const start = nodes.length;
   const c: Cursor = { v: 0 };
-  kids.forEach((t, i) => placeV(t, 1, dir, d, (d > 0 ? NODE_H / 2 : -NODE_H / 2) + d * LEVEL_GAP, colorFor(i), c, nodes));
+  kids.forEach((t, i) => placeV(t, 1, dir, d, (d > 0 ? rootS.h / 2 : -rootS.h / 2) + d * LEVEL_GAP, colorFor(i), c, nodes));
   shiftRange(nodes, start, -Math.max(0, c.v - COL_GAP) / 2, 0);
 
-  nodes.push({ id: root.id, topic: root, x: -rootW / 2, y: -NODE_H / 2, w: rootW, h: NODE_H, depth: 0, side: "root", color: ROOT_COLOR, hasHiddenChildren: hidden(root) });
+  nodes.push(mkNode(root, -rootS.w / 2, -rootS.h / 2, rootS, 0, "root", ROOT_COLOR));
   return nodes;
 }
 
@@ -212,12 +267,14 @@ function buildEdges(nodes: LaidOutNode[], kind: LaidOutEdge["kind"]): LaidOutEdg
     for (const child of visibleChildren(n.topic)) {
       const cn = byId.get(child.id);
       if (!cn) continue;
+      const color = cn.topic.style?.lineColor ?? cn.color;
+      const width = cn.topic.style?.lineWidth ?? 2.5;
       if (n.side === "down" || n.side === "up" || cn.side === "down" || cn.side === "up") {
         const down = cn.y >= n.y;
-        edges.push({ id: `${n.id}->${cn.id}`, x1: n.x + n.w / 2, y1: down ? n.y + n.h : n.y, x2: cn.x + cn.w / 2, y2: down ? cn.y : cn.y + cn.h, color: cn.color, kind: "elbow-v" });
+        edges.push({ id: `${n.id}->${cn.id}`, x1: n.x + n.w / 2, y1: down ? n.y + n.h : n.y, x2: cn.x + cn.w / 2, y2: down ? cn.y : cn.y + cn.h, color, kind: "elbow-v", width });
       } else {
         const right = cn.x >= n.x;
-        edges.push({ id: `${n.id}->${cn.id}`, x1: right ? n.x + n.w : n.x, y1: n.y + n.h / 2, x2: right ? cn.x : cn.x + cn.w, y2: cn.y + cn.h / 2, color: cn.color, kind });
+        edges.push({ id: `${n.id}->${cn.id}`, x1: right ? n.x + n.w : n.x, y1: n.y + n.h / 2, x2: right ? cn.x : cn.x + cn.w, y2: cn.y + cn.h / 2, color, kind, width });
       }
     }
   }
@@ -293,14 +350,14 @@ function fishbone(sheet: Sheet, dir: "left" | "right"): { nodes: LaidOutNode[]; 
   const nodes: LaidOutNode[] = [];
   const edges: LaidOutEdge[] = [];
   const root = sheet.rootTopic;
-  const rootW = widthOf(root);
+  const rootS = sizeOf(root);
   const sgn = dir === "right" ? 1 : -1;
-  nodes.push({ id: root.id, topic: root, x: -rootW / 2, y: -NODE_H / 2, w: rootW, h: NODE_H, depth: 0, side: "root", color: ROOT_COLOR, hasHiddenChildren: hidden(root) });
+  nodes.push(mkNode(root, -rootS.w / 2, -rootS.h / 2, rootS, 0, "root", ROOT_COLOR));
 
   const bones = visibleChildren(root);
   const pairs = Math.max(1, Math.ceil(bones.length / 2));
   const spineLen = Math.max(260, pairs * 170);
-  const headX = sgn > 0 ? -rootW / 2 : rootW / 2;
+  const headX = sgn > 0 ? -rootS.w / 2 : rootS.w / 2;
   const tailX = headX - sgn * spineLen;
   edges.push({ id: "spine", x1: headX, y1: 0, x2: tailX, y2: 0, color: "#64748b", kind: "straight", width: 3 });
 
@@ -310,18 +367,20 @@ function fishbone(sheet: Sheet, dir: "left" | "right"): { nodes: LaidOutNode[]; 
     const slot = Math.floor(i / 2) + 1;
     const attachX = headX - sgn * spineLen * (slot / (pairs + 1));
     const color = colorFor(i);
-    const bw = widthOf(b);
+    const bs = sizeOf(b);
     const cyB = above ? -boneDY : boneDY;
     const cxB = attachX - sgn * boneDX;
-    nodes.push({ id: b.id, topic: b, x: cxB - bw / 2, y: cyB - NODE_H / 2, w: bw, h: NODE_H, depth: 1, side: "right", color, hasHiddenChildren: hidden(b) });
-    edges.push({ id: `bone-${b.id}`, x1: attachX, y1: 0, x2: cxB, y2: cyB + (above ? NODE_H / 2 : -NODE_H / 2), color, kind: "straight", width: 2 });
-    visibleChildren(b).forEach((c, k) => {
-      const cw = widthOf(c);
-      const cyC = cyB + (above ? -1 : 1) * ((k + 1) * (NODE_H + 12));
+    nodes.push(mkNode(b, cxB - bs.w / 2, cyB - bs.h / 2, bs, 1, "right", color));
+    edges.push({ id: `bone-${b.id}`, x1: attachX, y1: 0, x2: cxB, y2: cyB + (above ? bs.h / 2 : -bs.h / 2), color, kind: "straight", width: 2 });
+    let edgeY = cyB + (above ? -bs.h / 2 : bs.h / 2);
+    for (const c of visibleChildren(b)) {
+      const cs = sizeOf(c);
+      const cyC = above ? edgeY - 12 - cs.h / 2 : edgeY + 12 + cs.h / 2;
+      edgeY = above ? cyC - cs.h / 2 : cyC + cs.h / 2;
       const cxC = cxB - sgn * 26;
-      nodes.push({ id: c.id, topic: c, x: cxC - cw / 2, y: cyC - NODE_H / 2, w: cw, h: NODE_H, depth: 2, side: "right", color, hasHiddenChildren: hidden(c) });
+      nodes.push(mkNode(c, cxC - cs.w / 2, cyC - cs.h / 2, cs, 2, "right", color));
       edges.push({ id: `fb-${c.id}`, x1: cxB, y1: cyB, x2: cxC, y2: cyC, color, kind: "straight", width: 1.5 });
-    });
+    }
   });
   return { nodes, edges };
 }
@@ -332,23 +391,35 @@ function matrix(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
   const lines: GridLine[] = [];
   const root = sheet.rootTopic;
   const cols = visibleChildren(root);
-  const rowH = NODE_H + 10;
   const gap = 12;
-  nodes.push({ id: root.id, topic: root, x: 0, y: 0, w: widthOf(root), h: NODE_H, depth: 0, side: "down", color: ROOT_COLOR, hasHiddenChildren: hidden(root) });
-  const headerY = NODE_H + 20;
-  const maxRows = Math.max(0, ...cols.map((c) => visibleChildren(c).length));
+  const rootS = sizeOf(root);
+  nodes.push(mkNode(root, 0, 0, rootS, 0, "down", ROOT_COLOR));
+  const headerY = rootS.h + 20;
+
+  // Measure every cell first so each row can size to its tallest member.
+  const colData = cols.map((c) => ({
+    topic: c, header: sizeOf(c), cells: visibleChildren(c).map((g) => ({ topic: g, size: sizeOf(g) })),
+  }));
+  const maxRows = Math.max(0, ...colData.map((c) => c.cells.length));
+  const headerH = Math.max(NODE_H, ...colData.map((c) => c.header.h));
+  const rowHs: number[] = [];
+  for (let r = 0; r < maxRows; r++) {
+    rowHs.push(Math.max(NODE_H, ...colData.map((c) => c.cells[r]?.size.h ?? 0)) + 10);
+  }
+  const rowY = (r: number) => headerY + headerH + 10 + rowHs.slice(0, r).reduce((a, b) => a + b, 0);
+
   let x = 0;
-  cols.forEach((c, j) => {
-    const cw = Math.max(widthOf(c), ...visibleChildren(c).map((g) => widthOf(g)), 90);
+  colData.forEach((c, j) => {
+    const cw = Math.max(c.header.w, ...c.cells.map((g) => g.size.w), 90);
     const color = colorFor(j);
-    nodes.push({ id: c.id, topic: c, x, y: headerY, w: cw, h: NODE_H, depth: 1, side: "down", color, hasHiddenChildren: hidden(c) });
-    visibleChildren(c).forEach((g, r) => {
-      nodes.push({ id: g.id, topic: g, x, y: headerY + (r + 1) * rowH, w: cw, h: NODE_H, depth: 2, side: "down", color, hasHiddenChildren: hidden(g) });
+    nodes.push(mkNode(c.topic, x, headerY, { ...c.header, w: cw }, 1, "down", color));
+    c.cells.forEach((g, r) => {
+      nodes.push(mkNode(g.topic, x, rowY(r), { ...g.size, w: cw }, 2, "down", color));
     });
-    if (j > 0) lines.push({ x1: x - gap / 2, y1: headerY - 6, x2: x - gap / 2, y2: headerY + (maxRows + 1) * rowH });
+    if (j > 0) lines.push({ x1: x - gap / 2, y1: headerY - 6, x2: x - gap / 2, y2: rowY(maxRows) });
     x += cw + gap;
   });
-  lines.push({ x1: -4, y1: headerY + NODE_H + 6, x2: x - gap, y2: headerY + NODE_H + 6 });
+  lines.push({ x1: -4, y1: headerY + headerH + 5, x2: x - gap, y2: headerY + headerH + 5 });
   return { nodes, gridLines: lines };
 }
 
@@ -356,17 +427,19 @@ function matrix(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
 function treeTable(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
   const nodes: LaidOutNode[] = [];
   const lines: GridLine[] = [];
-  const rowH = NODE_H + 8;
   const indent = 28;
-  let row = 0;
+  let y = 0;
+  const rowYs: number[] = [];
   const walk = (t: Topic, depth: number) => {
-    nodes.push({ id: t.id, topic: t, x: depth * indent, y: row * rowH, w: widthOf(t), h: NODE_H, depth, side: "down", color: depth === 0 ? ROOT_COLOR : colorFor(depth - 1), hasHiddenChildren: hidden(t) });
-    row++;
+    const s = sizeOf(t);
+    nodes.push(mkNode(t, depth * indent, y, s, depth, "down", depth === 0 ? ROOT_COLOR : colorFor(depth - 1)));
+    y += s.h + 8;
+    rowYs.push(y);
     for (const c of visibleChildren(t)) walk(c, depth + 1);
   };
   walk(sheet.rootTopic, 0);
   const fullW = Math.max(...nodes.map((n) => n.x + n.w));
-  for (let r = 1; r < row; r++) lines.push({ x1: -6, y1: r * rowH - 4, x2: fullW + 6, y2: r * rowH - 4 });
+  for (let r = 0; r < rowYs.length - 1; r++) lines.push({ x1: -6, y1: rowYs[r]! - 4, x2: fullW + 6, y2: rowYs[r]! - 4 });
   return { nodes, gridLines: lines };
 }
 
@@ -440,14 +513,11 @@ export function layoutSheet(sheet: Sheet): Layout {
     if (!bb) continue;
     const side = (byId.get(sm.childIds[0]!)?.side === "left" ? "left" : "right") as "left" | "right";
     const midY = (bb.minY + bb.maxY) / 2;
-    const w = widthOf(sm.summaryTopic);
+    const ss = sizeOf(sm.summaryTopic);
     const bx = side === "right" ? bb.maxX + 12 : bb.minX - 12;
-    const nodeX = side === "right" ? bx + 22 : bx - 22 - w;
+    const nodeX = side === "right" ? bx + 22 : bx - 22 - ss.w;
     summaries.push({ id: sm.id, side, x: bx, y1: bb.minY, y2: bb.maxY });
-    nodes.push({
-      id: sm.summaryTopic.id, topic: sm.summaryTopic, x: nodeX, y: midY - NODE_H / 2,
-      w, h: NODE_H, depth: 2, side, color: SUMMARY_COLOR, hasHiddenChildren: false,
-    });
+    nodes.push(mkNode(sm.summaryTopic, nodeX, midY - ss.h / 2, ss, 2, side, SUMMARY_COLOR));
   }
 
   edges = buildEdges(nodes, kind);
