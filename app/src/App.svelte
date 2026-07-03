@@ -15,6 +15,8 @@
   import MindMapView from "./lib/MindMapView.svelte";
   import Inspector from "./lib/Inspector.svelte";
   import OutlinePanel from "./lib/OutlinePanel.svelte";
+  import ConfirmHost from "./lib/ConfirmHost.svelte";
+  import { confirmDialog } from "./lib/confirm.svelte.js";
   import Icon from "./lib/Icon.svelte";
   import logoUrl from "../../app-icon.png";
 
@@ -115,6 +117,11 @@
 
   let showOutline = $state(localStorage.getItem("vynmm.outline") === "1");
   $effect(() => { localStorage.setItem("vynmm.outline", showOutline ? "1" : "0"); });
+
+  // Inspector (right sidebar) visibility — defaults to open on first run, then
+  // remembers the user's choice so it stays out of the way once collapsed.
+  let showInspector = $state(localStorage.getItem("vynmm.inspector") !== "0");
+  $effect(() => { localStorage.setItem("vynmm.inspector", showInspector ? "1" : "0"); });
 
   // --- autosave ---------------------------------------------------------------
   let autosave = $state(localStorage.getItem("vynmm.autosave") === "1");
@@ -271,9 +278,14 @@
 
   // Close the current map and return to the welcome screen. Warns if there are
   // unsaved changes.
-  function closeMap() {
+  async function closeMap() {
     if (!workbook) return;
-    if (dirty && !confirm("Close this map? Unsaved changes will be lost.")) return;
+    if (dirty && !(await confirmDialog({
+      title: "Close this map?",
+      message: "You have unsaved changes. Closing will discard them.",
+      confirmLabel: "Close without saving",
+      danger: true,
+    }))) return;
     error = ""; warning = "";
     workbook = null;
     resources = {};
@@ -329,8 +341,16 @@
     markDirty();
     queueFit();
   }
-  function deleteSheet(i: number) {
+  async function deleteSheet(i: number) {
     if (!workbook || workbook.sheets.length <= 1) return;
+    const title = workbook.sheets[i]?.title || "this sheet";
+    if (!(await confirmDialog({
+      title: "Delete sheet?",
+      message: `“${title}” and everything on it will be removed. You can undo with Ctrl+Z.`,
+      confirmLabel: "Delete sheet",
+      danger: true,
+    }))) return;
+    if (!workbook || workbook.sheets.length <= 1) return; // re-check after await
     workbook.sheets.splice(i, 1);
     activeSheet = Math.max(0, Math.min(activeSheet, workbook.sheets.length - 1));
     selectedId = null;
@@ -594,6 +614,8 @@
     <div class="group">
       <button class="ic" class:on={showOutline} onclick={() => (showOutline = !showOutline)} disabled={!workbook}
         title="Toggle outline panel" aria-label="Outline" aria-pressed={showOutline}><Icon name="list" /></button>
+      <button class="ic" class:on={showInspector} onclick={() => (showInspector = !showInspector)} disabled={!workbook}
+        title="Toggle style panel" aria-label="Style panel" aria-pressed={showInspector}><Icon name="panel-right" /></button>
       <button class="ic" class:on={autosave} onclick={() => { autosave = !autosave; if (autosave && dirty) scheduleAutosave(); }}
         title={autosave ? "Autosave is on (saves shortly after each change once a file is set)" : "Autosave is off"}
         aria-label="Autosave" aria-pressed={autosave}><Icon name="autosave" /></button>
@@ -662,8 +684,11 @@
           <MindMapView bind:this={view} {sheet} {resources} {markDirty} bind:selectedId />
         {/if}
       </div>
-      {#if sheet}
-        <Inspector {sheet} topic={selectedTopic} {markDirty} />
+      {#if sheet && showInspector}
+        <Inspector {sheet} topic={selectedTopic} {markDirty} onClose={() => (showInspector = false)} />
+      {:else if sheet}
+        <button class="inspector-open" title="Open style panel" aria-label="Open style panel"
+          onclick={() => (showInspector = true)}><Icon name="sliders" size={18} /></button>
       {/if}
     </div>
   {:else}
@@ -714,6 +739,8 @@
       </div>
     </div>
   {/if}
+
+  <ConfirmHost />
 </div>
 
 <style>
@@ -786,8 +813,18 @@
   .tab-add { border: none; background: none; color: var(--muted); padding: 9px 12px; font-size: 17px; }
   .tab-add:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 8%, transparent); border-color: transparent; }
   .tab-edit { width: 120px; padding: 5px 9px; border: 1px solid var(--accent); border-radius: 6px; font: inherit; margin: 4px 2px; }
-  .workspace { flex: 1; display: flex; min-height: 0; }
+  .workspace { flex: 1; display: flex; min-height: 0; position: relative; }
   .viewport { position: relative; flex: 1; min-height: 0; min-width: 0; }
+
+  /* Floating button to reopen the style panel once it's been collapsed. */
+  .inspector-open {
+    position: absolute; top: 12px; right: 12px; z-index: 5;
+    width: 38px; height: 38px; padding: 0; border-radius: 10px;
+    display: grid; place-items: center;
+    background: var(--panel); color: var(--accent);
+    border: 1px solid var(--border); box-shadow: var(--elev-2);
+  }
+  .inspector-open:hover:not(:disabled) { background: var(--surface-2); }
   code { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); padding: 1px 6px; border-radius: 5px; font-size: 0.88em; }
 
   /* Welcome / empty state */

@@ -5,7 +5,8 @@
     sheet,
     topic,
     markDirty,
-  }: { sheet: Sheet; topic: Topic | null; markDirty: () => void } = $props();
+    onClose,
+  }: { sheet: Sheet; topic: Topic | null; markDirty: () => void; onClose?: () => void } = $props();
 
   const STRUCTURES: { id: StructureId; label: string }[] = [
     { id: "map.balanced", label: "Mind map · balanced" },
@@ -160,6 +161,12 @@
 {/snippet}
 
 <aside class="inspector">
+  {#if onClose}
+    <div class="panelbar">
+      <span class="paneltitle">Style</span>
+      <button class="panelclose" title="Collapse panel" aria-label="Collapse panel" onclick={onClose}>✕</button>
+    </div>
+  {/if}
   <section>
     {@render sectionHeader("sheet", "Sheet")}
     {#if open.sheet}
@@ -331,6 +338,19 @@
     box-shadow: var(--elev-1);
     padding: 10px; font-size: 13px;
   }
+  .panelbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: -2px 0 6px; padding: 2px 2px 8px; border-bottom: 1px solid var(--border);
+  }
+  .paneltitle {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--muted); font-weight: 700;
+  }
+  .panelclose {
+    width: 26px; height: 26px; padding: 0; border: none; border-radius: 7px;
+    background: transparent; color: var(--muted); font-size: 13px;
+  }
+  .panelclose:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
   section { margin-bottom: 6px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
   section:last-of-type { border-bottom: none; }
 

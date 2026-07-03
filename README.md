@@ -35,6 +35,11 @@ See [DESIGN.md](DESIGN.md) for the full design.
 - **Context menu**: right-click a topic (add child/sibling, rename, relate,
   copy/cut/paste, duplicate, collapse, delete) or empty canvas (new floating
   topic, paste here, fit view).
+- **Collapsible panels**: the left **outline** and right **style** panels each
+  toggle from the toolbar (and the style panel has its own ✕); their state is
+  remembered. Collapse both for a full-width canvas.
+- **In-app dialogs**: destructive actions (closing a map with unsaved changes,
+  deleting a sheet) confirm with an in-app modal rather than a browser popup.
 - **Outline panel** (toolbar toggle): a synced tree sidebar — click to select
   and center, chevrons collapse/expand, double-click renames inline.
 - **Detach / reattach**: drag a topic onto empty canvas to detach its subtree
