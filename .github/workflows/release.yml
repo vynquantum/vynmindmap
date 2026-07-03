@@ -59,6 +59,26 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "VynMindMap ${{ github.ref_name }}"
-          releaseBody: "Download the installer for your operating system below."
+          releaseBody: |
+            Download the installer for your operating system below.
+
+            | OS | File |
+            |----|------|
+            | Windows | `..._x64-setup.exe` (or the `.msi`) |
+            | macOS (Apple Silicon) | `..._aarch64.dmg` |
+            | Linux | `.AppImage`, `.deb`, or `.rpm` |
+
+            ### First-run warning (unknown publisher)
+
+            These installers are **not code-signed yet**, so the OS shows an
+            "unknown developer" warning on first run. The app is safe — to proceed:
+
+            - **Windows (SmartScreen):** click **More info → Run anyway**. Or
+              right-click the `.msi` → **Properties → Unblock** before running.
+            - **Windows (Smart App Control):** it blocks unsigned apps with no
+              bypass; build from source or disable Smart App Control.
+            - **macOS (Gatekeeper):** right-click the app → **Open** → confirm.
+
+            Prefer no warning at all? Build from source (see the README).
           releaseDraft: false
           prerelease: false

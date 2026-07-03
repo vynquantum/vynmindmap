@@ -6,6 +6,36 @@ visual canvas; LLMs read/write them through a Markdown lane and an MCP/CLI.
 
 See [DESIGN.md](DESIGN.md) for the full design.
 
+## Download & install
+
+Grab the installer for your OS from the
+[**latest release**](https://github.com/vynquantum/vynmindmap/releases/latest):
+
+| OS | File |
+|----|------|
+| Windows | `VynMindMap_x.y.z_x64-setup.exe` (or the `.msi`) |
+| macOS (Apple Silicon) | `VynMindMap_x.y.z_aarch64.dmg` |
+| Linux | `.AppImage`, `.deb`, or `.rpm` |
+
+### "Windows protected your PC" / unknown publisher
+
+The installers are **not code-signed yet**, so Windows and macOS show an
+"unknown developer" warning the first time you run them. The app is safe — this
+is just the OS noticing there's no paid signing certificate. To proceed:
+
+- **Windows — SmartScreen** ("Windows protected your PC"): click **More info →
+  Run anyway**. You can also right-click the downloaded `.msi` → **Properties →
+  Unblock → OK** before running it.
+- **Windows — Smart App Control** (stricter Win 11 mode, no "Run anyway"): it
+  blocks unsigned apps outright. Either build from source (below), or turn Smart
+  App Control off in *Windows Security → App & browser control* (note: it can't
+  be re-enabled without reinstalling Windows).
+- **macOS — Gatekeeper**: right-click the app → **Open**, then confirm; or allow
+  it under *System Settings → Privacy & Security*.
+
+Prefer not to click through a warning? Build it yourself from source — see
+[Run it](#run-it) — which never trips SmartScreen.
+
 ## Status
 
 - **Milestone 1 — core model + file format** ✅
