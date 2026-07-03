@@ -1,6 +1,6 @@
 [package]
 name = "vynmindmap"
-version = "0.1.0"
+version = "0.1.1"
 description = "VynMindMap mind-mapping app"
 authors = ["VynMindMap"]
 edition = "2021"

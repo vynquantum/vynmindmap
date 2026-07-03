@@ -1,6 +1,6 @@
 {
   "name": "vynmm-core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Core model and .vmm file format for VynMM mind-mapping app",
   "type": "module",
   "main": "dist/index.js",
