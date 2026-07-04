@@ -102,26 +102,47 @@ async function currentVersion(): Promise<string> {
   }
 }
 
+/** Detailed result of a manual update check, so the UI can give feedback. */
+export type UpdateCheck =
+  | { kind: "update"; version: string; url: string }
+  | { kind: "current"; version: string }
+  | { kind: "unsupported" }
+  | { kind: "error"; message: string };
+
+/**
+ * Ask GitHub for the latest published release and classify it against the
+ * running app. Drives both the silent startup check and the manual button.
+ */
+export async function checkForUpdateDetailed(): Promise<UpdateCheck> {
+  if (!isTauri()) return { kind: "unsupported" };
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) {
+      return { kind: "error", message: res.status === 404 ? "no releases published yet" : `GitHub returned ${res.status}` };
+    }
+    const data = (await res.json()) as { tag_name?: string; html_url?: string };
+    const latest = (data.tag_name ?? "").replace(/^v/i, "");
+    if (!latest) return { kind: "error", message: "could not read the latest version" };
+    const current = await currentVersion();
+    if (isNewer(latest, current)) {
+      return { kind: "update", version: latest, url: data.html_url ?? `https://github.com/${REPO}/releases/latest` };
+    }
+    return { kind: "current", version: current };
+  } catch (e) {
+    return { kind: "error", message: (e as Error).message || "network error" };
+  }
+}
+
 /**
  * Ask GitHub for the latest published release and return it if it's newer than
  * the running app. Only meaningful in the native app; returns null on any error
  * (offline, no releases yet, rate-limited).
  */
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
-  if (!isTauri()) return null;
-  try {
-    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { Accept: "application/vnd.github+json" },
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { tag_name?: string; html_url?: string };
-    const latest = (data.tag_name ?? "").replace(/^v/i, "");
-    if (!latest) return null;
-    const current = await currentVersion();
-    return isNewer(latest, current) ? { version: latest, url: data.html_url ?? `https://github.com/${REPO}/releases/latest` } : null;
-  } catch {
-    return null;
-  }
+  const r = await checkForUpdateDetailed();
+  return r.kind === "update" ? { version: r.version, url: r.url } : null;
 }
 
 // --- browser File System Access API (Chromium) ----------------------------

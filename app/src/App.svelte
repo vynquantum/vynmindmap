@@ -7,7 +7,7 @@
     isTauri, basename, nativeSaveDialog, nativeOpenDialog, nativeWrite, nativeRead,
     nativeModifiedMs, getOpenedFile, onOpenFile, hasFilePicker, hasOpenPicker,
     browserSavePicker, browserOpenPicker, browserWriteHandle, browserDownload,
-    checkForUpdate, openExternal, type UpdateInfo, type FsFileHandle,
+    checkForUpdate, checkForUpdateDetailed, openExternal, type UpdateInfo, type FsFileHandle,
   } from "./lib/platform.js";
   import {
     getRecents, addRecentPath, addRecentHandle, removeRecent, type RecentEntry,
@@ -211,6 +211,20 @@
 
   let selectedId = $state<string | null>(null);
   let update = $state<UpdateInfo | null>(null);
+  // Manual "check for updates" feedback (the startup check is silent).
+  let checkingUpdate = $state(false);
+  let updateMsg = $state("");
+
+  async function checkUpdatesNow() {
+    checkingUpdate = true;
+    updateMsg = "";
+    const r = await checkForUpdateDetailed();
+    checkingUpdate = false;
+    if (r.kind === "update") { update = { version: r.version, url: r.url }; }
+    else if (r.kind === "current") { updateMsg = `You're on the latest version (v${r.version}).`; }
+    else if (r.kind === "unsupported") { updateMsg = "You're running the web version, which is always up to date."; }
+    else { updateMsg = `Couldn't check for updates: ${r.message}.`; }
+  }
 
   const sheet = $derived<Sheet | null>(
     workbook && workbook.sheets[activeSheet] ? workbook.sheets[activeSheet]! : null,
@@ -622,6 +636,8 @@
       <button class="ic" onclick={() => (theme = theme === "dark" ? "light" : "dark")}
         title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
         aria-label="Theme"><Icon name={theme === "dark" ? "sun" : "moon"} /></button>
+      <button class="ic" onclick={checkUpdatesNow} disabled={checkingUpdate}
+        title="Check for updates" aria-label="Check for updates"><Icon name="cloud-download" /></button>
     </div>
 
     <input bind:this={fileInput} type="file" accept=".vmm" onchange={onPick} hidden />
@@ -636,6 +652,15 @@
       <span class="update-actions">
         <button class="update-btn" onclick={() => update && openExternal(update.url)}>Download</button>
         <button class="update-dismiss" onclick={() => (update = null)} aria-label="Dismiss">✕</button>
+      </span>
+    </div>
+  {:else if checkingUpdate}
+    <div class="banner update"><span>Checking for updates…</span></div>
+  {:else if updateMsg}
+    <div class="banner update">
+      <span>{updateMsg}</span>
+      <span class="update-actions">
+        <button class="update-dismiss" onclick={() => (updateMsg = "")} aria-label="Dismiss">✕</button>
       </span>
     </div>
   {/if}
