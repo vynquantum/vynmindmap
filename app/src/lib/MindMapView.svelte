@@ -45,6 +45,8 @@
   let relSourceId = $state<string | null>(null);
   let editingId = $state<string | null>(null);
   let editValue = $state("");
+  let laserPoints = $state<{ x: number; y: number; id: number }[]>([]);
+  let nowTime = $state(Date.now());
   let panning = $state(false);
   let editInput = $state<HTMLTextAreaElement | null>(null);
   let svgEl = $state<SVGSVGElement | null>(null);
@@ -99,6 +101,24 @@
   // of the way (it otherwise overlaps the minimap/zoombar on narrow canvases).
   let showHint = $state(true);
   $effect(() => { if (selectedId) showHint = false; });
+
+  $effect(() => {
+    if (!presenterMode) {
+      if (laserPoints.length) laserPoints = [];
+      return;
+    }
+    let active = true;
+    const tick = () => {
+      if (!active) return;
+      nowTime = Date.now();
+      laserPoints = laserPoints.filter(p => nowTime - p.id < 600);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    return () => {
+      active = false;
+    };
+  });
 
   const nodeById = $derived(new Map(layout.nodes.map((n) => [n.id, n])));
 
@@ -217,6 +237,13 @@
   }
 
   function onContainerPointerMove(e: PointerEvent) {
+    if (presenterMode) {
+      const p = canvasPoint(e, e.currentTarget as HTMLElement);
+      laserPoints.push({ x: p.x, y: p.y, id: Date.now() });
+      if (laserPoints.length > 25) {
+        laserPoints.shift();
+      }
+    }
     if (relDragId) {
       // Reshape the relationship curve: store the control point in layout
       // coordinates minus the normalization shift (same space as floating
@@ -1197,6 +1224,13 @@
       <marker id="rel-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
         <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
       </marker>
+      <filter id="laser-glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
     </defs>
     <g class:animate-viewport={presenterMode && !panning && dragId === null} transform={`translate(${tx} ${ty}) scale(${scale})`}>
       {#each layout.boundaries as b (b.id)}
@@ -1354,6 +1388,18 @@
             y2={dropMode === "before" ? t.y - 4 : t.y + t.h + 4}
             stroke="#1d4ed8" stroke-width="3" stroke-linecap="round" />
         {/if}
+      {/if}
+      {#if presenterMode && laserPoints.length > 0}
+        <g pointer-events="none">
+          {#each laserPoints as p, i (p.id)}
+            {@const age = (nowTime - p.id) / 600}
+            {@const opacity = Math.max(0, 1 - age)}
+            {@const size = Math.max(0, 6 * (1 - age))}
+            {#if opacity > 0 && size > 0}
+              <circle cx={p.x} cy={p.y} r={size} fill="#f38ba8" opacity={opacity} filter="url(#laser-glow)" />
+            {/if}
+          {/each}
+        </g>
       {/if}
     </g>
   </svg>
