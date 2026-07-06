@@ -417,6 +417,49 @@
     if (t && (t.children?.length ?? 0) > 0) { toggleCollapse(t); notify(); }
   }
 
+  function setCollapsedRecursive(t: Topic, collapsed: boolean) {
+    t.collapsed = collapsed;
+    for (const c of t.children ?? []) {
+      setCollapsedRecursive(c, collapsed);
+    }
+  }
+
+  function expandSelectedSubtree(recursive: boolean) {
+    if (selectedId) {
+      const t = findTopic(sheet, selectedId);
+      if (t) {
+        if (recursive) {
+          setCollapsedRecursive(t, false);
+        } else {
+          t.collapsed = false;
+        }
+        notify();
+      }
+    } else {
+      if (sheet.rootTopic) setCollapsedRecursive(sheet.rootTopic, false);
+      for (const f of sheet.floatingTopics ?? []) setCollapsedRecursive(f, false);
+      notify();
+    }
+  }
+
+  function collapseSelectedSubtree(recursive: boolean) {
+    if (selectedId) {
+      const t = findTopic(sheet, selectedId);
+      if (t) {
+        if (recursive) {
+          setCollapsedRecursive(t, true);
+        } else {
+          t.collapsed = true;
+        }
+        notify();
+      }
+    } else {
+      if (sheet.rootTopic) setCollapsedRecursive(sheet.rootTopic, true);
+      for (const f of sheet.floatingTopics ?? []) setCollapsedRecursive(f, true);
+      notify();
+    }
+  }
+
   // --- clipboard (copy / cut / paste / duplicate) ---------------------------
   /** Selected ids minus any that sit inside another selected subtree. */
   function topLevelSelection(): string[] {
@@ -611,6 +654,12 @@
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault(); deleteSelected(); return;
       }
+      if (e.key === "*") {
+        e.preventDefault(); expandSelectedSubtree(true); return;
+      }
+      if (e.key === "/") {
+        e.preventDefault(); collapseSelectedSubtree(true); return;
+      }
       if (!selectedId) return;
       switch (e.key) {
         case "Tab": e.preventDefault(); addChildToSelected(); break;
@@ -618,6 +667,9 @@
         case "Enter": e.preventDefault(); addSiblingToSelected(); break;
         case "F2": e.preventDefault(); beginEdit(selectedId); break;
         case " ": e.preventDefault(); collapseSelected(); break;
+        case "+":
+        case "=": e.preventDefault(); expandSelectedSubtree(false); break;
+        case "-": e.preventDefault(); collapseSelectedSubtree(false); break;
         case "ArrowLeft":
         case "ArrowRight":
         case "ArrowUp":
