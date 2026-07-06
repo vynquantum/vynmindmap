@@ -151,6 +151,32 @@
     return false;
   }
 
+  // --- drag and drop images -------------------------------------------------
+  function handleDragOver(e: DragEvent) {
+    if (e.dataTransfer?.types.includes("Files")) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    if (!e.dataTransfer?.files.length) return;
+    const file = e.dataTransfer.files[0];
+    if (!file?.type.startsWith("image/")) return;
+    
+    const p = canvasPoint(e, e.currentTarget as HTMLElement);
+    const node = nodeAt(p.x, p.y);
+    if (!node) return;
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      node.topic.image = { resource: reader.result as string };
+      markDirty();
+    };
+    reader.readAsDataURL(file);
+  }
+
   // --- pan & zoom -----------------------------------------------------------
   function zoomAt(factor: number, cx = viewW / 2, cy = viewH / 2) {
     const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * factor));
@@ -1220,6 +1246,8 @@
   onpointermove={onContainerPointerMove}
   onpointerup={onContainerPointerUp}
   onpointercancel={onContainerPointerUp}
+  ondragover={handleDragOver}
+  ondrop={handleDrop}
   class:panning
   class:dragging={dragId !== null}
 >

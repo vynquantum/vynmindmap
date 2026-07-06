@@ -188,6 +188,16 @@
     { id: "paper", bg: "#fbf7ee", root: "#7a5c3a" },
     { id: "mint", bg: "#eef7f2", root: "#2f9e6f" },
     { id: "rose", bg: "#fdeef3", root: "#c2477e" },
+    { id: "ocean", bg: "#e0f2fe", root: "#0369a1" },
+    { id: "forest", bg: "#f0fdf4", root: "#15803d" },
+    { id: "sunset", bg: "#fff7ed", root: "#c2410c" },
+    { id: "lavender", bg: "#faf5ff", root: "#6d28d9" },
+    { id: "monochrome", bg: "#f1f5f9", root: "#334155" },
+    { id: "hacker", bg: "#000000", root: "#22c55e" },
+    { id: "cyberpunk", bg: "#0f172a", root: "#ec4899" },
+    { id: "coffee", bg: "#fef3c7", root: "#92400e" },
+    { id: "midnight", bg: "#020617", root: "#6366f1" },
+    { id: "solarized", bg: "#fdf6e3", root: "#b58900" },
   ];
   // Quick palette matching the canvas branch colors, plus neutrals.
   const SWATCHES = [
@@ -293,6 +303,29 @@
     if (topic) { topic.labels = v.split(",").map((s) => s.trim()).filter(Boolean); markDirty(); }
   }
   function setStructure(v: string) { sheet.structure = v as StructureId; markDirty(); }
+  
+  function handleImageUpload(e: Event) {
+    if (!topic) return;
+    const input = e.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+    const file = input.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        topic.image = { resource: reader.result as string };
+        markDirty();
+      };
+      reader.readAsDataURL(file);
+    }
+    input.value = ""; // reset
+  }
+  
+  function removeImage() {
+    if (topic?.image) {
+      delete topic.image;
+      markDirty();
+    }
+  }
 </script>
 
 {#snippet swatches(set: (c: string) => void)}
@@ -510,7 +543,7 @@
     </section>
 
     <section>
-      {@render sectionHeader("content", "Note · link · labels")}
+      {@render sectionHeader("content", "Note · link · labels · image")}
       {#if open.content}
         <div class="body">
           <label>Note
@@ -523,6 +556,13 @@
           <label>Labels (comma-separated)
             <input value={topic.labels?.join(", ") ?? ""} oninput={(e) => setLabels(e.currentTarget.value)} />
           </label>
+          <div class="fieldname">Image Attachment</div>
+          <div class="image-upload-row">
+            <input type="file" accept="image/*" onchange={handleImageUpload} class="file-input" />
+            {#if topic.image}
+              <button class="remove-img-btn" onclick={removeImage}>Remove Image</button>
+            {/if}
+          </div>
         </div>
       {/if}
     </section>
@@ -601,6 +641,35 @@
     border-radius: 8px; color: var(--muted);
   }
   .reset:hover:not(:disabled) { color: #c0392b; border-color: #c0392b; background: color-mix(in srgb, #c0392b 6%, var(--panel)); }
+
+  .image-upload-row { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .file-input {
+    font-size: 11px;
+    color: var(--muted);
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    padding: 8px;
+    background: var(--surface-1);
+    cursor: pointer;
+  }
+  .file-input::file-selector-button {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    padding: 4px 8px;
+    margin-right: 8px;
+    cursor: pointer;
+    font-size: 11px;
+  }
+  .file-input::file-selector-button:hover { background: var(--surface-3); }
+  .remove-img-btn {
+    padding: 6px 10px; font-size: 12px; border-radius: 6px;
+    color: #c0392b; border: 1px solid color-mix(in srgb, #c0392b 20%, transparent);
+    background: color-mix(in srgb, #c0392b 6%, var(--panel)); cursor: pointer;
+  }
+  .remove-img-btn:hover { background: color-mix(in srgb, #c0392b 12%, var(--panel)); }
+
 
   .fontbtns { display: flex; gap: 4px; margin-left: auto; }
   .ff { width: 28px; height: 28px; padding: 0; border-radius: 7px; }
