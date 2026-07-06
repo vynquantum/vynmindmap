@@ -29,6 +29,10 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Rust targets (macOS)
+        if: matrix.os == 'macos-latest'
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
@@ -59,6 +63,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "VynMindMap ${{ github.ref_name }}"
+          args: ${{ matrix.os == 'macos-latest' && '--target universal-apple-darwin' || '' }}
           releaseBody: |
             Download the installer for your operating system below.
 
