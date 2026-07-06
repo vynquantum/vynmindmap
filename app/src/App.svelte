@@ -130,6 +130,7 @@
   let isPresenterWindow = $state(window.location.search.includes("presenter=true"));
   let currentTitle = $state("No topic selected");
   let currentNote = $state("");
+  let isEditingNote = $state(false);
   let nextTitle = $state("");
   let currentIndex = $state(0);
   let totalTopics = $state(0);
@@ -302,8 +303,13 @@
     if (isPresenterWindow) {
       bc.onmessage = (e) => {
         if (e.data.action === "update") {
+          if (currentTitle !== e.data.title) {
+            isEditingNote = false;
+          }
           currentTitle = e.data.title;
-          currentNote = e.data.note;
+          if (!isEditingNote) {
+            currentNote = e.data.note;
+          }
           currentIndex = e.data.index;
           totalTopics = e.data.total;
           nextTitle = e.data.nextTitle;
@@ -364,6 +370,15 @@
           exitPresenterMode();
         } else if (e.data.action === "request_init") {
           sendPresenterUpdate();
+        } else if (e.data.action === "edit_note") {
+          if (selectedTopic) {
+            if (!selectedTopic.note) {
+              selectedTopic.note = { plain: e.data.note };
+            } else {
+              selectedTopic.note.plain = e.data.note;
+            }
+            markDirty();
+          }
         }
       };
       
@@ -887,12 +902,29 @@
         </div>
       {/if}
       <div class="presenter-title">{currentTitle}</div>
-      <div class="presenter-notes">
-        {#if currentNote}
-          {@html formatMarkdownNotes(currentNote)}
-        {:else}
-          <div class="presenter-placeholder">No notes for this topic. Add notes in the style panel to view them here.</div>
-        {/if}
+      <div class="presenter-notes-container">
+        <div class="notes-header">
+          <span class="notes-title">Topic Notes</span>
+          <button class="edit-notes-btn" onclick={() => isEditingNote = !isEditingNote}>
+            {isEditingNote ? "Done" : "Edit Notes"}
+          </button>
+        </div>
+        <div class="presenter-notes" class:editing={isEditingNote}>
+          {#if isEditingNote}
+            <textarea
+              class="notes-textarea"
+              bind:value={currentNote}
+              oninput={() => bc?.postMessage({ action: "edit_note", note: currentNote })}
+              placeholder="Type your notes here (Markdown supported)..."
+            ></textarea>
+          {:else}
+            {#if currentNote}
+              {@html formatMarkdownNotes(currentNote)}
+            {:else}
+              <div class="presenter-placeholder">No notes for this topic. Click "Edit Notes" above to add some.</div>
+            {/if}
+          {/if}
+        </div>
       </div>
       <div class="presenter-next-preview">
         <span class="next-label">Next:</span> {nextTitle}
@@ -1290,6 +1322,40 @@
     color: #89b4fa;
     margin-bottom: 16px;
   }
+  .presenter-notes-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .notes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .notes-title {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #a6adc8;
+    font-weight: 600;
+  }
+  .edit-notes-btn {
+    background: #313244;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .edit-notes-btn:hover {
+    background: #45475a;
+  }
   .presenter-notes {
     flex: 1;
     overflow-y: auto;
@@ -1299,6 +1365,26 @@
     font-size: 18px;
     line-height: 1.6;
     border: 1px solid #313244;
+    display: flex;
+    flex-direction: column;
+  }
+  .presenter-notes.editing {
+    padding: 8px;
+  }
+  .notes-textarea {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    color: #cdd6f4;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: inherit;
+    font-size: 18px;
+    line-height: 1.6;
+    box-sizing: border-box;
+    padding: 8px;
   }
   .presenter-placeholder {
     color: #585b70;
