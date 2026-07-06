@@ -295,9 +295,9 @@
     if (presenterMode) {
       exitPresenterMode();
     } else {
+      openPresenterNotes();
       presenterMode = true;
       zenMode = true;
-      openPresenterNotes();
     }
   }
 
