@@ -76,6 +76,23 @@
 
   let startX = 0, startY = 0, startTx = 0, startTy = 0;
 
+  // Gesture tracking
+  const activePointers = new Map<number, { clientX: number; clientY: number }>();
+  let lastDistance = 0;
+  let lastMidPoint = { x: 0, y: 0 };
+
+  function initGesture() {
+    const keys = Array.from(activePointers.keys());
+    if (keys.length < 2) return;
+    const p1 = activePointers.get(keys[0]!)!;
+    const p2 = activePointers.get(keys[1]!)!;
+    lastDistance = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
+    lastMidPoint = {
+      x: (p1.clientX + p2.clientX) / 2,
+      y: (p1.clientY + p2.clientY) / 2,
+    };
+  }
+
   const nodeById = $derived(new Map(layout.nodes.map((n) => [n.id, n])));
 
   // --- helpers --------------------------------------------------------------
@@ -121,9 +138,17 @@
 
   function onWheel(e: WheelEvent) {
     e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    zoomAt(factor, e.clientX - rect.left, e.clientY - rect.top);
+    if (e.ctrlKey) {
+      // Zoom (trackpad pinch-to-zoom or Ctrl + scroll wheel)
+      let factor = 1 - e.deltaY * 0.002;
+      factor = Math.min(1.15, Math.max(0.85, factor));
+      zoomAt(factor, e.clientX - rect.left, e.clientY - rect.top);
+    } else {
+      // Pan (trackpad two-finger scroll or standard mouse scroll wheel)
+      tx -= e.deltaX;
+      ty -= e.deltaY;
+    }
   }
 
   function onBgPointerDown(e: PointerEvent) {
@@ -649,6 +674,94 @@
     ro.observe(el);
     viewW = el.clientWidth; viewH = el.clientHeight;
     return () => ro.disconnect();
+  });
+
+  // Multi-touch gestures for zoom and pan on touchscreen.
+  $effect(() => {
+    if (!canvasEl) return;
+    const el = canvasEl;
+
+    const onDown = (e: PointerEvent) => {
+      activePointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+      if (activePointers.size >= 2) {
+        panning = false;
+        dragId = null;
+        dragOverId = null;
+        pressed = null;
+        relDragId = null;
+        relDragged = false;
+        ctxMenu = null;
+        initGesture();
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        el.setPointerCapture(e.pointerId);
+      }
+    };
+
+    const onMove = (e: PointerEvent) => {
+      if (activePointers.has(e.pointerId)) {
+        activePointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+      }
+      if (activePointers.size >= 2) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        const keys = Array.from(activePointers.keys());
+        const p1 = activePointers.get(keys[0]!)!;
+        const p2 = activePointers.get(keys[1]!)!;
+
+        const currentDistance = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
+        const currentMidPoint = {
+          x: (p1.clientX + p2.clientX) / 2,
+          y: (p1.clientY + p2.clientY) / 2,
+        };
+
+        if (lastDistance > 0 && currentDistance > 0) {
+          const factor = currentDistance / lastDistance;
+          const rect = el.getBoundingClientRect();
+          zoomAt(factor, currentMidPoint.x - rect.left, currentMidPoint.y - rect.top);
+        }
+
+        tx += (currentMidPoint.x - lastMidPoint.x);
+        ty += (currentMidPoint.y - lastMidPoint.y);
+
+        lastDistance = currentDistance;
+        lastMidPoint = currentMidPoint;
+      }
+    };
+
+    const onUp = (e: PointerEvent) => {
+      if (activePointers.has(e.pointerId)) {
+        activePointers.delete(e.pointerId);
+        if (activePointers.size >= 2) {
+          initGesture();
+        } else {
+          lastDistance = 0;
+        }
+      }
+    };
+
+    const onBlur = () => {
+      activePointers.clear();
+      lastDistance = 0;
+    };
+
+    el.addEventListener("pointerdown", onDown, { capture: true });
+    el.addEventListener("pointermove", onMove, { capture: true });
+    window.addEventListener("pointerup", onUp, { capture: true });
+    window.addEventListener("pointercancel", onUp, { capture: true });
+    window.addEventListener("blur", onBlur);
+
+    return () => {
+      activePointers.clear();
+      el.removeEventListener("pointerdown", onDown, { capture: true });
+      el.removeEventListener("pointermove", onMove, { capture: true });
+      window.removeEventListener("pointerup", onUp, { capture: true });
+      window.removeEventListener("pointercancel", onUp, { capture: true });
+      window.removeEventListener("blur", onBlur);
+    };
   });
 
   const MM_W = 190, MM_H = 130;
