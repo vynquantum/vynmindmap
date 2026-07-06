@@ -35,7 +35,10 @@
     { id: "underline", label: "Underline" },
     { id: "none", label: "No border" },
   ];
-  const PRIORITY_COLORS: Record<string, string> = { "1": "#e5484d", "2": "#e98a3a", "3": "#3f7fd0" };
+  const PRIORITY_COLORS: Record<string, string> = {
+    "1": "#e5484d", "2": "#e98a3a", "3": "#3f7fd0", "4": "#3aa6a6", "5": "#4fa84f",
+    "6": "#e7b93f", "7": "#7a5cc9", "8": "#c95ca0", "9": "#64748b"
+  };
   const MARKERS = [
     { id: "task-start", icon: "🔵" }, { id: "task-25%", icon: "◔" }, { id: "task-50%", icon: "◑" },
     { id: "task-75%", icon: "◕" }, { id: "task-done", icon: "✅" },
@@ -427,7 +430,7 @@
         <div class="body">
           <div class="fieldname">Priority</div>
           <div class="markers">
-            {#each ["1", "2", "3"] as p (p)}
+            {#each ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as p (p)}
               <button class="prio" class:on={hasMarker(`priority-${p}`)} title={`Priority ${p}`}
                 style={`--pc:${PRIORITY_COLORS[p]}`} onclick={() => toggleMarker(`priority-${p}`)}>
                 <span>{p}</span>

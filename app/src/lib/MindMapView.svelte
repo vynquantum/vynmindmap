@@ -1122,7 +1122,8 @@
     wink: "😉", "thumb-up": "👍", "thumb-down": "👎",
   };
   const PRIORITY_COLORS: Record<string, string> = {
-    "1": "#e5484d", "2": "#e98a3a", "3": "#3f7fd0",
+    "1": "#e5484d", "2": "#e98a3a", "3": "#3f7fd0", "4": "#3aa6a6", "5": "#4fa84f",
+    "6": "#e7b93f", "7": "#7a5cc9", "8": "#c95ca0", "9": "#64748b",
   };
   function markerIcon(id: string): string {
     return MARKER_ICONS[id] ?? "●";
