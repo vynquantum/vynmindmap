@@ -39,18 +39,146 @@
   const MARKERS = [
     { id: "task-start", icon: "🔵" }, { id: "task-25%", icon: "◔" }, { id: "task-50%", icon: "◑" },
     { id: "task-75%", icon: "◕" }, { id: "task-done", icon: "✅" },
-    { id: "flag-red", icon: "🚩" }, { id: "flag-green", icon: "🏁" }, { id: "star", icon: "⭐" },
-    { id: "idea", icon: "💡" }, { id: "question", icon: "❓" }, { id: "people", icon: "👤" },
-    { id: "smiley", icon: "🙂" },
+    { id: "flag-red", icon: "🚩" }, { id: "flag-green", icon: "🏁" }, { id: "flag-blue", icon: "🗳️" },
+    { id: "star", icon: "⭐" }, { id: "star-blue", icon: "🌟" }, { id: "heart", icon: "❤️" },
+    { id: "idea", icon: "💡" }, { id: "question", icon: "❓" }, { id: "warning", icon: "⚠️" },
+    { id: "info", icon: "ℹ️" }, { id: "cross", icon: "❌" }, { id: "check", icon: "✔️" },
+    { id: "rocket", icon: "🚀" }, { id: "fire", icon: "🔥" }, { id: "bomb", icon: "💣" },
+    { id: "money", icon: "💰" }, { id: "calendar", icon: "📅" }, { id: "clock", icon: "⏰" },
+    { id: "chart-up", icon: "📈" }, { id: "chart-down", icon: "📉" }, { id: "pin", icon: "📌" },
+    { id: "key", icon: "🔑" }, { id: "lock", icon: "🔒" }, { id: "people", icon: "👤" },
+    { id: "smiley", icon: "🙂" }, { id: "wink", icon: "😉" }, { id: "thumb-up", icon: "👍" },
+    { id: "thumb-down", icon: "👎" }
   ];
   const FONTS = [
-    "Inter", "system-ui", "Arial", "Helvetica", "Georgia", "Times New Roman",
-    "Courier New", "Verdana", "Tahoma", "Trebuchet MS", "Comic Sans MS", "Impact",
+    "Inter", "system-ui", "Outfit", "Roboto", "Montserrat", "Playfair Display",
+    "Merriweather", "JetBrains Mono", "Fira Code", "Pacifico", "Dancing Script",
+    "Caveat", "Architects Daughter", "Satisfy", "Open Sans", "Lato", "Poppins",
+    "Nunito", "Rubik", "Quicksand", "Arial", "Helvetica", "Georgia", "Times New Roman",
+    "Courier New", "Verdana", "Tahoma", "Trebuchet MS", "Comic Sans MS", "Impact"
   ];
   const FONT_SIZES = [10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32];
   const BORDER_WIDTHS = [1, 1.5, 2, 3, 4];
   const LINE_WIDTHS = [1.5, 2, 2.5, 3, 4];
-  const EMOJIS = "😀 😄 😎 🤔 👍 👎 ❤️ 🔥 ⭐ ✨ ✅ ❌ ⚠️ ❗ ❓ 💡 📌 📎 📝 📅 ⏰ 🎯 🚀 🏆 💰 📈 📉 🔑 🔒 🐛 ✔️ ➡️ ⬅️ ⬆️ ⬇️ 🟢 🟡 🔴 🔵 ⚫".split(" ");
+
+  const EMOJI_CATEGORIES = [
+    {
+      name: "Smileys",
+      icon: "😀",
+      emojis: [
+        { char: "😀", tags: "smile happy grin" }, { char: "😄", tags: "smile happy laugh" }, 
+        { char: "😆", tags: "laugh squint happy" }, { char: "😅", tags: "sweat laugh happy" }, 
+        { char: "😂", tags: "joy tears laugh cry" }, { char: "🤣", tags: "rofl laugh floor" }, 
+        { char: "😊", tags: "blush smile happy" }, { char: "😇", tags: "angel halo innocent" }, 
+        { char: "🙂", tags: "slight smile" }, { char: "🙃", tags: "upside down" }, 
+        { char: "😉", tags: "wink eye" }, { char: "😌", tags: "relieved peace calm" }, 
+        { char: "😍", tags: "heart eyes love" }, { char: "🥰", tags: "hearts love warm" }, 
+        { char: "😘", tags: "kiss love blow" }, { char: "😋", tags: "yum tongue delicious" }, 
+        { char: "😜", tags: "wink tongue crazy" }, { char: "🤪", tags: "zany crazy wild" }, 
+        { char: "🤨", tags: "raised eyebrow skeptic" }, { char: "🧐", tags: "monocle inspector investigate" }, 
+        { char: "🤓", tags: "nerd geek glasses" }, { char: "😎", tags: "cool sunglasses glasses" }, 
+        { char: "🥳", tags: "party celebrate hat" }, { char: "😏", tags: "smirk sly" }, 
+        { char: "😒", tags: "unamused meh" }, { char: "😞", tags: "sad disappointed" }, 
+        { char: "😔", tags: "pensive sad" }, { char: "😟", tags: "worried concern" }, 
+        { char: "😕", tags: "confused" }, { char: "🥺", tags: "pleading eyes beg puppy" }, 
+        { char: "😢", tags: "cry sad tear" }, { char: "😭", tags: "sob cry heavy" }, 
+        { char: "😤", tags: "steam nose angry pride" }, { char: "😠", tags: "angry mad" }, 
+        { char: "😡", tags: "rage angry red" }, { char: "🤬", tags: "cursing mouth swear" }, 
+        { char: "🤯", tags: "mind blown explode shock" }, { char: "😳", tags: "flushed blush shock" }, 
+        { char: "🥵", tags: "hot red sweat summer" }, { char: "🥶", tags: "cold blue freeze winter" }, 
+        { char: "😱", tags: "scream fear gasp" }, { char: "😴", tags: "sleep zzz tired" }, 
+        { char: "🤤", tags: "drool sleep" }, { char: "😪", tags: "sleepy bubble" },
+        { char: "🥴", tags: "woozy dizzy" }, { char: "🤢", tags: "nausea green sick" }, 
+        { char: "🤮", tags: "vomit sick" }, { char: "🤧", tags: "sneeze cold nose" }, 
+        { char: "😷", tags: "mask sick hospital" }
+      ]
+    },
+    {
+      name: "Gestures",
+      icon: "👋",
+      emojis: [
+        { char: "👋", tags: "wave hello goodbye" }, { char: "👌", tags: "ok correct good" }, 
+        { char: "✌️", tags: "victory peace hand" }, { char: "🤞", tags: "cross fingers luck" }, 
+        { char: "🤟", tags: "love sign" }, { char: "🤘", tags: "rock metal horns" }, 
+        { char: "👈", tags: "point left" }, { char: "👉", tags: "point right" }, 
+        { char: "👆", tags: "point up" }, { char: "👇", tags: "point down" }, 
+        { char: "👍", tags: "thumbs up like approve yes" }, { char: "👎", tags: "thumbs down dislike reject no" }, 
+        { char: "👏", tags: "clap hand applause" }, { char: "🙌", tags: "hooray celebrate raise hands" }, 
+        { char: "👐", tags: "open hands" }, { char: "🤲", tags: "palms together" }, 
+        { char: "🤝", tags: "handshake agree deal partnership" }, { char: "🙏", tags: "pray please thank you hands" }, 
+        { char: "✍️", tags: "write pen sign" }, { char: "💪", tags: "flex biceps strong power muscle" }, 
+        { char: "🧠", tags: "brain mind think smart intelligence" }, { char: "🧡", tags: "orange heart" }, 
+        { char: "💛", tags: "yellow heart" }, { char: "💚", tags: "green heart" }, 
+        { char: "💙", tags: "blue heart" }, { char: "💜", tags: "purple heart" }, 
+        { char: "🖤", tags: "black heart" }, { char: "🤍", tags: "white heart" }, 
+        { char: "💔", tags: "broken heart sad" }, { char: "❤️", tags: "red heart love" }, 
+        { char: "🔥", tags: "fire flame hot trend" }, { char: "✨", tags: "sparkles magic shiny" }
+      ]
+    },
+    {
+      name: "Office",
+      icon: "💻",
+      emojis: [
+        { char: "💻", tags: "laptop computer notebook code developer" }, { char: "🖥️", tags: "desktop monitor screen" }, 
+        { char: "📱", tags: "phone mobile cell smartphone" }, { char: "💾", tags: "save floppy disk" }, 
+        { char: "📁", tags: "folder file document" }, { char: "📂", tags: "open folder file" }, 
+        { char: "📄", tags: "page document paper sheet" }, { char: "📑", tags: "tabs bookmark document" }, 
+        { char: "📊", tags: "bar chart stats metrics report" }, { char: "📈", tags: "chart line growth metrics trend up" }, 
+        { char: "📉", tags: "chart line decline decrease metrics trend down" }, { char: "📜", tags: "scroll history paper" }, 
+        { char: "📋", tags: "clipboard copy paste list" }, { char: "📌", tags: "pin pushpin map location board" }, 
+        { char: "📍", tags: "pin red map location point" }, { char: "📎", tags: "paperclip attach document link" }, 
+        { char: "✉️", tags: "envelope mail letter inbox" }, { char: "📦", tags: "package box delivery parcel" }, 
+        { char: "📝", tags: "memo note write paper editor" }, { char: "✏️", tags: "pencil write draw" }, 
+        { char: "✒️", tags: "nib pen write sign" }, { char: "📏", tags: "ruler scale measure" }, 
+        { char: "📐", tags: "triangle ruler scale geometry measure" }, { char: "🔑", tags: "key password secret open access" }, 
+        { char: "🔒", tags: "lock closed secure privacy safe" }, { char: "🔓", tags: "unlock open insecure access" }, 
+        { char: "🛡️", tags: "shield protect security safe" }, { char: "⚙️", tags: "gear settings configure build options" }, 
+        { char: "🛠️", tags: "tools hammer wrench build configure fix repair" }, { char: "🔬", tags: "microscope science research test" }, 
+        { char: "🔭", tags: "telescope astronomy explore search find" }, { char: "🎯", tags: "target goal bullseye objective focus" }, 
+        { char: "🚀", tags: "rocket launch speed fast advance boost start" }, { char: "💡", tags: "lightbulb idea smart think solution inspiration" }
+      ]
+    },
+    {
+      name: "Travel",
+      icon: "✈️",
+      emojis: [
+        { char: "✈️", tags: "airplane fly travel flight" }, { char: "🚗", tags: "car auto drive vehicle" }, 
+        { char: "🚙", tags: "suv car auto vehicle" }, { char: "🛵", tags: "scooter moped drive" }, 
+        { char: "🚲", tags: "bicycle bike ride cycle" }, { char: "🚂", tags: "locomotive train rail travel" }, 
+        { char: "🚢", tags: "ship boat cruise travel water" }, { char: "🗺️", tags: "map world travel plan guide" }, 
+        { char: "🧭", tags: "compass direction guide navigation travel orientation" }, { char: "🏢", tags: "office building company corporate work" }, 
+        { char: "🏠", tags: "house home building" }, { char: "🏫", tags: "school building education university class" }, 
+        { char: "🏥", tags: "hospital clinic medical sick doctor" }, { char: "🏭", tags: "factory industry manufacturing" }, 
+        { char: "🏛️", tags: "museum bank government classical building" }, { char: "⛪", tags: "church building" }, 
+        { char: "🌃", tags: "night sky stars city building" }, { char: "🏞️", tags: "national park nature valley" }, 
+        { char: "🏜️", tags: "desert dry sand" }, { char: "🏝️", tags: "island beach palm tree travel" }, 
+        { char: "🌋", tags: "volcano eruption lava hot" }
+      ]
+    },
+    {
+      name: "Symbols",
+      icon: "⚽",
+      emojis: [
+        { char: "⚽", tags: "soccer ball sport game" }, { char: "🏀", tags: "basketball ball sport game" }, 
+        { char: "🏈", tags: "football ball sport game" }, { char: "🎾", tags: "tennis racket ball sport game" }, 
+        { char: "🥇", tags: "gold medal first champion win" }, { char: "🥈", tags: "silver medal second win" }, 
+        { char: "🥉", tags: "bronze medal third win" }, { char: "🏆", tags: "trophy cup prize champion win first" }, 
+        { char: "🎈", tags: "balloon party celebrate" }, { char: "🎉", tags: "popper party celebrate event" }, 
+        { char: "⚠️", tags: "warning alert caution hazard priority" }, { char: "❗", tags: "exclamation mark alert point priority warning" }, 
+        { char: "❓", tags: "question mark help info ask query" }, { char: "ℹ️", tags: "info help document details" }, 
+        { char: "🔔", tags: "bell alert notification sound alarm" }, { char: "📢", tags: "loudspeaker broadcast alert announcement" }, 
+        { char: "🔊", tags: "speaker sound volume loud audio" }, { char: "🔍", tags: "magnifier search glass zoom find investigate" }, 
+        { char: "💬", tags: "bubble chat message talk comments discussion" }, { char: "💭", tags: "thought bubble think mind dream idea" }, 
+        { char: "🟢", tags: "green circle status active safe" }, { char: "🟡", tags: "yellow circle status warning pending pause" }, 
+        { char: "🔴", tags: "red circle status error alert blocked" }, { char: "🔵", tags: "blue circle status info task start" }, 
+        { char: "✔️", tags: "check mark correct agree accept yes done" }, { char: "❌", tags: "cross cancel wrong reject delete block no" }, 
+        { char: "🌟", tags: "sparkling star bright favorite" }, { char: "⭐", tags: "star yellow favorite rate" }, 
+        { char: "⚡", tags: "lightning bolt electricity flash fast speed alert power" }, { char: "🌈", tags: "rainbow colorful dream sky" }, 
+        { char: "☀️", tags: "sun warm day bright light weather summer" }, { char: "🌙", tags: "moon crescent night sky sleep" }, 
+        { char: "🍀", tags: "clover leaf luck green" }, { char: "🌸", tags: "flower cherry blossom spring" }
+      ]
+    }
+  ];
   const THEMES = [
     { id: "classic", bg: "#f5f6f8", root: "#33415c" },
     { id: "dark", bg: "#1f2430", root: "#3f7fd0" },
@@ -76,6 +204,26 @@
   let open = $state<Record<string, boolean>>(loadSections());
   $effect(() => { localStorage.setItem(SECT_KEY, JSON.stringify(open)); });
   function toggle(id: string) { open[id] = !open[id]; }
+
+  let selectedCategory = $state("Smileys");
+  let emojiSearchQ = $state("");
+  let anyEmojiInput = $state("");
+  
+  const filteredEmojis = $derived.by(() => {
+    const q = emojiSearchQ.trim().toLowerCase();
+    if (!q) {
+      return EMOJI_CATEGORIES.find(c => c.name === selectedCategory)?.emojis.map(e => e.char) ?? [];
+    }
+    const matches: string[] = [];
+    for (const cat of EMOJI_CATEGORIES) {
+      for (const e of cat.emojis) {
+        if (e.tags.includes(q)) {
+          matches.push(e.char);
+        }
+      }
+    }
+    return matches;
+  });
 
   function expand(hex?: string): string {
     if (!hex) return "#ffffff";
@@ -299,11 +447,60 @@
     <section>
       {@render sectionHeader("emoji", "Insert emoji")}
       {#if open.emoji}
-        <div class="body">
-          <div class="emojis">
-            {#each EMOJIS as e (e)}
-              <button title={`Insert ${e}`} onclick={() => insertEmoji(e)}>{e}</button>
+        <div class="body emoji-picker-container">
+          <input
+            type="text"
+            class="emoji-search-input"
+            placeholder="Search emojis..."
+            bind:value={emojiSearchQ}
+            onpointerdown={(e) => e.stopPropagation()}
+          />
+          
+          {#if !emojiSearchQ}
+            <div class="emoji-category-tabs">
+              {#each EMOJI_CATEGORIES as cat}
+                <button
+                  class="cat-tab-btn"
+                  class:active={selectedCategory === cat.name}
+                  onclick={() => selectedCategory = cat.name}
+                  title={cat.name}
+                  type="button"
+                >
+                  {cat.icon}
+                </button>
+              {/each}
+            </div>
+          {/if}
+          
+          <div class="emojis-grid">
+            {#each filteredEmojis as e (e)}
+              <button title={`Insert ${e}`} onclick={() => insertEmoji(e)} type="button">{e}</button>
             {/each}
+            {#if filteredEmojis.length === 0}
+              <div class="no-emojis-msg">No matching emojis</div>
+            {/if}
+          </div>
+
+          <div class="custom-emoji-row">
+            <input
+              type="text"
+              class="custom-emoji-input"
+              placeholder="Or paste any emoji..."
+              bind:value={anyEmojiInput}
+              onpointerdown={(e) => e.stopPropagation()}
+            />
+            <button
+              class="custom-emoji-btn"
+              disabled={!anyEmojiInput.trim()}
+              onclick={() => { insertEmoji(anyEmojiInput.trim()); anyEmojiInput = ""; }}
+              type="button"
+            >
+              Insert
+            </button>
+          </div>
+          
+          <div class="emoji-keyboard-tip">
+            Tip: Press ⌘+Ctrl+Space (Mac) or Win+. (Win) for native emoji picker
           </div>
         </div>
       {/if}
@@ -419,9 +616,122 @@
   }
   .prio.on { border-color: var(--pc); background: color-mix(in srgb, var(--pc) 14%, var(--panel)); }
 
-  .emojis { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
-  .emojis button { padding: 0; height: 26px; font-size: 15px; border-color: transparent; background: none; }
-  .emojis button:hover { background: var(--surface-2); border-color: var(--border); }
+  .emoji-picker-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .emoji-search-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface-1);
+    color: var(--text);
+    outline: none;
+    font-size: 13px;
+  }
+  .emoji-search-input:focus {
+    border-color: var(--accent);
+  }
+  .emoji-category-tabs {
+    display: flex;
+    justify-content: space-between;
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 2px;
+  }
+  .cat-tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 4px 0;
+    font-size: 15px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.15s;
+  }
+  .cat-tab-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .cat-tab-btn.active {
+    background: var(--panel);
+    box-shadow: var(--elev-1);
+  }
+  .emojis-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 3px;
+    max-height: 140px;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+  .emojis-grid button {
+    padding: 0;
+    height: 28px;
+    font-size: 16px;
+    border: 1px solid transparent;
+    background: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .emojis-grid button:hover {
+    background: var(--surface-2);
+    border-color: var(--border);
+  }
+  .no-emojis-msg {
+    grid-column: span 8;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 12px 0;
+  }
+  .custom-emoji-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .custom-emoji-input {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface-1);
+    color: var(--text);
+    outline: none;
+    font-size: 13px;
+  }
+  .custom-emoji-input:focus {
+    border-color: var(--accent);
+  }
+  .custom-emoji-btn {
+    padding: 0 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .custom-emoji-btn:hover:not(:disabled) {
+    background: var(--surface-3);
+  }
+  .custom-emoji-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .emoji-keyboard-tip {
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.3;
+    margin-top: 4px;
+    font-style: italic;
+  }
 
   /* Theme swatches */
   .themes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }

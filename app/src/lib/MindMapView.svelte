@@ -1114,9 +1114,12 @@
     return 8;
   }
   const MARKER_ICONS: Record<string, string> = {
-    "flag-red": "🚩", "flag-green": "🏁", star: "⭐", "star-yellow": "⭐",
+    "flag-red": "🚩", "flag-green": "🏁", "flag-blue": "🗳️", star: "⭐", "star-yellow": "⭐", "star-blue": "🌟",
     "task-done": "✅", "task-start": "🔵", "task-25%": "◔", "task-50%": "◑", "task-75%": "◕",
-    idea: "💡", question: "❓", people: "👤", smiley: "🙂",
+    idea: "💡", question: "❓", people: "👤", smiley: "🙂", heart: "❤️", warning: "⚠️", info: "ℹ️",
+    cross: "❌", check: "✔️", rocket: "🚀", fire: "🔥", bomb: "💣", money: "💰", calendar: "📅",
+    clock: "⏰", "chart-up": "📈", "chart-down": "📉", pin: "📌", key: "🔑", lock: "🔒",
+    wink: "😉", "thumb-up": "👍", "thumb-down": "👎",
   };
   const PRIORITY_COLORS: Record<string, string> = {
     "1": "#e5484d", "2": "#e98a3a", "3": "#3f7fd0",
