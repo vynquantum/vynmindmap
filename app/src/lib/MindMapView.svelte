@@ -93,6 +93,11 @@
     };
   }
 
+  // Onboarding hint: shown until the first topic is selected, then it gets out
+  // of the way (it otherwise overlaps the minimap/zoombar on narrow canvases).
+  let showHint = $state(true);
+  $effect(() => { if (selectedId) showHint = false; });
+
   const nodeById = $derived(new Map(layout.nodes.map((n) => [n.id, n])));
 
   // --- helpers --------------------------------------------------------------
@@ -579,6 +584,15 @@
     else if (e.key === "Escape") { e.preventDefault(); closeSearch(); }
   }
 
+  // As the query changes, jump to the first match and keep the counter in
+  // range (otherwise a shrinking result set could show a stale "5/2").
+  $effect(() => {
+    searchQ; // track edits to the query
+    if (!searchOpen) return;
+    searchIdx = 0;
+    if (searchMatches.length) gotoMatch(0);
+  });
+
   // --- keyboard navigation --------------------------------------------------
   function navigate(key: string) {
     if (!selectedId) return;
@@ -594,8 +608,13 @@
     } else if (key === goOutward) {
       if (fp?.parent) selectedId = fp.parent.id;
     } else if (key === "ArrowUp" || key === "ArrowDown") {
-      const sibs = fp?.parent?.children ?? (node.side !== "root" ? sheet.rootTopic.children : []);
+      let sibs = fp?.parent?.children ?? (node.side !== "root" ? sheet.rootTopic.children : []);
       if (!sibs) return;
+      // In balanced maps the root's children split into two sides; keep
+      // vertical navigation on the same visual side instead of jumping across.
+      if (fp?.parent?.id === sheet.rootTopic.id) {
+        sibs = sibs.filter((c) => nodeById.get(c.id)?.side === node.side);
+      }
       const idx = sibs.findIndex((c) => c.id === selectedId);
       const nextIdx = key === "ArrowUp" ? idx - 1 : idx + 1;
       if (idx !== -1 && sibs[nextIdx]) selectedId = sibs[nextIdx]!.id;
@@ -1014,6 +1033,13 @@
     const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
     return 0.299 * r + 0.587 * g + 0.114 * b < 140;
   }
+
+  // Canvas chrome (dot grid, table separators) adapts to the sheet background
+  // so a dark-themed sheet doesn't show jarring near-white dots/lines.
+  const canvasBg = $derived(sheet.background?.color ?? "#f5f6f8");
+  const darkCanvas = $derived(isDark(canvasBg));
+  const dotColor = $derived(darkCanvas ? "rgba(255,255,255,0.07)" : "rgba(20,28,45,0.07)");
+  const gridStroke = $derived(darkCanvas ? "#3a4152" : "#cbd2dc");
   function rxFor(n: LaidOutNode): number {
     const shape = n.topic.style?.shape ?? "rounded";
     if (shape === "rect") return 0;
@@ -1115,7 +1141,7 @@
   bind:this={canvasEl}
   class="canvas"
   role="application"
-  style={`background-color:${sheet.background?.color ?? "#f5f6f8"}`}
+  style={`background-color:${canvasBg}; background-image: radial-gradient(circle, ${dotColor} 1px, transparent 1px); background-size: 24px 24px;`}
   ondblclick={onCanvasDblClick}
   oncontextmenu={onContextMenu}
   onwheel={onWheel}
@@ -1147,7 +1173,7 @@
       {/each}
 
       {#each layout.gridLines as l, li (li)}
-        <line x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#cbd2dc" stroke-width="1" />
+        <line x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke={gridStroke} stroke-width="1" />
       {/each}
 
       {#each layout.braces as br (br.id)}
@@ -1410,9 +1436,11 @@
     </svg>
   {/if}
 
-  <div class="hint">
-    Tab: child · Enter: sibling · F2: rename · Del: delete · Ctrl+C/V: copy/paste · Ctrl+F: find · right-click: menu
-  </div>
+  {#if showHint}
+    <div class="hint">
+      Tab: child · Enter: sibling · F2: rename · Del: delete · Ctrl+C/V: copy/paste · Ctrl+F: find · right-click: menu
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -1420,7 +1448,9 @@
     position: relative;
     width: 100%; height: 100%;
     cursor: grab;
-    background: radial-gradient(circle, #e7eaef 1px, transparent 1px) 0 0 / 24px 24px;
+    /* background-color + dot grid are set inline so they adapt to the sheet
+       background (see the derived dotColor). */
+    background-position: 0 0;
     touch-action: none; user-select: none;
     overflow: hidden;
   }
