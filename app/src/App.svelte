@@ -123,6 +123,8 @@
   let showInspector = $state(localStorage.getItem("vynmm.inspector") !== "0");
   $effect(() => { localStorage.setItem("vynmm.inspector", showInspector ? "1" : "0"); });
 
+  let zenMode = $state(false);
+
   // --- autosave ---------------------------------------------------------------
   let autosave = $state(localStorage.getItem("vynmm.autosave") === "1");
   $effect(() => { localStorage.setItem("vynmm.autosave", autosave ? "1" : "0"); });
@@ -314,6 +316,7 @@
     histLen = 0;
     clearTimeout(autosaveTimer);
     stopWatch();
+    zenMode = false;
   }
 
   // Read and load a .vmm at a native path (open dialog, launch arg, or file event).
@@ -573,9 +576,16 @@
 
   $effect(() => {
     function onKey(e: KeyboardEvent) {
-      if (!(e.ctrlKey || e.metaKey)) return;
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return; // let fields do native undo
+      if (tag === "INPUT" || tag === "TEXTAREA") return; // let fields do native keys
+
+      if (e.key === "F8") {
+        e.preventDefault();
+        zenMode = !zenMode;
+        return;
+      }
+
+      if (!(e.ctrlKey || e.metaKey)) return;
       const k = e.key.toLowerCase();
       if (k === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
       else if ((k === "z" && e.shiftKey) || k === "y") { e.preventDefault(); redo(); }
@@ -590,7 +600,8 @@
 </script>
 
 <div class="app">
-  <header>
+  {#if !zenMode}
+    <header>
     <div class="brand"><img class="brand-logo" src={logoUrl} alt="" /><span>VynMindMap</span></div>
 
     <div class="group">
@@ -630,6 +641,8 @@
         title="Toggle outline panel" aria-label="Outline" aria-pressed={showOutline}><Icon name="list" /></button>
       <button class="ic" class:on={showInspector} onclick={() => (showInspector = !showInspector)} disabled={!workbook}
         title="Toggle style panel" aria-label="Style panel" aria-pressed={showInspector}><Icon name="panel-right" /></button>
+      <button class="ic" class:on={zenMode} onclick={() => (zenMode = !zenMode)} disabled={!workbook}
+        title="Full Window Mode (F8)" aria-label="Full Window" aria-pressed={zenMode}><Icon name="maximize" /></button>
       <button class="ic" class:on={autosave} onclick={() => { autosave = !autosave; if (autosave && dirty) scheduleAutosave(); }}
         title={autosave ? "Autosave is on (saves shortly after each change once a file is set)" : "Autosave is off"}
         aria-label="Autosave" aria-pressed={autosave}><Icon name="autosave" /></button>
@@ -644,7 +657,8 @@
     <input bind:this={mdInput} type="file" accept=".md,.markdown,text/markdown" onchange={onPickMarkdown} hidden />
 
     {#if fileName}<span class="file">{#if dirty}<span class="dot" title="Unsaved changes"></span>{/if}{fileName}</span>{/if}
-  </header>
+    </header>
+  {/if}
 
   {#if update}
     <div class="banner update">
@@ -677,41 +691,48 @@
   {/if}
 
   {#if workbook}
-    <nav class="tabs">
-      {#each workbook.sheets as s, i (s.id)}
-        <div class="tab" class:active={i === activeSheet}>
-          {#if editingTab === i}
-            <input
-              class="tab-edit"
-              value={s.title}
-              onblur={(e) => renameSheet(i, e.currentTarget.value)}
-              onkeydown={(e) => { if (e.key === "Enter") renameSheet(i, e.currentTarget.value); if (e.key === "Escape") editingTab = null; }}
-              use:focus
-            />
-          {:else}
-            <button class="tab-label" onclick={() => (activeSheet = i)} ondblclick={() => (editingTab = i)}>
-              {s.title}
-            </button>
-            {#if workbook.sheets.length > 1}
-              <button class="tab-x" title="Delete sheet" onclick={() => deleteSheet(i)}>×</button>
+    {#if !zenMode}
+      <nav class="tabs">
+        {#each workbook.sheets as s, i (s.id)}
+          <div class="tab" class:active={i === activeSheet}>
+            {#if editingTab === i}
+              <input
+                class="tab-edit"
+                value={s.title}
+                onblur={(e) => renameSheet(i, e.currentTarget.value)}
+                onkeydown={(e) => { if (e.key === "Enter") renameSheet(i, e.currentTarget.value); if (e.key === "Escape") editingTab = null; }}
+                use:focus
+              />
+            {:else}
+              <button class="tab-label" onclick={() => (activeSheet = i)} ondblclick={() => (editingTab = i)}>
+                {s.title}
+              </button>
+              {#if workbook.sheets.length > 1}
+                <button class="tab-x" title="Delete sheet" onclick={() => deleteSheet(i)}>×</button>
+              {/if}
             {/if}
-          {/if}
-        </div>
-      {/each}
-      <button class="tab-add" title="Add sheet" onclick={addNewSheet}>+</button>
-    </nav>
+          </div>
+        {/each}
+        <button class="tab-add" title="Add sheet" onclick={addNewSheet}>+</button>
+      </nav>
+    {/if}
     <div class="workspace">
-      {#if showOutline && sheet}
+      {#if showOutline && !zenMode && sheet}
         <OutlinePanel {sheet} bind:selectedId {markDirty} reveal={(id) => view?.centerOn(id)} />
       {/if}
       <div class="viewport" bind:this={viewportEl}>
         {#if sheet}
           <MindMapView bind:this={view} {sheet} {resources} {markDirty} bind:selectedId />
         {/if}
+        {#if zenMode}
+          <button class="zen-toggle exit" title="Exit full window (F8)" onclick={() => (zenMode = false)}>
+            <Icon name="minimize" size={18} />
+          </button>
+        {/if}
       </div>
-      {#if sheet && showInspector}
+      {#if sheet && showInspector && !zenMode}
         <Inspector {sheet} topic={selectedTopic} {markDirty} onClose={() => (showInspector = false)} />
-      {:else if sheet}
+      {:else if sheet && !zenMode}
         <button class="inspector-open" title="Open style panel" aria-label="Open style panel"
           onclick={() => (showInspector = true)}><Icon name="sliders" size={18} /></button>
       {/if}
@@ -915,4 +936,14 @@
     padding: 0 14px; font-size: 16px; line-height: 1;
   }
   .recent-x:hover:not(:disabled) { color: #c0392b; background: color-mix(in srgb, #c0392b 8%, transparent); }
+
+  .zen-toggle.exit {
+    position: absolute; top: 12px; left: 12px; z-index: 10;
+    width: 38px; height: 38px; padding: 0; border-radius: 10px;
+    display: grid; place-items: center;
+    background: var(--panel); color: var(--accent);
+    border: 1px solid var(--border); box-shadow: var(--elev-2);
+    cursor: pointer;
+  }
+  .zen-toggle.exit:hover { background: var(--surface-2); }
 </style>
