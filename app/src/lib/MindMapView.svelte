@@ -641,8 +641,46 @@
   export function centerOn(id: string) {
     const n = layout.nodes.find((x) => x.id === id);
     if (!n || viewW === 0) return;
-    tx = viewW / 2 - (n.x + n.w / 2) * scale;
-    ty = viewH / 2 - (n.y + n.h / 2) * scale;
+    
+    if (presenterMode) {
+      // Collect visible descendants
+      const getSubtreeNodes = (topic: Topic): LaidOutNode[] => {
+        const subNodes: LaidOutNode[] = [];
+        const node = layout.nodes.find(x => x.id === topic.id);
+        if (node) subNodes.push(node);
+        
+        if (!topic.collapsed && topic.children) {
+          for (const child of topic.children) {
+            subNodes.push(...getSubtreeNodes(child));
+          }
+        }
+        return subNodes;
+      };
+      
+      const subNodes = getSubtreeNodes(n.topic);
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const sn of subNodes) {
+        if (sn.x < minX) minX = sn.x;
+        if (sn.x + sn.w > maxX) maxX = sn.x + sn.w;
+        if (sn.y < minY) minY = sn.y;
+        if (sn.y + sn.h > maxY) maxY = sn.y + sn.h;
+      }
+      
+      const w = maxX - minX;
+      const h = maxY - minY;
+      
+      // Target 70% viewport framing
+      const idealScale = Math.min((viewW * 0.7) / w, (viewH * 0.7) / h);
+      scale = Math.min(Math.max(idealScale, 0.65), 1.25);
+      
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      tx = viewW / 2 - centerX * scale;
+      ty = viewH / 2 - centerY * scale;
+    } else {
+      tx = viewW / 2 - (n.x + n.w / 2) * scale;
+      ty = viewH / 2 - (n.y + n.h / 2) * scale;
+    }
   }
 
   // --- global keyboard ------------------------------------------------------
@@ -1160,7 +1198,7 @@
         <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
       </marker>
     </defs>
-    <g transform={`translate(${tx} ${ty}) scale(${scale})`}>
+    <g class:animate-viewport={presenterMode && !panning && dragId === null} transform={`translate(${tx} ${ty}) scale(${scale})`}>
       {#each layout.boundaries as b (b.id)}
         <rect x={b.x} y={b.y} width={b.w} height={b.h} rx="14"
           fill={b.color} fill-opacity={selectedDeco?.id === b.id ? 0.16 : 0.08}
@@ -1459,6 +1497,9 @@
   }
   .canvas.panning { cursor: grabbing; }
   .canvas.dragging { cursor: grabbing; }
+  .animate-viewport {
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  }
   .node { cursor: pointer; }
   .node.ghost { opacity: 0.45; }
 
