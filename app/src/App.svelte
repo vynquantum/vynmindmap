@@ -130,7 +130,11 @@
   let isPresenterWindow = $state(window.location.search.includes("presenter=true"));
   let currentTitle = $state("No topic selected");
   let currentNote = $state("");
+  let nextTitle = $state("");
+  let currentIndex = $state(0);
+  let totalTopics = $state(0);
   let timerText = $state("00:00");
+  let clockText = $state("00:00:00");
   let bc = $state<BroadcastChannel | null>(null);
 
   function getPresentationOrder(): string[] {
@@ -155,6 +159,24 @@
     }
     
     return order;
+  }
+
+  function sendPresenterUpdate() {
+    if (bc && workbook) {
+      const ids = getPresentationOrder();
+      const idx = selectedId ? ids.indexOf(selectedId) : -1;
+      const nextId = idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null;
+      const nextTopic = nextId ? findTopic(sheet!, nextId) : null;
+      
+      bc.postMessage({
+        action: "update",
+        title: selectedTopic?.title ?? "No topic selected",
+        note: selectedTopic?.note?.plain ?? "",
+        index: idx >= 0 ? idx + 1 : 0,
+        total: ids.length,
+        nextTitle: nextTopic?.title ?? "End of presentation"
+      });
+    }
   }
 
   function uncollapseAncestors(sheet: Sheet, targetId: string): boolean {
@@ -282,6 +304,9 @@
         if (e.data.action === "update") {
           currentTitle = e.data.title;
           currentNote = e.data.note;
+          currentIndex = e.data.index;
+          totalTopics = e.data.total;
+          nextTitle = e.data.nextTitle;
         } else if (e.data.action === "close") {
           window.close();
         }
@@ -296,6 +321,11 @@
         const secs = (diff % 60).toString().padStart(2, '0');
         timerText = `${mins}:${secs}`;
       }, 1000);
+
+      const clockInterval = setInterval(() => {
+        const now = new Date();
+        clockText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      }, 1000);
       
       window.onbeforeunload = () => {
         bc?.postMessage({ action: "exit" });
@@ -303,6 +333,7 @@
       
       return () => {
         clearInterval(interval);
+        clearInterval(clockInterval);
         bc?.close();
       };
     } else {
@@ -314,13 +345,7 @@
         } else if (e.data.action === "exit") {
           exitPresenterMode();
         } else if (e.data.action === "request_init") {
-          if (bc && workbook) {
-            bc.postMessage({
-              action: "update",
-              title: selectedTopic?.title ?? "No topic selected",
-              note: selectedTopic?.note?.plain ?? ""
-            });
-          }
+          sendPresenterUpdate();
         }
       };
       
@@ -331,12 +356,9 @@
   });
 
   $effect(() => {
-    if (presenterMode && bc) {
-      bc.postMessage({
-        action: "update",
-        title: selectedTopic?.title ?? "No topic selected",
-        note: selectedTopic?.note?.plain ?? ""
-      });
+    selectedTopic;
+    if (presenterMode) {
+      sendPresenterUpdate();
     }
   });
 
@@ -835,8 +857,17 @@
     <div class="presenter-view">
       <div class="presenter-header">
         <span class="presenter-tag">Presenter View</span>
+        <span class="presenter-clock">{clockText}</span>
         <span class="presenter-timer">{timerText}</span>
       </div>
+      {#if totalTopics > 0}
+        <div class="presenter-progress">
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" style="width: {(currentIndex / totalTopics) * 100}%"></div>
+          </div>
+          <div class="progress-text">Topic {currentIndex} of {totalTopics}</div>
+        </div>
+      {/if}
       <div class="presenter-title">{currentTitle}</div>
       <div class="presenter-notes">
         {#if currentNote}
@@ -844,6 +875,9 @@
         {:else}
           <div class="presenter-placeholder">No notes for this topic. Add notes in the style panel to view them here.</div>
         {/if}
+      </div>
+      <div class="presenter-next-preview">
+        <span class="next-label">Next:</span> {nextTitle}
       </div>
       <div class="presenter-controls">
         <button onclick={() => bc?.postMessage({ action: "prev" })}>Previous</button>
@@ -975,7 +1009,7 @@
       {/if}
       <div class="viewport" bind:this={viewportEl}>
         {#if sheet}
-          <MindMapView bind:this={view} {sheet} {resources} {markDirty} bind:selectedId />
+          <MindMapView bind:this={view} {sheet} {resources} {markDirty} bind:selectedId {presenterMode} />
         {/if}
         {#if zenMode}
           <button class="zen-toggle exit" title="Exit full window (F8)" onclick={() => (zenMode = false)}>
@@ -1274,5 +1308,49 @@
   }
   .presenter-controls button:hover {
     background: #b4befe;
+  }
+
+  /* Presenter progress & preview styles */
+  .presenter-clock {
+    font-size: 15px;
+    color: #a6adc8;
+    font-family: monospace;
+  }
+  .presenter-progress {
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .progress-bar-bg {
+    width: 100%;
+    height: 6px;
+    background: #313244;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: #89b4fa;
+    transition: width 0.3s ease;
+  }
+  .progress-text {
+    font-size: 13px;
+    color: #a6adc8;
+    text-align: right;
+  }
+  .presenter-next-preview {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: #181825;
+    border: 1px dashed #45475a;
+    border-radius: 8px;
+    font-size: 15px;
+    color: #cdd6f4;
+  }
+  .presenter-next-preview .next-label {
+    font-weight: bold;
+    color: #f38ba8;
+    margin-right: 6px;
   }
 </style>

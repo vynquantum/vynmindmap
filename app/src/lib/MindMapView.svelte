@@ -20,11 +20,13 @@
     markDirty,
     resources = {},
     selectedId = $bindable(null),
+    presenterMode = false,
   }: {
     sheet: Sheet;
     markDirty: () => void;
     resources?: Record<string, Uint8Array>;
     selectedId?: string | null;
+    presenterMode?: boolean;
   } = $props();
 
   // Layout recomputes whenever the (proxied) sheet mutates.
@@ -1223,6 +1225,7 @@
           tabindex={-1}
           aria-label={n.topic.title}
           class:selected={n.id === selectedId}
+          class:presenting-highlight={presenterMode}
           class:dragover={n.id === dragOverId}
           class:ghost={n.id === dragId}
           onpointerdown={(e) => onNodePointerDown(e, n.id)}
@@ -1458,6 +1461,27 @@
   .canvas.dragging { cursor: grabbing; }
   .node { cursor: pointer; }
   .node.ghost { opacity: 0.45; }
+
+  @keyframes pulse-glow {
+    0% {
+      stroke-width: 3px;
+      filter: drop-shadow(0 0 2px rgba(29, 78, 216, 0.5));
+    }
+    50% {
+      stroke-width: 4.5px;
+      filter: drop-shadow(0 0 8px rgba(29, 78, 216, 0.8));
+    }
+    100% {
+      stroke-width: 3px;
+      filter: drop-shadow(0 0 2px rgba(29, 78, 216, 0.5));
+    }
+  }
+
+  .node.selected.presenting-highlight rect,
+  .node.selected.presenting-highlight ellipse {
+    animation: pulse-glow 2s infinite ease-in-out;
+    stroke: #1d4ed8 !important;
+  }
   .toggle { cursor: pointer; }
   text { pointer-events: none; }
   .toggle text { pointer-events: none; }
