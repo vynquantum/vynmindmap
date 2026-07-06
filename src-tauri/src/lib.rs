@@ -67,6 +67,30 @@ fn open_external(url: String) -> Result<(), String> {
     res.map(|_| ()).map_err(|e| e.to_string())
 }
 
+/// Open the presenter notes window.
+#[tauri::command]
+fn open_presenter_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    // Check if the window already exists
+    if let Some(win) = app.get_webview_window("presenter-notes") {
+        win.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    let _window = tauri::WebviewWindowBuilder::new(
+        &app,
+        "presenter-notes",
+        tauri::WebviewUrl::App("index.html?presenter=true".into()),
+    )
+    .title("Presenter Notes")
+    .inner_size(500.0, 600.0)
+    .resizable(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 /// The `.vmm` the app was launched to open, if any. On Windows/Linux the path
 /// arrives as a launch argument; on macOS it comes via the Opened event and is
 /// stashed in `OpenedFile`.
@@ -106,7 +130,8 @@ pub fn run() {
             write_file_bytes,
             file_modified_ms,
             get_opened_file,
-            open_external
+            open_external,
+            open_presenter_window
         ])
         .build(tauri::generate_context!())
         .expect("error while building VynMindMap");

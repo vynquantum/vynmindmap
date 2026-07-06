@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { Workbook, Sheet } from "../../src/index.js";
+  import type { Workbook, Sheet, Topic } from "../../src/index.js";
   import { createWorkbook, writeVmm, workbookToMarkdown, markdownToWorkbook, findTopic, addSheet, readVmm } from "../../src/index.js";
   import { readVmmFromFile, readVmmFromUrl } from "./lib/loadVmm.js";
   import {
@@ -8,6 +8,7 @@
     nativeModifiedMs, getOpenedFile, onOpenFile, hasFilePicker, hasOpenPicker,
     browserSavePicker, browserOpenPicker, browserWriteHandle, browserDownload,
     checkForUpdate, checkForUpdateDetailed, openExternal, type UpdateInfo, type FsFileHandle,
+    openPresenterWindow,
   } from "./lib/platform.js";
   import {
     getRecents, addRecentPath, addRecentHandle, removeRecent, type RecentEntry,
@@ -19,7 +20,6 @@
   import { confirmDialog } from "./lib/confirm.svelte.js";
   import Icon from "./lib/Icon.svelte";
   import logoUrl from "../../app-icon.png";
-  import { layoutSheet, type LaidOutNode } from "./lib/layout.js";
 
   let exportOpen = $state(false);
   const SAMPLES = [
@@ -127,9 +127,69 @@
 
   let zenMode = $state(false);
   let presenterMode = $state(false);
-  let notesWindow: Window | null = null;
+  let isPresenterWindow = $state(window.location.search.includes("presenter=true"));
+  let currentTitle = $state("No topic selected");
+  let currentNote = $state("");
+  let timerText = $state("00:00");
+  let bc = $state<BroadcastChannel | null>(null);
 
-  const activeSheetLayout = $derived(workbook && workbook.sheets[activeSheet] ? layoutSheet(workbook.sheets[activeSheet]!) : null);
+  function getPresentationOrder(): string[] {
+    if (!sheet) return [];
+    const order: string[] = [];
+    
+    function walk(topic: Topic) {
+      order.push(topic.id);
+      if (topic.children) {
+        for (const child of topic.children) {
+          walk(child);
+        }
+      }
+    }
+    
+    walk(sheet.rootTopic);
+    
+    if (sheet.floatingTopics) {
+      for (const float of sheet.floatingTopics) {
+        walk(float);
+      }
+    }
+    
+    return order;
+  }
+
+  function uncollapseAncestors(sheet: Sheet, targetId: string): boolean {
+    let modified = false;
+    
+    function walk(topic: Topic): boolean {
+      if (topic.id === targetId) {
+        return true;
+      }
+      if (topic.children) {
+        for (const child of topic.children) {
+          if (walk(child)) {
+            if (topic.collapsed) {
+              topic.collapsed = false;
+              modified = true;
+            }
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+    
+    walk(sheet.rootTopic);
+    
+    if (sheet.floatingTopics) {
+      for (const float of sheet.floatingTopics) {
+        if (walk(float)) {
+          return modified;
+        }
+      }
+    }
+    
+    return modified;
+  }
 
   function formatMarkdownNotes(text: string): string {
     if (!text) return "";
@@ -146,156 +206,15 @@
     }).join("");
   }
 
-  function updatePresenterWindow() {
-    if (!notesWindow || notesWindow.closed) return;
-    const topic = selectedTopic;
-    const titleEl = notesWindow.document.getElementById("topic-title");
-    const notesEl = notesWindow.document.getElementById("notes");
-    if (!titleEl || !notesEl) return;
-    if (topic) {
-      titleEl.innerText = topic.title;
-      if (topic.note?.plain) {
-        notesEl.innerHTML = formatMarkdownNotes(topic.note.plain);
-      } else {
-        notesEl.innerHTML = `<div class="placeholder">No notes for this topic. Add notes in the style panel to view them here.</div>`;
-      }
-    } else {
-      titleEl.innerText = "No topic selected";
-      notesEl.innerHTML = `<div class="placeholder">Select a topic in the mind map to view its presenter notes here.</div>`;
-    }
+  async function openPresenterNotes() {
+    await openPresenterWindow();
   }
 
-  function openPresenterNotes() {
-    if (notesWindow && !notesWindow.closed) {
-      notesWindow.focus();
-      return;
-    }
-    notesWindow = window.open("", "VynMindMapPresenterNotes", "width=500,height=600,menubar=no,status=no,toolbar=no");
-    if (!notesWindow) {
-      alert("Popup blocked! Please allow popups to open the Presenter Notes window.");
-      return;
-    }
-    notesWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Presenter Notes - VynMindMap</title>
-        <style>
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 24px;
-            background: #1e1e2e;
-            color: #cdd6f4;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            box-sizing: border-box;
-          }
-          .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #313244;
-            padding-bottom: 12px;
-            margin-bottom: 16px;
-          }
-          .title {
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #a6adc8;
-          }
-          .timer {
-            font-size: 16px;
-            font-weight: bold;
-            color: #f38ba8;
-            font-family: monospace;
-          }
-          .topic-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: #89b4fa;
-            margin-bottom: 16px;
-          }
-          .notes-container {
-            flex: 1;
-            overflow-y: auto;
-            background: #11111b;
-            border-radius: 8px;
-            padding: 16px;
-            font-size: 18px;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            border: 1px solid #313244;
-          }
-          .placeholder {
-            color: #585b70;
-            font-style: italic;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-          }
-          .controls {
-            margin-top: 16px;
-            display: flex;
-            gap: 12px;
-          }
-          button {
-            flex: 1;
-            height: 40px;
-            border: none;
-            border-radius: 6px;
-            background: #89b4fa;
-            color: #11111b;
-            font-weight: bold;
-            font-size: 14px;
-            cursor: pointer;
-          }
-          button:hover {
-            background: #b4befe;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <span class="title">Presenter View</span>
-          <span id="timer" class="timer">00:00</span>
-        </div>
-        <div id="topic-title" class="topic-title">No topic selected</div>
-        <div id="notes" class="notes-container">
-          <div class="placeholder">Select a topic in the mind map to view its presenter notes here.</div>
-        </div>
-        <div class="controls">
-          <button onclick="window.opener.presentPrev()">Previous</button>
-          <button onclick="window.opener.presentNext()">Next</button>
-        </div>
-        <` + `script>
-          let startTime = Date.now();
-          setInterval(() => {
-            let diff = Math.floor((Date.now() - startTime) / 1000);
-            let mins = Math.floor(diff / 60).toString().padStart(2, '0');
-            let secs = (diff % 60).toString().padStart(2, '0');
-            document.getElementById('timer').innerText = mins + ':' + secs;
-          }, 1000);
-
-          window.onbeforeunload = () => {
-            window.opener.exitPresenterMode();
-          };
-        <` + `/script>
-      </body>
-      </html>
-    `);
-    notesWindow.document.close();
-    updatePresenterWindow();
-  }
-
-  function togglePresenterMode() {
+  async function togglePresenterMode() {
     if (presenterMode) {
       exitPresenterMode();
     } else {
-      openPresenterNotes();
+      await openPresenterNotes();
       presenterMode = true;
       zenMode = true;
     }
@@ -304,50 +223,120 @@
   function exitPresenterMode() {
     presenterMode = false;
     zenMode = false;
-    if (notesWindow && !notesWindow.closed) {
-      notesWindow.close();
+    if (bc) {
+      bc.postMessage({ action: "close" });
     }
-    notesWindow = null;
   }
 
   function presentNext() {
-    if (!activeSheetLayout || !activeSheetLayout.nodes.length) return;
-    const nodes = activeSheetLayout.nodes;
+    if (!sheet) return;
+    const ids = getPresentationOrder();
+    if (!ids.length) return;
     if (!selectedId) {
-      selectedId = nodes[0]?.id ?? null;
+      selectedId = ids[0] ?? null;
     } else {
-      const idx = nodes.findIndex((n: LaidOutNode) => n.id === selectedId);
-      if (idx >= 0 && idx < nodes.length - 1) {
-        selectedId = nodes[idx + 1]!.id;
+      const idx = ids.indexOf(selectedId);
+      if (idx >= 0 && idx < ids.length - 1) {
+        selectedId = ids[idx + 1]!;
       }
     }
-    view?.centerOn(selectedId!);
+    if (selectedId) {
+      const modified = uncollapseAncestors(sheet, selectedId);
+      if (modified) {
+        markDirty();
+      }
+      view?.centerOn(selectedId);
+    }
   }
 
   function presentPrev() {
-    if (!activeSheetLayout || !activeSheetLayout.nodes.length) return;
-    const nodes = activeSheetLayout.nodes;
+    if (!sheet) return;
+    const ids = getPresentationOrder();
+    if (!ids.length) return;
     if (!selectedId) {
-      selectedId = nodes[nodes.length - 1]?.id ?? null;
+      selectedId = ids[ids.length - 1] ?? null;
     } else {
-      const idx = nodes.findIndex((n: LaidOutNode) => n.id === selectedId);
+      const idx = ids.indexOf(selectedId);
       if (idx > 0) {
-        selectedId = nodes[idx - 1]!.id;
+        selectedId = ids[idx - 1]!;
       }
     }
-    view?.centerOn(selectedId!);
+    if (selectedId) {
+      const modified = uncollapseAncestors(sheet, selectedId);
+      if (modified) {
+        markDirty();
+      }
+      view?.centerOn(selectedId);
+    }
   }
 
   onMount(() => {
     (window as any).presentNext = presentNext;
     (window as any).presentPrev = presentPrev;
     (window as any).exitPresenterMode = exitPresenterMode;
+
+    bc = new BroadcastChannel("vynmm-presenter");
+    
+    if (isPresenterWindow) {
+      bc.onmessage = (e) => {
+        if (e.data.action === "update") {
+          currentTitle = e.data.title;
+          currentNote = e.data.note;
+        } else if (e.data.action === "close") {
+          window.close();
+        }
+      };
+      
+      bc.postMessage({ action: "request_init" });
+      
+      const startTime = Date.now();
+      const interval = setInterval(() => {
+        const diff = Math.floor((Date.now() - startTime) / 1000);
+        const mins = Math.floor(diff / 60).toString().padStart(2, '0');
+        const secs = (diff % 60).toString().padStart(2, '0');
+        timerText = `${mins}:${secs}`;
+      }, 1000);
+      
+      window.onbeforeunload = () => {
+        bc?.postMessage({ action: "exit" });
+      };
+      
+      return () => {
+        clearInterval(interval);
+        bc?.close();
+      };
+    } else {
+      bc.onmessage = (e) => {
+        if (e.data.action === "next") {
+          presentNext();
+        } else if (e.data.action === "prev") {
+          presentPrev();
+        } else if (e.data.action === "exit") {
+          exitPresenterMode();
+        } else if (e.data.action === "request_init") {
+          if (bc && workbook) {
+            bc.postMessage({
+              action: "update",
+              title: selectedTopic?.title ?? "No topic selected",
+              note: selectedTopic?.note?.plain ?? ""
+            });
+          }
+        }
+      };
+      
+      return () => {
+        bc?.close();
+      };
+    }
   });
 
   $effect(() => {
-    selectedTopic;
-    if (notesWindow && !notesWindow.closed) {
-      updatePresenterWindow();
+    if (presenterMode && bc) {
+      bc.postMessage({
+        action: "update",
+        title: selectedTopic?.title ?? "No topic selected",
+        note: selectedTopic?.note?.plain ?? ""
+      });
     }
   });
 
@@ -355,14 +344,6 @@
     if (!zenMode && presenterMode) {
       exitPresenterMode();
     }
-  });
-
-  $effect(() => {
-    return () => {
-      if (notesWindow && !notesWindow.closed) {
-        notesWindow.close();
-      }
-    };
   });
 
   // --- autosave ---------------------------------------------------------------
@@ -474,7 +455,7 @@
 
   const selectedTopic = $derived(sheet && selectedId ? findTopic(sheet, selectedId) ?? null : null);
 
-  let fileInput: HTMLInputElement;
+  let fileInput = $state<HTMLInputElement>();
 
   async function onPick(e: Event) {
     const f = (e.target as HTMLInputElement).files?.[0];
@@ -585,7 +566,7 @@
       const file = await handle.getFile();
       await load(() => readVmmFromFile(file), file.name, null, handle);
     } else {
-      fileInput.click();
+      fileInput?.click();
     }
   }
 
@@ -738,7 +719,7 @@
     download((fileName || "untitled").replace(/\.vmm$/, "") + ".md", md, "text/markdown");
   }
 
-  let mdInput: HTMLInputElement;
+  let mdInput = $state<HTMLInputElement>();
   async function onPickMarkdown(e: Event) {
     const f = (e.target as HTMLInputElement).files?.[0];
     if (!f) return;
@@ -850,7 +831,27 @@
 </script>
 
 <div class="app">
-  {#if !zenMode}
+  {#if isPresenterWindow}
+    <div class="presenter-view">
+      <div class="presenter-header">
+        <span class="presenter-tag">Presenter View</span>
+        <span class="presenter-timer">{timerText}</span>
+      </div>
+      <div class="presenter-title">{currentTitle}</div>
+      <div class="presenter-notes">
+        {#if currentNote}
+          {@html formatMarkdownNotes(currentNote)}
+        {:else}
+          <div class="presenter-placeholder">No notes for this topic. Add notes in the style panel to view them here.</div>
+        {/if}
+      </div>
+      <div class="presenter-controls">
+        <button onclick={() => bc?.postMessage({ action: "prev" })}>Previous</button>
+        <button onclick={() => bc?.postMessage({ action: "next" })}>Next</button>
+      </div>
+    </div>
+  {:else}
+    {#if !zenMode}
     <header>
     <div class="brand"><img class="brand-logo" src={logoUrl} alt="" /><span>VynMindMap</span></div>
 
@@ -870,7 +871,7 @@
 
     <div class="divider"></div>
     <div class="group">
-      <button class="ic" onclick={() => mdInput.click()} title="Import a Markdown outline" aria-label="Import Markdown"><Icon name="upload" /></button>
+      <button class="ic" onclick={() => mdInput?.click()} title="Import a Markdown outline" aria-label="Import Markdown"><Icon name="upload" /></button>
       <div class="menu-wrap">
         <button class="ic chev" disabled={!workbook} onclick={() => (exportOpen = !exportOpen)} title="Export" aria-label="Export">
           <Icon name="download" /><Icon name="chevron-down" size={14} />
@@ -1038,7 +1039,8 @@
     </div>
   {/if}
 
-  <ConfirmHost />
+    <ConfirmHost />
+  {/if}
 </div>
 
 <style>
@@ -1198,4 +1200,79 @@
     cursor: pointer;
   }
   .zen-toggle.exit:hover { background: var(--surface-2); }
+
+  /* Presenter view layout */
+  .presenter-view {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 24px;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    box-sizing: border-box;
+  }
+  .presenter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #313244;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+  .presenter-tag {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #a6adc8;
+    font-weight: 600;
+  }
+  .presenter-timer {
+    font-size: 18px;
+    font-weight: bold;
+    color: #f38ba8;
+    font-family: monospace;
+  }
+  .presenter-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #89b4fa;
+    margin-bottom: 16px;
+  }
+  .presenter-notes {
+    flex: 1;
+    overflow-y: auto;
+    background: #11111b;
+    border-radius: 12px;
+    padding: 20px;
+    font-size: 18px;
+    line-height: 1.6;
+    border: 1px solid #313244;
+  }
+  .presenter-placeholder {
+    color: #585b70;
+    font-style: italic;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+  .presenter-controls {
+    margin-top: 16px;
+    display: flex;
+    gap: 12px;
+  }
+  .presenter-controls button {
+    flex: 1;
+    height: 44px;
+    border: none;
+    border-radius: 8px;
+    background: #89b4fa;
+    color: #11111b;
+    font-weight: bold;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .presenter-controls button:hover {
+    background: #b4befe;
+  }
 </style>

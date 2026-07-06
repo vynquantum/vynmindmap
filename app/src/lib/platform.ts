@@ -240,3 +240,11 @@ export function browserDownload(name: string, bytes: Uint8Array): void {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+export async function openPresenterWindow(): Promise<void> {
+  if (isTauri()) {
+    await invoke("open_presenter_window");
+  } else {
+    window.open(window.location.origin + "?presenter=true", "VynPresenterNotes", "width=500,height=600");
+  }
+}
