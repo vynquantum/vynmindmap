@@ -1065,6 +1065,19 @@
           <button class="zen-toggle exit" title="Exit full window (F8)" onclick={() => (zenMode = false)}>
             <Icon name="minimize" size={18} />
           </button>
+          {#if workbook.sheets.length > 1}
+            <div class="zen-sheets-bar" role="toolbar" tabindex={-1} onpointerdown={(e) => e.stopPropagation()}>
+              {#each workbook.sheets as s, i (s.id)}
+                <button
+                  class="zen-sheet-tab"
+                  class:active={i === activeSheet}
+                  onclick={() => { activeSheet = i; }}
+                >
+                  {s.title}
+                </button>
+              {/each}
+            </div>
+          {/if}
         {/if}
       </div>
       {#if sheet && showInspector && !zenMode}
@@ -1456,5 +1469,43 @@
     font-weight: bold;
     color: #f38ba8;
     margin-right: 6px;
+  }
+  /* Zen Mode floating sheets overlay style */
+  .zen-sheets-bar {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+    background: rgba(28, 34, 48, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 4px 6px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    z-index: 100;
+  }
+  .zen-sheet-tab {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .zen-sheet-tab:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
+  }
+  .zen-sheet-tab.active {
+    background: #1d4ed8;
+    color: #fff;
+    font-weight: 600;
   }
 </style>
