@@ -326,6 +326,23 @@
         const now = new Date();
         clockText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       }, 1000);
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable) {
+          return;
+        }
+        
+        if (e.key === "PageDown" || e.key === "ArrowRight" || e.key === "Space") {
+          e.preventDefault();
+          bc?.postMessage({ action: "next" });
+        } else if (e.key === "PageUp" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          bc?.postMessage({ action: "prev" });
+        }
+      };
+
+      window.addEventListener("keydown", handleKeyDown);
       
       window.onbeforeunload = () => {
         bc?.postMessage({ action: "exit" });
@@ -334,6 +351,7 @@
       return () => {
         clearInterval(interval);
         clearInterval(clockInterval);
+        window.removeEventListener("keydown", handleKeyDown);
         bc?.close();
       };
     } else {
