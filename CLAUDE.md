@@ -8,3 +8,9 @@ Rules:
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+
+## ponytail
+
+Follow the ponytail rules (lazy-senior-dev mode: reuse before writing, stdlib before dependencies, shortest correct diff) for all code changes:
+
+@.agents/rules/ponytail.md
