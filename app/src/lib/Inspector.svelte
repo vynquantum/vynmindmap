@@ -405,9 +405,11 @@
     if (item.presentation === 'underline') return underlineActive;
     if (sheet.structure !== item.id || (underlineActive && item.id === 'map.right')) return false;
     if (!item.preset) return true;
+    // Raw comparison: unset means the structure family's own default, which
+    // differs per family (map curves, logic elbows), so unset ≠ any explicit.
     return (
-      (item.preset.branchStyle ?? 'curve') === (sheet.settings?.branchStyle ?? 'curve') &&
-      (item.preset.defaultShape ?? 'rounded') === (sheet.settings?.defaultShape ?? 'rounded')
+      item.preset.branchStyle === sheet.settings?.branchStyle &&
+      item.preset.defaultShape === sheet.settings?.defaultShape
     );
   }
   const activePreview = $derived(
@@ -897,7 +899,8 @@
           value={sheet.settings?.branchStyle ?? ''}
           onchange={(e) => setBranchStyle(e.currentTarget.value)}
         >
-          <option value="">Curved (default)</option>
+          <option value="">Default</option>
+          <option value="curve">Curved</option>
           <option value="straight">Straight</option>
           <option value="elbow">Elbow</option>
         </select>

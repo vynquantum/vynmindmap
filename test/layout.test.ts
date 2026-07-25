@@ -114,9 +114,17 @@ describe('layoutBalanced', () => {
     expect(layoutSheet(sheet).edges.every((e) => e.kind === 'straight')).toBe(true);
     sheet.settings.branchStyle = 'elbow';
     expect(layoutSheet(sheet).edges.every((e) => e.kind === 'elbow-h')).toBe(true);
-    // Non-map structures keep their own geometry regardless of branch style.
+    // Each family keeps its own default but honors an explicit style.
     sheet.structure = 'logic.right';
+    delete sheet.settings.branchStyle;
     expect(layoutSheet(sheet).edges.every((e) => e.kind === 'elbow-h')).toBe(true);
+    sheet.settings.branchStyle = 'curve';
+    expect(layoutSheet(sheet).edges.every((e) => e.kind === 'bezier')).toBe(true);
+    // Vertical charts support straight diagonals and otherwise stay elbowed.
+    sheet.structure = 'org.down';
+    expect(layoutSheet(sheet).edges.every((e) => e.kind === 'elbow-v')).toBe(true);
+    sheet.settings.branchStyle = 'straight';
+    expect(layoutSheet(sheet).edges.every((e) => e.kind === 'straight')).toBe(true);
   });
 
   it('lays out the grid structure as non-overlapping cards with separators', () => {

@@ -210,7 +210,9 @@ export interface SheetSettings {
   globalFont?: string;
   /** Node presentation, deliberately separate from chart structure. */
   mapPresentation?: MapPresentation;
-  /** Branch line geometry for mind-map structures ('curve' when unset). */
+  /** Branch line geometry for connector-based structures; each structure
+   * family keeps its own default when unset. Vertical charts (org, vertical
+   * timeline) support 'straight' and otherwise stay elbowed. */
   branchStyle?: 'curve' | 'straight' | 'elbow';
   /** Default shape for topics without a topic-specific override. */
   defaultShape?: TopicShape;

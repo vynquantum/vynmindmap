@@ -366,7 +366,9 @@ function buildEdges(sheet: Sheet, nodes: LaidOutNode[], kind: LaidOutEdge['kind'
           x2: cn.x + cn.w / 2,
           y2: down ? cn.y : cn.y + cn.h,
           color,
-          kind: 'elbow-v',
+          // Vertical charts support straight diagonals; curves stay elbowed
+          // because the bezier path is horizontal-oriented.
+          kind: sheet.settings?.branchStyle === 'straight' ? 'straight' : 'elbow-v',
           width
         });
       } else if (kind === 'underline') {
@@ -751,12 +753,14 @@ function grid(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
   return { nodes, gridLines: lines };
 }
 
-/** Edge geometry for mind-map structures, from the sheet's branch style. */
-function mapBranchKind(sheet: Sheet): LaidOutEdge['kind'] {
+/** Edge geometry for connector-based structures, from the sheet's branch
+ * style; each structure family keeps its own default when unset. */
+function branchKind(sheet: Sheet, fallback: LaidOutEdge['kind']): LaidOutEdge['kind'] {
   const style = sheet.settings?.branchStyle;
   if (style === 'straight') return 'straight';
   if (style === 'elbow') return 'elbow-h';
-  return 'bezier';
+  if (style === 'curve') return 'bezier';
+  return fallback;
 }
 
 export function layoutSheet(sheet: Sheet): Layout {
@@ -791,11 +795,11 @@ export function layoutSheet(sheet: Sheet): Layout {
     kind = 'underline';
     nodes = horizontal(sheet, 'right');
   } else if (s === 'map.balanced') {
-    kind = mapBranchKind(sheet);
+    kind = branchKind(sheet, 'bezier');
     nodes = horizontal(sheet, 'balanced');
   } else {
     const left = s.endsWith('.left');
-    kind = s.startsWith('map.') ? mapBranchKind(sheet) : 'elbow-h';
+    kind = branchKind(sheet, s.startsWith('map.') ? 'bezier' : 'elbow-h');
     nodes = horizontal(sheet, left ? 'left' : 'right');
   }
 
