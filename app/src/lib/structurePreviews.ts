@@ -456,7 +456,12 @@ export const STRUCTURE_CATEGORIES: StructureCategory[] = [
   }
 ];
 
+/** All cards in display order. */
+export const STRUCTURE_ITEMS: readonly StructurePreview[] = STRUCTURE_CATEGORIES.flatMap(
+  (c) => c.items
+);
+
 /** Card lookup keyed by `key ?? id`, for showing the active selection. */
 export const STRUCTURE_PREVIEWS: ReadonlyMap<string, StructurePreview> = new Map(
-  STRUCTURE_CATEGORIES.flatMap((c) => c.items.map((i) => [i.key ?? i.id, i]))
+  STRUCTURE_ITEMS.map((i) => [i.key ?? i.id, i])
 );

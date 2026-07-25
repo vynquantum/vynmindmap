@@ -7,8 +7,10 @@
     StructureId
   } from '../../../src/index.js';
   import { COLOR_THEMES } from './mapAppearance.js';
+  import { clampTopicMinHeight, clampTopicWidth } from './layout.js';
   import {
     STRUCTURE_CATEGORIES,
+    STRUCTURE_ITEMS,
     STRUCTURE_PREVIEWS,
     type StructurePreview
   } from './structurePreviews.js';
@@ -358,7 +360,6 @@
       /* fall through to defaults */
     }
     return {
-      map: true,
       layout: true,
       style: true,
       font: true,
@@ -413,8 +414,7 @@
     );
   }
   const activePreview = $derived(
-    STRUCTURE_CATEGORIES.flatMap((c) => c.items).find(isItemActive) ??
-      STRUCTURE_PREVIEWS.get(sheet.structure)
+    STRUCTURE_ITEMS.find(isItemActive) ?? STRUCTURE_PREVIEWS.get(sheet.structure)
   );
   const currentStructureLabel = $derived(
     activePreview?.label ??
@@ -483,14 +483,14 @@
     if (!topic) return;
     const n = Number(v);
     if (v === '' || !Number.isFinite(n)) delete topic.style?.width;
-    else (topic.style ??= {}).width = Math.max(56, Math.min(800, Math.round(n)));
+    else (topic.style ??= {}).width = clampTopicWidth(n);
     markDirty();
   }
   function setNodeMinHeight(v: string) {
     if (!topic) return;
     const n = Number(v);
     if (v === '' || !Number.isFinite(n)) delete topic.style?.minHeight;
-    else (topic.style ??= {}).minHeight = Math.max(34, Math.round(n));
+    else (topic.style ??= {}).minHeight = clampTopicMinHeight(n);
     markDirty();
   }
   function resetNodeSize() {
@@ -657,6 +657,11 @@
       sheet.structure !== 'map.right' &&
       sheet.structure !== 'map.underline'
     ) {
+      sheet.structure = 'map.right';
+    }
+    // Turning the treatment off needs the same migration for legacy documents:
+    // in map.underline the geometry itself is the treatment.
+    if (v === 'boxed' && sheet.structure === 'map.underline') {
       sheet.structure = 'map.right';
     }
     markDirty();
@@ -960,19 +965,11 @@
         <span class="rowlabel">Text on Lines</span>
         <button
           class="switch"
-          class:on={(sheet.settings?.mapPresentation ??
-            (sheet.structure === 'map.underline' ? 'underline' : 'boxed')) === 'underline'}
+          class:on={underlineActive}
           role="switch"
-          aria-checked={(sheet.settings?.mapPresentation ??
-            (sheet.structure === 'map.underline' ? 'underline' : 'boxed')) === 'underline'}
+          aria-checked={underlineActive}
           aria-label="Text on lines"
-          onclick={() =>
-            setMapPresentation(
-              (sheet.settings?.mapPresentation ??
-                (sheet.structure === 'map.underline' ? 'underline' : 'boxed')) === 'underline'
-                ? 'boxed'
-                : 'underline'
-            )}
+          onclick={() => setMapPresentation(underlineActive ? 'boxed' : 'underline')}
         ></button>
       </div>
     </div>

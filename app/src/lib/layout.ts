@@ -119,9 +119,7 @@ export function sizeOf(t: Topic): TopicSize {
   // Automatic topics stop expanding at MAX_W. A user-specified width is a
   // layout preference: it controls wrapping and is retained in the document.
   const requestedWidth = t.style?.width;
-  const fixedWidth = Number.isFinite(requestedWidth)
-    ? Math.max(MIN_W, Math.min(MAX_MANUAL_W, Math.round(requestedWidth!)))
-    : undefined;
+  const fixedWidth = Number.isFinite(requestedWidth) ? clampTopicWidth(requestedWidth!) : undefined;
   const maxChars = Math.max(4, Math.floor(((fixedWidth ?? MAX_W) - PAD_X) / cw));
 
   const lines: string[] = [];
@@ -163,6 +161,16 @@ export function sizeOf(t: Topic): TopicSize {
 /** Back-compat width-only measure. */
 export function widthOf(t: Topic): number {
   return sizeOf(t).w;
+}
+
+/** Clamp a user-requested topic width to the bounds layout enforces. */
+export function clampTopicWidth(px: number): number {
+  return Math.max(MIN_W, Math.min(MAX_MANUAL_W, Math.round(px)));
+}
+
+/** Clamp a user-requested topic minimum height likewise. */
+export function clampTopicMinHeight(px: number): number {
+  return Math.max(NODE_H, Math.round(px));
 }
 
 function mkNode(

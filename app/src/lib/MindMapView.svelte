@@ -27,7 +27,15 @@
     removeSummary,
     walkSheetTopics
   } from '../../../src/index.js';
-  import { layoutSheet, edgePath, summaryPath, type Layout, type LaidOutNode } from './layout.js';
+  import {
+    layoutSheet,
+    edgePath,
+    summaryPath,
+    clampTopicMinHeight,
+    clampTopicWidth,
+    type Layout,
+    type LaidOutNode
+  } from './layout.js';
   import { isTextOnLines } from './mapAppearance.js';
 
   let {
@@ -329,10 +337,8 @@
     if (resizing) {
       const t = findTopic(sheet, resizing.id);
       if (t) {
-        const w = resizing.w + (e.clientX - resizing.sx) / scale;
-        const h = resizing.h + (e.clientY - resizing.sy) / scale;
-        (t.style ??= {}).width = Math.max(56, Math.min(800, Math.round(w)));
-        t.style.minHeight = Math.max(34, Math.round(h));
+        (t.style ??= {}).width = clampTopicWidth(resizing.w + (e.clientX - resizing.sx) / scale);
+        t.style.minHeight = clampTopicMinHeight(resizing.h + (e.clientY - resizing.sy) / scale);
       }
       return;
     }
