@@ -1099,8 +1099,17 @@
     return { w, h };
   }
 
+  function nodeShape(n: LaidOutNode): string {
+    if (n.topic.style?.shape) return n.topic.style.shape;
+    // This layout treats every topic as text positioned on a connector line.
+    // Keep an explicitly selected topic shape as an intentional override.
+    if (sheet.structure === "map.underline") return "none";
+    return "rounded";
+  }
+
   // --- styling / decoration helpers ----------------------------------------
   function nodeFill(n: LaidOutNode): string {
+    if (nodeShape(n) === "none") return "transparent";
     return n.topic.style?.fillColor ?? (n.depth === 0 ? n.color : "#ffffff");
   }
   function nodeStroke(n: LaidOutNode): string {
@@ -1113,10 +1122,11 @@
   function nodeStrokeWidth(n: LaidOutNode): number {
     if (n.id === selectedId || (n.id === dragOverId && dropMode === "child")) return 3;
     if (inSelection(n.id)) return 2.5;
-    if (n.topic.style?.shape === "none") return 0;
+    if (nodeShape(n) === "none") return 0;
     return n.depth === 0 && !n.topic.style?.fillColor ? 0 : (n.topic.style?.borderWidth ?? 1.5);
   }
   function textFill(n: LaidOutNode): string {
+    if (sheet.structure === "map.underline") return n.topic.style?.font?.color ?? "#171750";
     return n.topic.style?.font?.color ?? (n.depth === 0 || isDark(nodeFill(n)) ? "#ffffff" : "#1c2230");
   }
   function isDark(hex: string): boolean {
@@ -1134,7 +1144,7 @@
   const dotColor = $derived(darkCanvas ? "rgba(255,255,255,0.07)" : "rgba(20,28,45,0.07)");
   const gridStroke = $derived(darkCanvas ? "#3a4152" : "#cbd2dc");
   function rxFor(n: LaidOutNode): number {
-    const shape = n.topic.style?.shape ?? "rounded";
+    const shape = nodeShape(n);
     if (shape === "rect") return 0;
     if (shape === "capsule") return n.h / 2;
     return 8;
@@ -1335,10 +1345,10 @@
           onpointerdown={(e) => onNodePointerDown(e, n.id)}
           ondblclick={(e) => { e.stopPropagation(); beginEdit(n.id); }}
         >
-          {#if n.topic.style?.shape === "ellipse"}
+          {#if nodeShape(n) === "ellipse"}
             <ellipse cx={n.w / 2} cy={n.h / 2} rx={n.w / 2} ry={n.h / 2}
               fill={nodeFill(n)} stroke={nodeStroke(n)} stroke-width={nodeStrokeWidth(n)} />
-          {:else if n.topic.style?.shape === "underline"}
+          {:else if nodeShape(n) === "underline"}
             <line x1="0" y1={n.h} x2={n.w} y2={n.h} stroke={nodeStroke(n)} stroke-width="2" />
             {#if n.id === selectedId}
               <rect width={n.w} height={n.h} rx="6" fill="none" stroke="#1d4ed8" stroke-width="2" stroke-dasharray="3 3" />

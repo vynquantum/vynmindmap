@@ -11,6 +11,7 @@
   const STRUCTURES: { id: StructureId; label: string }[] = [
     { id: "map.balanced", label: "Mind map · balanced" },
     { id: "map.right", label: "Mind map · right" },
+    { id: "map.underline", label: "Mind map · underline" },
     { id: "map.left", label: "Mind map · left" },
     { id: "logic.right", label: "Logic chart · right" },
     { id: "logic.left", label: "Logic chart · left" },
@@ -212,7 +213,7 @@
       const raw = localStorage.getItem(SECT_KEY);
       if (raw) return JSON.parse(raw) as Record<string, boolean>;
     } catch { /* fall through to defaults */ }
-    return { sheet: true, style: true, font: true, markers: false, emoji: false, content: true };
+    return { structure: true, canvas: true, layout: true, style: true, font: true, markers: false, emoji: false, content: true };
   }
   let open = $state<Record<string, boolean>>(loadSections());
   $effect(() => { localStorage.setItem(SECT_KEY, JSON.stringify(open)); });
@@ -247,6 +248,26 @@
 
   // Mutations operate directly on the proxied topic, then flag dirty.
   function setText(v: string) { if (topic) { topic.title = v; markDirty(); } }
+  function setNodeWidth(v: string) {
+    if (!topic) return;
+    const n = Number(v);
+    if (v === "" || !Number.isFinite(n)) delete topic.style?.width;
+    else (topic.style ??= {}).width = Math.max(56, Math.min(800, Math.round(n)));
+    markDirty();
+  }
+  function setNodeMinHeight(v: string) {
+    if (!topic) return;
+    const n = Number(v);
+    if (v === "" || !Number.isFinite(n)) delete topic.style?.minHeight;
+    else (topic.style ??= {}).minHeight = Math.max(34, Math.round(n));
+    markDirty();
+  }
+  function resetNodeSize() {
+    if (!topic?.style) return;
+    delete topic.style.width;
+    delete topic.style.minHeight;
+    markDirty();
+  }
   function setShape(v: TopicShape) { if (topic) { (topic.style ??= {}).shape = v; markDirty(); } }
   function setFill(v: string) { if (topic) { (topic.style ??= {}).fillColor = v; markDirty(); } }
   function clearFill() { if (topic?.style) { delete topic.style.fillColor; markDirty(); } }
@@ -258,7 +279,17 @@
   function setLineWidth(v: number) { if (topic) { (topic.style ??= {}).lineWidth = v; markDirty(); } }
   function setFontColor(v: string) { if (topic) { ((topic.style ??= {}).font ??= {}).color = v; markDirty(); } }
   function clearFontColor() { if (topic?.style?.font) { delete topic.style.font.color; markDirty(); } }
-  function resetStyle() { if (topic) { delete topic.style; markDirty(); } }
+  function resetAppearance() {
+    if (!topic?.style) return;
+    delete topic.style.shape;
+    delete topic.style.fillColor;
+    delete topic.style.borderColor;
+    delete topic.style.borderWidth;
+    delete topic.style.lineColor;
+    delete topic.style.lineWidth;
+    delete topic.style.lineTaper;
+    markDirty();
+  }
   function toggleBold() {
     if (!topic) return;
     const font = ((topic.style ??= {}).font ??= {});
@@ -352,14 +383,22 @@
     </div>
   {/if}
   <section>
-    {@render sectionHeader("sheet", "Sheet")}
-    {#if open.sheet}
+    {@render sectionHeader("structure", "Structure")}
+    {#if open.structure}
       <div class="body">
         <label>Structure
           <select value={sheet.structure} onchange={(e) => setStructure(e.currentTarget.value)}>
             {#each STRUCTURES as s (s.id)}<option value={s.id}>{s.label}</option>{/each}
           </select>
         </label>
+      </div>
+    {/if}
+  </section>
+
+  <section>
+    {@render sectionHeader("canvas", "Canvas style")}
+    {#if open.canvas}
+      <div class="body">
         <div class="fieldname">Theme</div>
         <div class="themes">
           {#each THEMES as t (t.id)}
@@ -378,7 +417,27 @@
 
   {#if topic}
     <section>
-      {@render sectionHeader("style", "Topic style")}
+      {@render sectionHeader("layout", "Size & wrapping")}
+      {#if open.layout}
+        <div class="body">
+          <p class="hint">Leave width empty for automatic sizing. A fixed width controls where the title wraps.</p>
+          <div class="row">
+            <label class="col">Width
+              <input type="number" min="56" max="800" step="4" placeholder="Auto"
+                value={topic.style?.width ?? ""} oninput={(e) => setNodeWidth(e.currentTarget.value)} />
+            </label>
+            <label class="col">Min height
+              <input type="number" min="34" step="4" placeholder="Auto"
+                value={topic.style?.minHeight ?? ""} oninput={(e) => setNodeMinHeight(e.currentTarget.value)} />
+            </label>
+          </div>
+          <button class="reset" onclick={resetNodeSize}>Auto size</button>
+        </div>
+      {/if}
+    </section>
+
+    <section>
+      {@render sectionHeader("style", "Appearance")}
       {#if open.style}
         <div class="body">
           <label>Text
@@ -420,7 +479,7 @@
             <button class="link" onclick={clearLineColor}>auto</button>
           </div>
 
-          <button class="reset" onclick={resetStyle}>Reset topic style</button>
+          <button class="reset" onclick={resetAppearance}>Reset appearance</button>
         </div>
       {/if}
     </section>

@@ -30,7 +30,7 @@ export interface Manifest {
 // ---------------------------------------------------------------------------
 
 export type StructureId =
-  | "map.balanced" | "map.left" | "map.right"
+  | "map.balanced" | "map.left" | "map.right" | "map.underline"
   | "logic.right" | "logic.left"
   | "org.down" | "org.up"
   | "tree.right" | "tree.left"
@@ -57,6 +57,10 @@ export interface FontStyle {
 }
 
 export interface TopicStyle {
+  /** Explicit topic width in canvas pixels. Omit to size to the text. */
+  width?: number;
+  /** Minimum topic height in canvas pixels. Text can still make it taller. */
+  minHeight?: number;
   shape?: TopicShape;
   fillColor?: string;
   borderColor?: string;

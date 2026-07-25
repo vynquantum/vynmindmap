@@ -70,6 +70,21 @@ describe("layoutBalanced", () => {
     expect(sizeOf({ id: "c", title: "one\ntwo", children: [] }).lines).toEqual(["one", "two"]);
   });
 
+  it("honors an explicit width and minimum height for text wrapping", () => {
+    const topic = {
+      id: "sized", title: "A longer title that should wrap at the selected width", children: [],
+      style: { width: 120, minHeight: 100 },
+    };
+    const sized = sizeOf(topic);
+    expect(sized.w).toBe(120);
+    expect(sized.h).toBeGreaterThanOrEqual(100);
+    expect(sized.lines.length).toBeGreaterThan(1);
+
+    const wider = sizeOf({ ...topic, style: { width: 400 } });
+    expect(wider.w).toBe(400);
+    expect(wider.lines.length).toBeLessThan(sized.lines.length);
+  });
+
   it("keeps multi-line siblings from overlapping vertically", () => {
     const wb = createWorkbook("Root");
     const root = wb.sheets[0]!.rootTopic;
@@ -79,6 +94,25 @@ describe("layoutBalanced", () => {
     const layout = layoutSheet(wb.sheets[0]!);
     const kids = layout.nodes.filter((n) => n.depth === 1).sort((a, b) => a.y - b.y);
     expect(kids[0]!.y + kids[0]!.h).toBeLessThanOrEqual(kids[1]!.y);
+  });
+
+  it("uses continuous indigo underlines for the text-on-lines map", () => {
+    const wb = createWorkbook("Root");
+    const sheet = wb.sheets[0]!;
+    sheet.structure = "map.underline";
+    const number = addChild(sheet.rootTopic, "1");
+    const label = addChild(number, "Gratitude");
+    addChild(label, "A daily practice");
+
+    const layout = layoutSheet(sheet);
+    // The first link is a curved join plus the first topic's underline; every
+    // deeper link continues the shared underline.
+    expect(layout.edges).toHaveLength(4);
+    expect(layout.edges.filter((e) => e.kind === "bezier")).toHaveLength(1);
+    expect(layout.edges.filter((e) => e.kind === "straight")).toHaveLength(1);
+    expect(layout.edges.filter((e) => e.kind === "underline")).toHaveLength(2);
+    expect(layout.edges.every((e) => e.color === "#4f46d4")).toBe(true);
+    expect(edgePath(layout.edges.find((e) => e.kind === "underline")!)).toMatch(/^M .* V .* H /);
   });
 
   it("lays out the rich example without errors", () => {

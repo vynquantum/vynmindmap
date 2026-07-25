@@ -31,7 +31,7 @@ export interface LaidOutEdge {
   x1: number; y1: number;
   x2: number; y2: number;
   color: string;
-  kind: "bezier" | "elbow-h" | "elbow-v" | "straight";
+  kind: "bezier" | "elbow-h" | "elbow-v" | "straight" | "underline";
   width?: number;
 }
 
@@ -79,6 +79,7 @@ const PAD_X = 26;
 const PAD_Y = 8;
 const MIN_W = 56;
 const MAX_W = 260;
+const MAX_MANUAL_W = 800;
 const MARGIN = 56;
 
 const PALETTE = [
@@ -88,6 +89,8 @@ const PALETTE = [
 const ROOT_COLOR = "#33415c";
 const FLOAT_COLOR = "#7a8699";
 const SUMMARY_COLOR = "#64748b";
+/** Default connector color for the text-on-lines mind map. */
+const UNDERLINE_COLOR = "#4f46d4";
 
 // Sizing / wrapping ----------------------------------------------------------
 
@@ -100,7 +103,13 @@ export interface TopicSize { w: number; h: number; lines: string[]; lineH: numbe
 export function sizeOf(t: Topic): TopicSize {
   const size = t.style?.font?.size ?? 13;
   const cw = CHAR_W * (size / 13) * (t.style?.font?.weight === "bold" ? 1.05 : 1);
-  const maxChars = Math.max(4, Math.floor((MAX_W - PAD_X) / cw));
+  // Automatic topics stop expanding at MAX_W. A user-specified width is a
+  // layout preference: it controls wrapping and is retained in the document.
+  const requestedWidth = t.style?.width;
+  const fixedWidth = Number.isFinite(requestedWidth)
+    ? Math.max(MIN_W, Math.min(MAX_MANUAL_W, Math.round(requestedWidth!)))
+    : undefined;
+  const maxChars = Math.max(4, Math.floor(((fixedWidth ?? MAX_W) - PAD_X) / cw));
 
   const lines: string[] = [];
   for (const raw of (t.title ?? "").split("\n")) {
@@ -123,8 +132,9 @@ export function sizeOf(t: Topic): TopicSize {
 
   const longest = lines.reduce((m, l) => Math.max(m, l.length), 0);
   const lineH = Math.max(18, size + 5);
-  const w = Math.max(MIN_W, Math.min(MAX_W, longest * cw + PAD_X));
-  const h = Math.max(NODE_H, lines.length * lineH + PAD_Y * 2);
+  const w = fixedWidth ?? Math.max(MIN_W, Math.min(MAX_W, longest * cw + PAD_X));
+  const minHeight = Number.isFinite(t.style?.minHeight) ? t.style!.minHeight! : 0;
+  const h = Math.max(NODE_H, Math.round(minHeight), lines.length * lineH + PAD_Y * 2);
   return { w, h, lines, lineH };
 }
 
@@ -267,11 +277,21 @@ function buildEdges(nodes: LaidOutNode[], kind: LaidOutEdge["kind"]): LaidOutEdg
     for (const child of visibleChildren(n.topic)) {
       const cn = byId.get(child.id);
       if (!cn) continue;
-      const color = cn.topic.style?.lineColor ?? cn.color;
+      // Underline maps use one restrained connector color, as the lines also
+      // serve as the visual treatment for the otherwise transparent nodes.
+      // An explicit topic line color still takes precedence.
+      const color = cn.topic.style?.lineColor ?? (kind === "underline" ? UNDERLINE_COLOR : cn.color);
       const width = cn.topic.style?.lineWidth ?? 2.5;
       if (n.side === "down" || n.side === "up" || cn.side === "down" || cn.side === "up") {
         const down = cn.y >= n.y;
         edges.push({ id: `${n.id}->${cn.id}`, x1: n.x + n.w / 2, y1: down ? n.y + n.h : n.y, x2: cn.x + cn.w / 2, y2: down ? cn.y : cn.y + cn.h, color, kind: "elbow-v", width });
+      } else if (kind === "underline") {
+        if (n.depth === 0) {
+          edges.push({ id: `${n.id}->${cn.id}-conn`, x1: n.x + n.w, y1: n.y + n.h / 2, x2: cn.x, y2: cn.y + cn.h, color, kind: "bezier", width });
+          edges.push({ id: `${n.id}->${cn.id}-line`, x1: cn.x, y1: cn.y + cn.h, x2: cn.x + cn.w, y2: cn.y + cn.h, color, kind: "straight", width });
+        } else {
+          edges.push({ id: `${n.id}->${cn.id}`, x1: n.x + n.w, y1: n.y + n.h, x2: cn.x + cn.w, y2: cn.y + cn.h, color, kind: "underline", width });
+        }
       } else {
         const right = cn.x >= n.x;
         edges.push({ id: `${n.id}->${cn.id}`, x1: right ? n.x + n.w : n.x, y1: n.y + n.h / 2, x2: right ? cn.x : cn.x + cn.w, y2: cn.y + cn.h / 2, color, kind, width });
@@ -470,6 +490,9 @@ export function layoutSheet(sheet: Sheet): Layout {
     nodes = vertical(sheet, "down");
   } else if (s === "map.balanced") {
     nodes = horizontal(sheet, "balanced");
+  } else if (s === "map.underline") {
+    kind = "underline";
+    nodes = horizontal(sheet, "right");
   } else {
     const left = s.endsWith(".left");
     kind = s.startsWith("map.") ? "bezier" : "elbow-h";
@@ -539,6 +562,9 @@ export function edgePath(e: LaidOutEdge): string {
   if (e.kind === "elbow-v") {
     const my = (e.y1 + e.y2) / 2;
     return `M ${e.x1} ${e.y1} V ${my} H ${e.x2} V ${e.y2}`;
+  }
+  if (e.kind === "underline") {
+    return `M ${e.x1} ${e.y1} V ${e.y2} H ${e.x2}`;
   }
   const mx = (e.x1 + e.x2) / 2;
   return `M ${e.x1} ${e.y1} C ${mx} ${e.y1}, ${mx} ${e.y2}, ${e.x2} ${e.y2}`;
