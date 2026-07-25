@@ -14,6 +14,7 @@
     walkSheetTopics,
   } from "../../../src/index.js";
   import { layoutSheet, edgePath, summaryPath, type Layout, type LaidOutNode } from "./layout.js";
+  import { isTextOnLines } from "./mapAppearance.js";
 
   let {
     sheet,
@@ -1103,7 +1104,7 @@
     if (n.topic.style?.shape) return n.topic.style.shape;
     // This layout treats every topic as text positioned on a connector line.
     // Keep an explicitly selected topic shape as an intentional override.
-    if (sheet.structure === "map.underline") return "none";
+    if (isTextOnLines(sheet)) return "none";
     return "rounded";
   }
 
@@ -1126,7 +1127,7 @@
     return n.depth === 0 && !n.topic.style?.fillColor ? 0 : (n.topic.style?.borderWidth ?? 1.5);
   }
   function textFill(n: LaidOutNode): string {
-    if (sheet.structure === "map.underline") return n.topic.style?.font?.color ?? "#171750";
+    if (isTextOnLines(sheet)) return n.topic.style?.font?.color ?? "#171750";
     return n.topic.style?.font?.color ?? (n.depth === 0 || isDark(nodeFill(n)) ? "#ffffff" : "#1c2230");
   }
   function isDark(hex: string): boolean {
@@ -1362,7 +1363,7 @@
           {#if n.id !== editingId}
             <text
               dominant-baseline="central" text-anchor="middle"
-              font-family={n.topic.style?.font?.family ?? "inherit"}
+              font-family={n.topic.style?.font?.family ?? sheet.settings?.globalFont ?? "inherit"}
               font-size={n.topic.style?.font?.size ?? (n.depth === 0 ? 15 : 13)}
               font-weight={n.topic.style?.font?.weight ?? (n.depth === 0 ? "700" : n.depth === 1 ? "600" : "400")}
               font-style={n.topic.style?.font?.style ?? "normal"}

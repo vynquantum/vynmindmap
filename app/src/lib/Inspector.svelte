@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { Sheet, Topic, TopicShape, StructureId } from "../../../src/index.js";
+  import type { MapPresentation, Sheet, Topic, TopicShape, StructureId } from "../../../src/index.js";
+  import { COLOR_THEMES } from "./mapAppearance.js";
 
   let {
     sheet,
@@ -11,7 +12,6 @@
   const STRUCTURES: { id: StructureId; label: string }[] = [
     { id: "map.balanced", label: "Mind map · balanced" },
     { id: "map.right", label: "Mind map · right" },
-    { id: "map.underline", label: "Mind map · underline" },
     { id: "map.left", label: "Mind map · left" },
     { id: "logic.right", label: "Logic chart · right" },
     { id: "logic.left", label: "Logic chart · left" },
@@ -183,23 +183,6 @@
       ]
     }
   ];
-  const THEMES = [
-    { id: "classic", bg: "#f5f6f8", root: "#33415c" },
-    { id: "dark", bg: "#1f2430", root: "#3f7fd0" },
-    { id: "paper", bg: "#fbf7ee", root: "#7a5c3a" },
-    { id: "mint", bg: "#eef7f2", root: "#2f9e6f" },
-    { id: "rose", bg: "#fdeef3", root: "#c2477e" },
-    { id: "ocean", bg: "#e0f2fe", root: "#0369a1" },
-    { id: "forest", bg: "#f0fdf4", root: "#15803d" },
-    { id: "sunset", bg: "#fff7ed", root: "#c2410c" },
-    { id: "lavender", bg: "#faf5ff", root: "#6d28d9" },
-    { id: "monochrome", bg: "#f1f5f9", root: "#334155" },
-    { id: "hacker", bg: "#000000", root: "#22c55e" },
-    { id: "cyberpunk", bg: "#0f172a", root: "#ec4899" },
-    { id: "coffee", bg: "#fef3c7", root: "#92400e" },
-    { id: "midnight", bg: "#020617", root: "#6366f1" },
-    { id: "solarized", bg: "#fdf6e3", root: "#b58900" },
-  ];
   // Quick palette matching the canvas branch colors, plus neutrals.
   const SWATCHES = [
     "#e6584c", "#e98a3a", "#e7b93f", "#4fa84f", "#3aa6a6", "#3f7fd0",
@@ -213,7 +196,7 @@
       const raw = localStorage.getItem(SECT_KEY);
       if (raw) return JSON.parse(raw) as Record<string, boolean>;
     } catch { /* fall through to defaults */ }
-    return { structure: true, canvas: true, layout: true, style: true, font: true, markers: false, emoji: false, content: true };
+    return { map: true, layout: true, style: true, font: true, markers: false, emoji: false, content: true };
   }
   let open = $state<Record<string, boolean>>(loadSections());
   $effect(() => { localStorage.setItem(SECT_KEY, JSON.stringify(open)); });
@@ -311,12 +294,24 @@
   function setFontFamily(v: string) { if (topic) { ((topic.style ??= {}).font ??= {}).family = v || undefined; markDirty(); } }
   function setFontSize(v: number) { if (topic) { ((topic.style ??= {}).font ??= {}).size = v; markDirty(); } }
   function insertEmoji(e: string) { if (topic) { topic.title = (topic.title ?? "") + e; markDirty(); } }
-  function applyTheme(id: string) {
-    const th = THEMES.find((t) => t.id === id);
-    if (!th) return;
-    sheet.theme = th.id;
-    sheet.background = { ...(sheet.background ?? {}), color: th.bg };
-    (sheet.rootTopic.style ??= {}).fillColor = th.root;
+  function setColorTheme(id: string) { sheet.theme = id; markDirty(); }
+  function setBackground(v: string) { sheet.background = { ...(sheet.background ?? {}), color: v }; markDirty(); }
+  function setGlobalFont(v: string) { (sheet.settings ??= {}).globalFont = v || undefined; markDirty(); }
+  function setBranchLineWidth(v: string) {
+    if (v === "") delete sheet.settings?.branchLineWidth;
+    else (sheet.settings ??= {}).branchLineWidth = Number(v);
+    markDirty();
+  }
+  function setColoredBranches(v: boolean) { (sheet.settings ??= {}).coloredBranches = v; markDirty(); }
+  function setBranchColor(v: string) { (sheet.settings ??= {}).branchColor = v; markDirty(); }
+  function setMapPresentation(v: MapPresentation) {
+    (sheet.settings ??= {}).mapPresentation = v;
+    // The text-on-lines treatment uses a rightward mind-map layout. Selecting
+    // it makes that compatible chart type explicit instead of hiding a layout
+    // change inside the style implementation.
+    if (v === "underline" && sheet.structure !== "map.right" && sheet.structure !== "map.underline") {
+      sheet.structure = "map.right";
+    }
     markDirty();
   }
   const font = $derived(topic?.style?.font);
@@ -333,7 +328,13 @@
   function setLabels(v: string) {
     if (topic) { topic.labels = v.split(",").map((s) => s.trim()).filter(Boolean); markDirty(); }
   }
-  function setStructure(v: string) { sheet.structure = v as StructureId; markDirty(); }
+  function setStructure(v: string) {
+    sheet.structure = v as StructureId;
+    if (v !== "map.right" && v !== "map.underline" && sheet.settings?.mapPresentation === "underline") {
+      sheet.settings.mapPresentation = "boxed";
+    }
+    markDirty();
+  }
   
   function handleImageUpload(e: Event) {
     if (!topic) return;
@@ -383,34 +384,73 @@
     </div>
   {/if}
   <section>
-    {@render sectionHeader("structure", "Structure")}
-    {#if open.structure}
+    {@render sectionHeader("map", "Map")}
+    {#if open.map}
       <div class="body">
-        <label>Structure
+        <label>Chart type
           <select value={sheet.structure} onchange={(e) => setStructure(e.currentTarget.value)}>
+            {#if sheet.structure === "map.underline"}<option value="map.underline">Mind map · underline (legacy)</option>{/if}
             {#each STRUCTURES as s (s.id)}<option value={s.id}>{s.label}</option>{/each}
           </select>
         </label>
-      </div>
-    {/if}
-  </section>
 
-  <section>
-    {@render sectionHeader("canvas", "Canvas style")}
-    {#if open.canvas}
-      <div class="body">
-        <div class="fieldname">Theme</div>
+        <div class="fieldname">Color theme</div>
+        <select value={sheet.theme} onchange={(e) => setColorTheme(e.currentTarget.value)}>
+          {#each COLOR_THEMES as theme (theme.id)}<option value={theme.id}>{theme.label}</option>{/each}
+        </select>
         <div class="themes">
-          {#each THEMES as t (t.id)}
-            <button class="theme" class:on={sheet.theme === t.id} title={`${t.id} theme`}
-              onclick={() => applyTheme(t.id)}>
-              <span class="tbg" style={`background:${t.bg}`}>
-                <span class="troot" style={`background:${t.root}`}></span>
-              </span>
-              <small>{t.id}</small>
+          {#each COLOR_THEMES as theme (theme.id)}
+            <button class="theme" class:on={sheet.theme === theme.id} title={`${theme.label} color theme`}
+              onclick={() => setColorTheme(theme.id)}>
+              <span class="tbg" style={`background:linear-gradient(90deg, ${theme.palette.join(",")})`}></span>
+              <small>{theme.label}</small>
             </button>
           {/each}
         </div>
+
+        <div class="map-divider"></div>
+        <label class="color-setting">Background color
+          <span class="colorline">
+            <input type="color" value={expand(sheet.background?.color)} oninput={(e) => setBackground(e.currentTarget.value)} />
+            <input value={sheet.background?.color ?? "#f5f6f8"} oninput={(e) => setBackground(e.currentTarget.value)} />
+          </span>
+        </label>
+
+        <label>Global font
+          <select value={sheet.settings?.globalFont ?? ""} onchange={(e) => setGlobalFont(e.currentTarget.value)}>
+            <option value="">Default</option>
+            {#each FONTS as fontName (fontName)}<option value={fontName}>{fontName}</option>{/each}
+          </select>
+        </label>
+        <label>Branch line width
+          <select value={sheet.settings?.branchLineWidth ?? ""} onchange={(e) => setBranchLineWidth(e.currentTarget.value)}>
+            <option value="">Default</option>
+            {#each LINE_WIDTHS as width (width)}<option value={width}>{width} px</option>{/each}
+          </select>
+        </label>
+
+        <label class="checkline">
+          <input type="checkbox" checked={sheet.settings?.coloredBranches !== false}
+            onchange={(e) => setColoredBranches(e.currentTarget.checked)} />
+          <span>Colored branches</span>
+        </label>
+        {#if sheet.settings?.coloredBranches === false}
+          <label class="color-setting">Branch color
+            <span class="colorline">
+              <input type="color" value={expand(sheet.settings?.branchColor)} oninput={(e) => setBranchColor(e.currentTarget.value)} />
+              <input value={sheet.settings?.branchColor ?? "#4f46d4"} oninput={(e) => setBranchColor(e.currentTarget.value)} />
+            </span>
+          </label>
+        {/if}
+
+        <div class="map-divider"></div>
+        <label>Map style
+          <select value={sheet.settings?.mapPresentation ?? (sheet.structure === "map.underline" ? "underline" : "boxed")}
+            onchange={(e) => setMapPresentation(e.currentTarget.value as MapPresentation)}>
+            <option value="boxed">Boxed topics</option>
+            <option value="underline">Text on lines</option>
+          </select>
+        </label>
       </div>
     {/if}
   </section>
@@ -689,6 +729,10 @@
   .sw:hover:not(:disabled) { transform: scale(1.15); box-shadow: var(--elev-1); }
 
   .colorline { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .colorline input:not([type="color"]) { flex: 1; min-width: 0; }
+  .map-divider { height: 1px; margin: 14px 0; background: var(--border); }
+  .checkline { display: flex; align-items: center; gap: 9px; color: var(--text); font-size: 13px; }
+  .checkline input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
   input[type="color"] {
     width: 44px; height: 28px; padding: 0; flex: none;
     border: 1px solid var(--border); border-radius: 6px; background: var(--panel);
@@ -875,7 +919,6 @@
     width: 30px; height: 22px; border-radius: 5px; display: grid; place-items: center;
     border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
   }
-  .theme .troot { width: 14px; height: 8px; border-radius: 3px; }
   .theme small { font-size: 10px; color: var(--muted); }
 
   .hint { color: var(--muted); padding: 6px; }

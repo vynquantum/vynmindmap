@@ -40,6 +40,9 @@ export type StructureId =
   | "tree-table"
   | "brace.right" | "brace.left";
 
+/** Visual treatment applied independently from the chart's geometry. */
+export type MapPresentation = "boxed" | "underline";
+
 // ---------------------------------------------------------------------------
 // Styling
 // ---------------------------------------------------------------------------
@@ -188,6 +191,16 @@ export interface SheetBackground {
 
 export interface SheetSettings {
   rainbowBranches?: boolean;
+  /** Whether each top-level branch uses the active color theme's palette. */
+  coloredBranches?: boolean;
+  /** Single branch color when coloredBranches is disabled. */
+  branchColor?: string;
+  /** Default line width for branches without a topic-specific override. */
+  branchLineWidth?: number;
+  /** Default font family for topics without a topic-specific override. */
+  globalFont?: string;
+  /** Node presentation, deliberately separate from chart structure. */
+  mapPresentation?: MapPresentation;
   [key: string]: unknown;
 }
 

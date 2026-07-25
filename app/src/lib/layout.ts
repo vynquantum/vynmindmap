@@ -7,6 +7,7 @@
  */
 
 import type { Sheet, StructureId, Topic } from "../../../src/index.js";
+import { isTextOnLines, paletteForSheet, rootColorForSheet, underlineColorForSheet } from "./mapAppearance.js";
 
 export interface LaidOutNode {
   id: string;
@@ -82,15 +83,8 @@ const MAX_W = 260;
 const MAX_MANUAL_W = 800;
 const MARGIN = 56;
 
-const PALETTE = [
-  "#e6584c", "#e98a3a", "#e7b93f", "#4fa84f",
-  "#3aa6a6", "#3f7fd0", "#7a5cc9", "#c95ca0",
-];
-const ROOT_COLOR = "#33415c";
 const FLOAT_COLOR = "#7a8699";
 const SUMMARY_COLOR = "#64748b";
-/** Default connector color for the text-on-lines mind map. */
-const UNDERLINE_COLOR = "#4f46d4";
 
 // Sizing / wrapping ----------------------------------------------------------
 
@@ -211,13 +205,14 @@ function shiftRange(nodes: LaidOutNode[], from: number, dx: number, dy: number):
   for (let i = from; i < nodes.length; i++) { nodes[i]!.x += dx; nodes[i]!.y += dy; }
 }
 
-const colorFor = (i: number) => PALETTE[i % PALETTE.length]!;
+const colorFor = (i: number, palette: readonly string[]) => palette[i % palette.length]!;
 
 function horizontal(sheet: Sheet, mode: "balanced" | "right" | "left"): LaidOutNode[] {
   const nodes: LaidOutNode[] = [];
   const root = sheet.rootTopic;
   const rootS = sizeOf(root);
   const kids = visibleChildren(root);
+  const palette = paletteForSheet(sheet);
 
   const right: { t: Topic; i: number }[] = [];
   const left: { t: Topic; i: number }[] = [];
@@ -229,15 +224,15 @@ function horizontal(sheet: Sheet, mode: "balanced" | "right" | "left"): LaidOutN
 
   const rStart = nodes.length;
   const rc: Cursor = { v: 0 };
-  for (const { t, i } of right) placeH(t, 1, "right", 1, rootS.w / 2 + LEVEL_GAP, colorFor(i), rc, nodes);
+  for (const { t, i } of right) placeH(t, 1, "right", 1, rootS.w / 2 + LEVEL_GAP, colorFor(i, palette), rc, nodes);
   shiftRange(nodes, rStart, 0, -Math.max(0, rc.v - ROW_GAP) / 2);
 
   const lStart = nodes.length;
   const lc: Cursor = { v: 0 };
-  for (const { t, i } of left) placeH(t, 1, "left", -1, -rootS.w / 2 - LEVEL_GAP, colorFor(i), lc, nodes);
+  for (const { t, i } of left) placeH(t, 1, "left", -1, -rootS.w / 2 - LEVEL_GAP, colorFor(i, palette), lc, nodes);
   shiftRange(nodes, lStart, 0, -Math.max(0, lc.v - ROW_GAP) / 2);
 
-  nodes.push(mkNode(root, -rootS.w / 2, -rootS.h / 2, rootS, 0, "root", ROOT_COLOR));
+  nodes.push(mkNode(root, -rootS.w / 2, -rootS.h / 2, rootS, 0, "root", rootColorForSheet(sheet)));
   return nodes;
 }
 
@@ -247,13 +242,14 @@ function vertical(sheet: Sheet, dir: "down" | "up"): LaidOutNode[] {
   const rootS = sizeOf(root);
   const d: 1 | -1 = dir === "down" ? 1 : -1;
   const kids = visibleChildren(root);
+  const palette = paletteForSheet(sheet);
 
   const start = nodes.length;
   const c: Cursor = { v: 0 };
-  kids.forEach((t, i) => placeV(t, 1, dir, d, (d > 0 ? rootS.h / 2 : -rootS.h / 2) + d * LEVEL_GAP, colorFor(i), c, nodes));
+  kids.forEach((t, i) => placeV(t, 1, dir, d, (d > 0 ? rootS.h / 2 : -rootS.h / 2) + d * LEVEL_GAP, colorFor(i, palette), c, nodes));
   shiftRange(nodes, start, -Math.max(0, c.v - COL_GAP) / 2, 0);
 
-  nodes.push(mkNode(root, -rootS.w / 2, -rootS.h / 2, rootS, 0, "root", ROOT_COLOR));
+  nodes.push(mkNode(root, -rootS.w / 2, -rootS.h / 2, rootS, 0, "root", rootColorForSheet(sheet)));
   return nodes;
 }
 
@@ -270,7 +266,7 @@ function placeFloating(topic: Topic, index: number, nodes: LaidOutNode[]): void 
   nodes.push(...sub);
 }
 
-function buildEdges(nodes: LaidOutNode[], kind: LaidOutEdge["kind"]): LaidOutEdge[] {
+function buildEdges(sheet: Sheet, nodes: LaidOutNode[], kind: LaidOutEdge["kind"]): LaidOutEdge[] {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const edges: LaidOutEdge[] = [];
   for (const n of nodes) {
@@ -280,8 +276,8 @@ function buildEdges(nodes: LaidOutNode[], kind: LaidOutEdge["kind"]): LaidOutEdg
       // Underline maps use one restrained connector color, as the lines also
       // serve as the visual treatment for the otherwise transparent nodes.
       // An explicit topic line color still takes precedence.
-      const color = cn.topic.style?.lineColor ?? (kind === "underline" ? UNDERLINE_COLOR : cn.color);
-      const width = cn.topic.style?.lineWidth ?? 2.5;
+      const color = cn.topic.style?.lineColor ?? (kind === "underline" ? underlineColorForSheet(sheet) : cn.color);
+      const width = cn.topic.style?.lineWidth ?? sheet.settings?.branchLineWidth ?? 2.5;
       if (n.side === "down" || n.side === "up" || cn.side === "down" || cn.side === "up") {
         const down = cn.y >= n.y;
         edges.push({ id: `${n.id}->${cn.id}`, x1: n.x + n.w / 2, y1: down ? n.y + n.h : n.y, x2: cn.x + cn.w / 2, y2: down ? cn.y : cn.y + cn.h, color, kind: "elbow-v", width });
@@ -372,7 +368,7 @@ function fishbone(sheet: Sheet, dir: "left" | "right"): { nodes: LaidOutNode[]; 
   const root = sheet.rootTopic;
   const rootS = sizeOf(root);
   const sgn = dir === "right" ? 1 : -1;
-  nodes.push(mkNode(root, -rootS.w / 2, -rootS.h / 2, rootS, 0, "root", ROOT_COLOR));
+  nodes.push(mkNode(root, -rootS.w / 2, -rootS.h / 2, rootS, 0, "root", rootColorForSheet(sheet)));
 
   const bones = visibleChildren(root);
   const pairs = Math.max(1, Math.ceil(bones.length / 2));
@@ -386,7 +382,7 @@ function fishbone(sheet: Sheet, dir: "left" | "right"): { nodes: LaidOutNode[]; 
     const above = i % 2 === 0;
     const slot = Math.floor(i / 2) + 1;
     const attachX = headX - sgn * spineLen * (slot / (pairs + 1));
-    const color = colorFor(i);
+    const color = colorFor(i, paletteForSheet(sheet));
     const bs = sizeOf(b);
     const cyB = above ? -boneDY : boneDY;
     const cxB = attachX - sgn * boneDX;
@@ -413,7 +409,7 @@ function matrix(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
   const cols = visibleChildren(root);
   const gap = 12;
   const rootS = sizeOf(root);
-  nodes.push(mkNode(root, 0, 0, rootS, 0, "down", ROOT_COLOR));
+  nodes.push(mkNode(root, 0, 0, rootS, 0, "down", rootColorForSheet(sheet)));
   const headerY = rootS.h + 20;
 
   // Measure every cell first so each row can size to its tallest member.
@@ -431,7 +427,7 @@ function matrix(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
   let x = 0;
   colData.forEach((c, j) => {
     const cw = Math.max(c.header.w, ...c.cells.map((g) => g.size.w), 90);
-    const color = colorFor(j);
+    const color = colorFor(j, paletteForSheet(sheet));
     nodes.push(mkNode(c.topic, x, headerY, { ...c.header, w: cw }, 1, "down", color));
     c.cells.forEach((g, r) => {
       nodes.push(mkNode(g.topic, x, rowY(r), { ...g.size, w: cw }, 2, "down", color));
@@ -452,7 +448,7 @@ function treeTable(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] 
   const rowYs: number[] = [];
   const walk = (t: Topic, depth: number) => {
     const s = sizeOf(t);
-    nodes.push(mkNode(t, depth * indent, y, s, depth, "down", depth === 0 ? ROOT_COLOR : colorFor(depth - 1)));
+    nodes.push(mkNode(t, depth * indent, y, s, depth, "down", depth === 0 ? rootColorForSheet(sheet) : colorFor(depth - 1, paletteForSheet(sheet))));
     y += s.h + 8;
     rowYs.push(y);
     for (const c of visibleChildren(t)) walk(c, depth + 1);
@@ -488,11 +484,11 @@ export function layoutSheet(sheet: Sheet): Layout {
     nodes = vertical(sheet, s === "org.up" ? "up" : "down");
   } else if (s === "timeline.v") {
     nodes = vertical(sheet, "down");
-  } else if (s === "map.balanced") {
-    nodes = horizontal(sheet, "balanced");
-  } else if (s === "map.underline") {
+  } else if (isTextOnLines(sheet)) {
     kind = "underline";
     nodes = horizontal(sheet, "right");
+  } else if (s === "map.balanced") {
+    nodes = horizontal(sheet, "balanced");
   } else {
     const left = s.endsWith(".left");
     kind = s.startsWith("map.") ? "bezier" : "elbow-h";
@@ -543,14 +539,14 @@ export function layoutSheet(sheet: Sheet): Layout {
     nodes.push(mkNode(sm.summaryTopic, nodeX, midY - ss.h / 2, ss, 2, side, SUMMARY_COLOR));
   }
 
-  edges = buildEdges(nodes, kind);
+  edges = buildEdges(sheet, nodes, kind);
   return normalize({ nodes, edges, boundaries, summaries, braces, gridLines, width: 0, height: 0, shiftX: 0, shiftY: 0 });
 }
 
 /** Back-compat alias used by tests. */
 export const layoutBalanced = (sheet: Sheet): Layout => {
   const nodes = horizontal(sheet, "balanced");
-  return normalize({ nodes, edges: buildEdges(nodes, "bezier"), boundaries: [], summaries: [], braces: [], gridLines: [], width: 0, height: 0, shiftX: 0, shiftY: 0 });
+  return normalize({ nodes, edges: buildEdges(sheet, nodes, "bezier"), boundaries: [], summaries: [], braces: [], gridLines: [], width: 0, height: 0, shiftX: 0, shiftY: 0 });
 };
 
 export function edgePath(e: LaidOutEdge): string {

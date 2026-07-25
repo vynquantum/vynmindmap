@@ -115,6 +115,26 @@ describe("layoutBalanced", () => {
     expect(edgePath(layout.edges.find((e) => e.kind === "underline")!)).toMatch(/^M .* V .* H /);
   });
 
+  it("keeps chart type, map presentation, and color controls independent", () => {
+    const wb = createWorkbook("Root");
+    const sheet = wb.sheets[0]!;
+    sheet.structure = "map.right";
+    sheet.theme = "ocean";
+    sheet.settings = {
+      mapPresentation: "underline",
+      coloredBranches: false,
+      branchColor: "#123456",
+      branchLineWidth: 4,
+    };
+    const a = addChild(sheet.rootTopic, "A");
+    addChild(a, "A detail");
+
+    const layout = layoutSheet(sheet);
+    expect(layout.nodes.find((n) => n.depth === 0)!.color).toBe("#075985");
+    expect(layout.edges.every((e) => e.color === "#123456" && e.width === 4)).toBe(true);
+    expect(layout.edges.some((e) => e.kind === "underline")).toBe(true);
+  });
+
   it("lays out the rich example without errors", () => {
     const bytes = readFileSync(join(examples, "rich.vmm"));
     const { workbook } = readVmm(bytes);
