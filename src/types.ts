@@ -46,6 +46,7 @@ export type StructureId =
   | 'fishbone.left'
   | 'matrix'
   | 'tree-table'
+  | 'grid'
   | 'brace.right'
   | 'brace.left';
 

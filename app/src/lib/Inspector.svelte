@@ -7,6 +7,11 @@
     StructureId
   } from '../../../src/index.js';
   import { COLOR_THEMES } from './mapAppearance.js';
+  import {
+    STRUCTURE_CATEGORIES,
+    STRUCTURE_PREVIEWS,
+    type StructurePreview
+  } from './structurePreviews.js';
 
   let {
     sheet,
@@ -31,6 +36,7 @@
     { id: 'fishbone.left', label: 'Fishbone · left' },
     { id: 'matrix', label: 'Matrix' },
     { id: 'tree-table', label: 'Tree table' },
+    { id: 'grid', label: 'Grid' },
     { id: 'brace.right', label: 'Brace map · right' },
     { id: 'brace.left', label: 'Brace map · left' }
   ];
@@ -369,6 +375,57 @@
     open[id] = !open[id];
   }
 
+  // --- top-level tabs (persisted) --------------------------------------------
+  const TAB_KEY = 'vynmm.inspector.tab';
+  type TabId = 'style' | 'pitch' | 'map';
+  const TABS: { id: TabId; label: string }[] = [
+    { id: 'style', label: 'Style' },
+    { id: 'pitch', label: 'Pitch' },
+    { id: 'map', label: 'Map' }
+  ];
+  function loadTab(): TabId {
+    const raw = localStorage.getItem(TAB_KEY);
+    return raw === 'style' || raw === 'pitch' || raw === 'map' ? raw : 'map';
+  }
+  let activeTab = $state<TabId>(loadTab());
+  $effect(() => {
+    localStorage.setItem(TAB_KEY, activeTab);
+  });
+
+  const currentTheme = $derived(COLOR_THEMES.find((t) => t.id === sheet.theme) ?? COLOR_THEMES[0]);
+  const structFamily = $derived((sheet.structure ?? 'map.balanced').split('.')[0]!);
+
+  // Chart-type picker (thumbnail gallery below the card)
+  let structurePickerOpen = $state(false);
+  let collapsedCats = $state<Record<string, boolean>>({});
+  const underlineActive = $derived(
+    sheet.settings?.mapPresentation === 'underline' || sheet.structure === 'map.underline'
+  );
+  const activePreview = $derived(
+    underlineActive && (sheet.structure === 'map.right' || sheet.structure === 'map.underline')
+      ? STRUCTURE_PREVIEWS.get('map.text-on-lines')
+      : STRUCTURE_PREVIEWS.get(sheet.structure)
+  );
+  const currentStructureLabel = $derived(
+    activePreview?.label ??
+      STRUCTURES.find((s) => s.id === sheet.structure)?.label ??
+      'Mind map · underline (legacy)'
+  );
+  function isItemActive(item: StructurePreview): boolean {
+    if (item.presentation === 'underline') return underlineActive;
+    return sheet.structure === item.id && !(underlineActive && item.id === 'map.right');
+  }
+  function pickStructure(item: StructurePreview) {
+    if (item.presentation === 'underline') {
+      setMapPresentation('underline');
+    } else {
+      setStructure(item.id);
+      // A boxed card was chosen explicitly, so leave the underline treatment.
+      if (sheet.settings?.mapPresentation === 'underline') setMapPresentation('boxed');
+    }
+    structurePickerOpen = false;
+  }
+
   let selectedCategory = $state('Smileys');
   let emojiSearchQ = $state('');
   let anyEmojiInput = $state('');
@@ -675,132 +732,216 @@
 {/snippet}
 
 <aside class="inspector">
-  {#if onClose}
-    <div class="panelbar">
-      <span class="paneltitle">Style</span>
+  <div class="tabbar">
+    <div class="tabs" role="tablist" aria-label="Panel sections">
+      {#each TABS as t (t.id)}
+        <button
+          class="tab"
+          role="tab"
+          class:active={activeTab === t.id}
+          aria-selected={activeTab === t.id}
+          onclick={() => (activeTab = t.id)}>{t.label}</button
+        >
+      {/each}
+    </div>
+    {#if onClose}
       <button
         class="panelclose"
         title="Collapse panel"
         aria-label="Collapse panel"
         onclick={onClose}>✕</button
       >
-    </div>
-  {/if}
-  <section>
-    {@render sectionHeader('map', 'Map')}
-    {#if open.map}
-      <div class="body">
-        <label
-          >Chart type
-          <select value={sheet.structure} onchange={(e) => setStructure(e.currentTarget.value)}>
-            {#if sheet.structure === 'map.underline'}<option value="map.underline"
-                >Mind map · underline (legacy)</option
-              >{/if}
-            {#each STRUCTURES as s (s.id)}<option value={s.id}>{s.label}</option>{/each}
-          </select>
-        </label>
+    {/if}
+  </div>
 
-        <div class="fieldname">Color theme</div>
-        <select value={sheet.theme} onchange={(e) => setColorTheme(e.currentTarget.value)}>
+  {#if activeTab === 'map'}
+    <div class="tabbody">
+      <button
+        class="cardselect structbtn"
+        aria-expanded={structurePickerOpen}
+        onclick={() => (structurePickerOpen = !structurePickerOpen)}
+      >
+        <svg class="structthumb" viewBox="0 0 84 54" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+            >{@html activePreview?.svg ?? ''}</g
+          >
+        </svg>
+        <span class="structlabel">{currentStructureLabel}</span>
+        <span class="chev" class:closed={!structurePickerOpen}>▾</span>
+      </button>
+      {#if structurePickerOpen}
+        <div class="struct-picker">
+          {#each STRUCTURE_CATEGORIES as cat (cat.name)}
+            <button
+              class="struct-cat"
+              aria-expanded={!collapsedCats[cat.name]}
+              onclick={() => (collapsedCats[cat.name] = !collapsedCats[cat.name])}
+            >
+              <span class="chev" class:closed={collapsedCats[cat.name]}>▾</span>
+              <span>{cat.name}</span>
+            </button>
+            {#if !collapsedCats[cat.name]}
+              <div class="struct-grid">
+                {#each cat.items as item (item.key ?? item.id)}
+                  <button
+                    class="scard"
+                    class:on={isItemActive(item)}
+                    title={item.label}
+                    aria-label={item.label}
+                    onclick={() => pickStructure(item)}
+                  >
+                    <svg viewBox="0 0 84 54" aria-hidden="true">
+                      <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+                        >{@html item.svg}</g
+                      >
+                    </svg>
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          {/each}
+        </div>
+      {/if}
+
+      <div class="groupname">Color Theme</div>
+      <div class="theme-dropdown">
+        <span
+          class="strip"
+          style={`background:linear-gradient(90deg, ${currentTheme.palette.join(',')})`}
+        ></span>
+        <select
+          class="cardinput"
+          value={sheet.theme ?? currentTheme.id}
+          onchange={(e) => setColorTheme(e.currentTarget.value)}
+        >
           {#each COLOR_THEMES as theme (theme.id)}<option value={theme.id}>{theme.label}</option
             >{/each}
         </select>
-        <div class="themes">
-          {#each COLOR_THEMES as theme (theme.id)}
-            <button
-              class="theme"
-              class:on={sheet.theme === theme.id}
-              title={`${theme.label} color theme`}
-              onclick={() => setColorTheme(theme.id)}
-            >
-              <span
-                class="tbg"
-                style={`background:linear-gradient(90deg, ${theme.palette.join(',')})`}
-              ></span>
-              <small>{theme.label}</small>
-            </button>
-          {/each}
-        </div>
-
-        <div class="map-divider"></div>
-        <label class="color-setting"
-          >Background color
-          <span class="colorline">
-            <input
-              type="color"
-              value={expand(sheet.background?.color)}
-              oninput={(e) => setBackground(e.currentTarget.value)}
-            />
-            <input
-              value={sheet.background?.color ?? '#f5f6f8'}
-              oninput={(e) => setBackground(e.currentTarget.value)}
-            />
-          </span>
-        </label>
-
-        <label
-          >Global font
-          <select
-            value={sheet.settings?.globalFont ?? ''}
-            onchange={(e) => setGlobalFont(e.currentTarget.value)}
+      </div>
+      <div class="theme-grid">
+        {#each COLOR_THEMES as theme (theme.id)}
+          <button
+            class="tcard"
+            class:on={(sheet.theme ?? COLOR_THEMES[0].id) === theme.id}
+            title={`${theme.label} color theme`}
+            aria-label={`${theme.label} color theme`}
+            onclick={() => setColorTheme(theme.id)}
           >
-            <option value="">Default</option>
-            {#each FONTS as fontName (fontName)}<option value={fontName}>{fontName}</option>{/each}
-          </select>
-        </label>
-        <label
-          >Branch line width
-          <select
-            value={sheet.settings?.branchLineWidth ?? ''}
-            onchange={(e) => setBranchLineWidth(e.currentTarget.value)}
-          >
-            <option value="">Default</option>
-            {#each LINE_WIDTHS as width (width)}<option value={width}>{width} px</option>{/each}
-          </select>
-        </label>
+            <svg viewBox="0 0 84 54" aria-hidden="true">
+              <rect x="5" y="22" width="25" height="11" rx="3" fill={theme.root} />
+              {#each theme.palette.slice(0, 5) as c, i (i)}
+                <path
+                  d={`M30 27 C 44 27, 42 ${9 + i * 9.5}, 54 ${9 + i * 9.5}`}
+                  stroke={c}
+                  fill="none"
+                  stroke-width="1.5"
+                />
+                <rect x="54" y={9 + i * 9.5 - 2.2} width="24" height="4.4" rx="2.2" fill={c} />
+              {/each}
+            </svg>
+          </button>
+        {/each}
+      </div>
 
+      <div class="map-divider"></div>
+      <div class="rowline">
+        <span class="rowlabel">Background Color</span>
+        <input
+          type="color"
+          value={expand(sheet.background?.color ?? '#f5f6f8')}
+          oninput={(e) => setBackground(e.currentTarget.value)}
+        />
+      </div>
+
+      <label class="stack"
+        >Global Font
+        <select
+          value={sheet.settings?.globalFont ?? ''}
+          onchange={(e) => setGlobalFont(e.currentTarget.value)}
+        >
+          <option value="">Default</option>
+          {#each FONTS as fontName (fontName)}<option value={fontName}>{fontName}</option>{/each}
+        </select>
+      </label>
+      <label class="stack"
+        >Branch Line Width
+        <select
+          value={sheet.settings?.branchLineWidth ?? ''}
+          onchange={(e) => setBranchLineWidth(e.currentTarget.value)}
+        >
+          <option value="">Default</option>
+          {#each LINE_WIDTHS as width (width)}<option value={width}>{width} px</option>{/each}
+        </select>
+      </label>
+
+      <div class="rowline">
         <label class="checkline">
           <input
             type="checkbox"
             checked={sheet.settings?.coloredBranches !== false}
             onchange={(e) => setColoredBranches(e.currentTarget.checked)}
           />
-          <span>Colored branches</span>
+          <span>Colored Branch</span>
         </label>
         {#if sheet.settings?.coloredBranches === false}
-          <label class="color-setting"
-            >Branch color
-            <span class="colorline">
-              <input
-                type="color"
-                value={expand(sheet.settings?.branchColor)}
-                oninput={(e) => setBranchColor(e.currentTarget.value)}
-              />
-              <input
-                value={sheet.settings?.branchColor ?? '#4f46d4'}
-                oninput={(e) => setBranchColor(e.currentTarget.value)}
-              />
-            </span>
-          </label>
+          <input
+            type="color"
+            title="Branch color"
+            value={expand(sheet.settings?.branchColor ?? '#4f46d4')}
+            oninput={(e) => setBranchColor(e.currentTarget.value)}
+          />
+        {:else}
+          <span
+            class="rainbow-chip"
+            title="Branches use the color theme"
+            style={`background:conic-gradient(${currentTheme.palette.join(',')},${currentTheme.palette[0]})`}
+          ></span>
         {/if}
-
-        <div class="map-divider"></div>
-        <label
-          >Map style
-          <select
-            value={sheet.settings?.mapPresentation ??
-              (sheet.structure === 'map.underline' ? 'underline' : 'boxed')}
-            onchange={(e) => setMapPresentation(e.currentTarget.value as MapPresentation)}
-          >
-            <option value="boxed">Boxed topics</option>
-            <option value="underline">Text on lines</option>
-          </select>
-        </label>
       </div>
-    {/if}
-  </section>
 
-  {#if topic}
+      <div class="map-divider"></div>
+      <div class="groupname strong">Map Style</div>
+      <div class="rowline">
+        <span class="rowlabel">Balance Map</span>
+        <button
+          class="switch"
+          class:on={sheet.structure === 'map.balanced'}
+          role="switch"
+          aria-checked={sheet.structure === 'map.balanced'}
+          aria-label="Balance map"
+          disabled={structFamily !== 'map'}
+          onclick={() =>
+            setStructure(sheet.structure === 'map.balanced' ? 'map.right' : 'map.balanced')}
+        ></button>
+      </div>
+      <div class="rowline">
+        <span class="rowlabel">Text on Lines</span>
+        <button
+          class="switch"
+          class:on={(sheet.settings?.mapPresentation ??
+            (sheet.structure === 'map.underline' ? 'underline' : 'boxed')) === 'underline'}
+          role="switch"
+          aria-checked={(sheet.settings?.mapPresentation ??
+            (sheet.structure === 'map.underline' ? 'underline' : 'boxed')) === 'underline'}
+          aria-label="Text on lines"
+          onclick={() =>
+            setMapPresentation(
+              (sheet.settings?.mapPresentation ??
+                (sheet.structure === 'map.underline' ? 'underline' : 'boxed')) === 'underline'
+                ? 'boxed'
+                : 'underline'
+            )}
+        ></button>
+      </div>
+    </div>
+  {:else if activeTab === 'pitch'}
+    <div class="tabbody">
+      <p class="hint">
+        Pitch mode settings are coming soon. Use the presentation button in the toolbar to present
+        this map.
+      </p>
+    </div>
+  {:else if topic}
     <section>
       {@render sectionHeader('layout', 'Size & wrapping')}
       {#if open.layout}
@@ -1115,7 +1256,7 @@
 
 <style>
   .inspector {
-    width: 280px;
+    width: 300px;
     flex: none;
     height: 100%;
     overflow-y: auto;
@@ -1125,21 +1266,271 @@
     padding: 10px;
     font-size: 13px;
   }
-  .panelbar {
+
+  /* Top-level Style / Pitch / Map tabs */
+  .tabbar {
+    position: sticky;
+    top: -10px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: -10px -10px 10px;
+    padding: 6px 8px 0;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs {
+    display: flex;
+    flex: 1;
+    justify-content: space-evenly;
+  }
+  .tab {
+    position: relative;
+    border: none;
+    background: transparent;
+    padding: 8px 14px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    border-radius: 0;
+  }
+  .tab:hover:not(:disabled) {
+    color: var(--text);
+  }
+  .tab.active {
+    color: var(--text);
+  }
+  .tab.active::after {
+    content: '';
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: -1px;
+    height: 2.5px;
+    border-radius: 2px;
+    background: var(--text);
+  }
+  .tabbody {
+    padding: 2px 2px 8px;
+  }
+
+  /* Chart-type card + theme dropdown */
+  .cardselect,
+  .theme-dropdown {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--panel);
+    margin-bottom: 8px;
+  }
+  .cardselect {
+    padding: 14px 12px;
+  }
+  .cardselect:focus-within,
+  .theme-dropdown:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  .structthumb {
+    width: 66px;
+    height: auto;
+    flex: none;
+    color: color-mix(in srgb, var(--text) 72%, transparent);
+    background: color-mix(in srgb, var(--text) 3%, var(--panel));
+    border: 1px solid var(--border);
+    border-radius: 7px;
+  }
+  .cardinput {
+    flex: 1;
+    min-width: 0;
+    margin: 0 !important;
+    padding: 4px 2px !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+  .strip {
+    width: 56px;
+    height: 14px;
+    flex: none;
+    border-radius: 4px;
+    border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  }
+
+  /* Chart-type picker gallery */
+  .structbtn {
+    width: 100%;
+    text-align: left;
+    color: var(--text);
+  }
+  .structbtn:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  }
+  .structlabel {
+    flex: 1;
+    min-width: 0;
+    font-size: 13.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .struct-picker {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--panel);
+    padding: 4px 8px 10px;
+    margin-bottom: 8px;
+    max-height: 380px;
+    overflow-y: auto;
+  }
+  .struct-cat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 8px 2px 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text);
+    text-align: left;
+  }
+  .struct-cat:hover:not(:disabled) {
+    color: var(--accent);
+  }
+  .struct-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 7px;
+    margin-bottom: 4px;
+  }
+  .scard {
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: color-mix(in srgb, var(--text) 72%, transparent);
+  }
+  .scard svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--text) 3%, var(--panel));
+  }
+  .scard:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+    color: var(--text);
+  }
+  .scard.on {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+    color: var(--text);
+  }
+
+  .groupname {
+    color: var(--muted);
+    font-size: 12px;
+    margin: 14px 0 7px;
+  }
+  .groupname.strong {
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  /* Theme preview cards */
+  .theme-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 7px;
+  }
+  .tcard {
+    padding: 5px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .tcard svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--text) 3%, var(--panel));
+  }
+  .tcard:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  }
+  .tcard.on {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+
+  /* Label-left / control-right rows */
+  .rowline {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin: -2px 0 6px;
-    padding: 2px 2px 8px;
-    border-bottom: 1px solid var(--border);
+    gap: 10px;
+    margin: 12px 0;
   }
-  .paneltitle {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
+  .rowlabel {
+    color: var(--text);
+    font-size: 13px;
+  }
+  .stack {
     color: var(--muted);
-    font-weight: 700;
   }
+  .rainbow-chip {
+    width: 22px;
+    height: 22px;
+    flex: none;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+  }
+
+  /* Toggle switch */
+  .switch {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    flex: none;
+    padding: 0;
+    border: none;
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--text) 18%, var(--panel));
+    transition: background 0.15s ease;
+  }
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.15s ease;
+  }
+  .switch.on {
+    background: var(--accent);
+  }
+  .switch.on::after {
+    transform: translateX(16px);
+  }
+  .switch:disabled {
+    opacity: 0.4;
+  }
+
   .panelclose {
     width: 26px;
     height: 26px;
@@ -1545,39 +1936,6 @@
     line-height: 1.3;
     margin-top: 4px;
     font-style: italic;
-  }
-
-  /* Theme swatches */
-  .themes {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 5px;
-  }
-  .theme {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 3px;
-    padding: 5px 2px;
-    border-radius: 9px;
-    border: 1px solid var(--border);
-    background: var(--panel);
-  }
-  .theme.on {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
-  }
-  .theme .tbg {
-    width: 30px;
-    height: 22px;
-    border-radius: 5px;
-    display: grid;
-    place-items: center;
-    border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
-  }
-  .theme small {
-    font-size: 10px;
-    color: var(--muted);
   }
 
   .hint {

@@ -104,6 +104,7 @@ function save(name: string, wb: Workbook): void {
     'fishbone.right',
     'matrix',
     'tree-table',
+    'grid',
     'brace.right'
   ] as const;
   for (const s of structures) {

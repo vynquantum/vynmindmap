@@ -682,6 +682,75 @@ function treeTable(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] 
   return { nodes, gridLines: lines };
 }
 
+// --- grid: level-1 topics as uniform cards, subtrees stacked inside --------
+function grid(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
+  const nodes: LaidOutNode[] = [];
+  const lines: GridLine[] = [];
+  const root = sheet.rootTopic;
+  const kids = visibleChildren(root);
+  const rootS = sizeOf(root);
+  const cols = Math.max(1, Math.ceil(Math.sqrt(kids.length)));
+  const nRows = Math.ceil(kids.length / cols);
+  const gapX = 18;
+  const gapY = 18;
+  const indent = 20;
+  const topY = rootS.h + 24;
+
+  // Measure each cell: the level-1 header with its descendants listed below.
+  const cells = kids.map((t) => {
+    const rows: { topic: Topic; s: ReturnType<typeof sizeOf>; depth: number }[] = [];
+    const walk = (x: Topic, depth: number) => {
+      rows.push({ topic: x, s: sizeOf(x), depth });
+      for (const c of visibleChildren(x)) walk(c, depth + 1);
+    };
+    walk(t, 0);
+    return {
+      rows,
+      w: Math.max(120, ...rows.map((r) => r.s.w + r.depth * indent)),
+      h: rows.reduce((a, r) => a + r.s.h + 6, 0)
+    };
+  });
+  const colW: number[] = [];
+  for (let j = 0; j < cols; j++)
+    colW.push(Math.max(0, ...cells.filter((_, i) => i % cols === j).map((c) => c.w)));
+  const rowH: number[] = [];
+  for (let r = 0; r < nRows; r++)
+    rowH.push(Math.max(0, ...cells.slice(r * cols, r * cols + cols).map((c) => c.h)));
+  const colX = (j: number) => colW.slice(0, j).reduce((a, b) => a + b + gapX, 0);
+  const rowY = (r: number) => topY + rowH.slice(0, r).reduce((a, b) => a + b + gapY, 0);
+  const fullW = cols ? colX(cols - 1) + (colW[cols - 1] ?? 0) : rootS.w;
+
+  nodes.push(mkNode(root, (fullW - rootS.w) / 2, 0, rootS, 0, 'down', rootColorForSheet(sheet)));
+  cells.forEach((cell, i) => {
+    const j = i % cols;
+    const r = Math.floor(i / cols);
+    const color = colorFor(i, paletteForSheet(sheet));
+    let y = rowY(r);
+    cell.rows.forEach((row, k) => {
+      nodes.push(
+        mkNode(
+          row.topic,
+          colX(j) + row.depth * indent,
+          y,
+          k === 0 ? { ...row.s, w: colW[j]! } : row.s,
+          k === 0 ? 1 : 2,
+          'down',
+          color
+        )
+      );
+      y += row.s.h + 6;
+    });
+  });
+  for (let j = 1; j < cols; j++)
+    lines.push({
+      x1: colX(j) - gapX / 2,
+      y1: topY - 6,
+      x2: colX(j) - gapX / 2,
+      y2: rowY(nRows - 1) + (rowH[nRows - 1] ?? 0) + 6
+    });
+  return { nodes, gridLines: lines };
+}
+
 export function layoutSheet(sheet: Sheet): Layout {
   const s: StructureId = sheet.structure;
   let nodes: LaidOutNode[];
@@ -702,6 +771,9 @@ export function layoutSheet(sheet: Sheet): Layout {
     treeLike = false;
   } else if (s === 'tree-table') {
     ({ nodes, gridLines } = treeTable(sheet));
+    treeLike = false;
+  } else if (s === 'grid') {
+    ({ nodes, gridLines } = grid(sheet));
     treeLike = false;
   } else if (s === 'org.down' || s === 'org.up') {
     nodes = vertical(sheet, s === 'org.up' ? 'up' : 'down');

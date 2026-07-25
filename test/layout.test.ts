@@ -102,6 +102,29 @@ describe('layoutBalanced', () => {
     expect(kids[0]!.y + kids[0]!.h).toBeLessThanOrEqual(kids[1]!.y);
   });
 
+  it('lays out the grid structure as non-overlapping cards with separators', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    sheet.structure = 'grid';
+    for (let i = 0; i < 5; i++) {
+      const c = addChild(sheet.rootTopic, `Section ${i}`);
+      addChild(c, `Item ${i}`);
+    }
+
+    const layout = layoutSheet(sheet);
+    expect(layout.nodes).toHaveLength(11);
+    // 5 cells → 3 columns → 2 column separators.
+    expect(layout.gridLines).toHaveLength(2);
+    const headers = layout.nodes.filter((n) => n.depth === 1);
+    for (const a of headers) {
+      for (const b of headers) {
+        if (a === b) continue;
+        const overlaps = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+        expect(overlaps).toBe(false);
+      }
+    }
+  });
+
   it('uses continuous indigo underlines for the text-on-lines map', () => {
     const wb = createWorkbook('Root');
     const sheet = wb.sheets[0]!;
