@@ -1,36 +1,64 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import type { Workbook, Sheet, Topic } from "../../src/index.js";
-  import { createWorkbook, writeVmm, workbookToMarkdown, markdownToWorkbook, findTopic, addSheet, readVmm } from "../../src/index.js";
-  import { readVmmFromFile, readVmmFromUrl } from "./lib/loadVmm.js";
+  import { onMount } from 'svelte';
+  import type { Workbook, Sheet, Topic } from '../../src/index.js';
   import {
-    isTauri, basename, nativeSaveDialog, nativeOpenDialog, nativeWrite, nativeRead,
-    nativeModifiedMs, getOpenedFile, onOpenFile, hasFilePicker, hasOpenPicker,
-    browserSavePicker, browserOpenPicker, browserWriteHandle, browserDownload,
-    checkForUpdate, checkForUpdateDetailed, openExternal, type UpdateInfo, type FsFileHandle,
-    openPresenterWindow,
-  } from "./lib/platform.js";
+    createWorkbook,
+    writeVmm,
+    workbookToMarkdown,
+    markdownToWorkbook,
+    findTopic,
+    addSheet,
+    readVmm
+  } from '../../src/index.js';
+  import { readVmmFromFile, readVmmFromUrl } from './lib/loadVmm.js';
   import {
-    getRecents, addRecentPath, addRecentHandle, removeRecent, type RecentEntry,
-  } from "./lib/recents.js";
-  import MindMapView from "./lib/MindMapView.svelte";
-  import Inspector from "./lib/Inspector.svelte";
-  import OutlinePanel from "./lib/OutlinePanel.svelte";
-  import ConfirmHost from "./lib/ConfirmHost.svelte";
-  import { confirmDialog } from "./lib/confirm.svelte.js";
-  import Icon from "./lib/Icon.svelte";
-  import logoUrl from "../../app-icon.png";
+    isTauri,
+    basename,
+    nativeSaveDialog,
+    nativeOpenDialog,
+    nativeWrite,
+    nativeRead,
+    nativeModifiedMs,
+    getOpenedFile,
+    onOpenFile,
+    hasFilePicker,
+    hasOpenPicker,
+    browserSavePicker,
+    browserOpenPicker,
+    browserWriteHandle,
+    browserDownload,
+    checkForUpdate,
+    checkForUpdateDetailed,
+    openExternal,
+    type UpdateInfo,
+    type FsFileHandle,
+    openPresenterWindow
+  } from './lib/platform.js';
+  import {
+    getRecents,
+    addRecentPath,
+    addRecentHandle,
+    removeRecent,
+    type RecentEntry
+  } from './lib/recents.js';
+  import MindMapView from './lib/MindMapView.svelte';
+  import Inspector from './lib/Inspector.svelte';
+  import OutlinePanel from './lib/OutlinePanel.svelte';
+  import ConfirmHost from './lib/ConfirmHost.svelte';
+  import { confirmDialog } from './lib/confirm.svelte.js';
+  import Icon from './lib/Icon.svelte';
+  import logoUrl from '../../app-icon.png';
 
   let exportOpen = $state(false);
   const SAMPLES = [
-    { id: "rich", title: "Project Plan", note: "styles · relationships · sheets" },
-    { id: "minimal", title: "Hello VynMindMap", note: "a tiny starter map" },
-    { id: "structures", title: "Structures", note: "every layout type" },
+    { id: 'rich', title: 'Project Plan', note: 'styles · relationships · sheets' },
+    { id: 'minimal', title: 'Hello VynMindMap', note: 'a tiny starter map' },
+    { id: 'structures', title: 'Structures', note: 'every layout type' }
   ];
 
   let workbook = $state<Workbook | null>(null);
   let resources = $state<Record<string, Uint8Array>>({});
-  let fileName = $state<string>("");
+  let fileName = $state<string>('');
   let currentPath = $state<string | null>(null); // native path of the open file, if any
   // Browser (File System Access API) handle of the open file. Held so "Save"
   // writes back silently; only "Save As" re-prompts. Not reactive — no UI
@@ -43,8 +71,8 @@
   let directWriteBlocked = false;
   let activeSheet = $state(0);
   let dirty = $state(false);
-  let error = $state<string>("");
-  let warning = $state<string>("");
+  let error = $state<string>('');
+  let warning = $state<string>('');
   let view = $state<MindMapView | null>(null);
   let viewportEl = $state<HTMLDivElement | null>(null);
 
@@ -106,42 +134,50 @@
     dirty = true;
     scheduleAutosave();
   }
-  function undo() { if (canUndo) restore(histIndex - 1); }
-  function redo() { if (canRedo) restore(histIndex + 1); }
+  function undo() {
+    if (canUndo) restore(histIndex - 1);
+  }
+  function redo() {
+    if (canRedo) restore(histIndex + 1);
+  }
 
   // --- preferences (persisted) ----------------------------------------------
-  let theme = $state(localStorage.getItem("vynmm.theme") === "dark" ? "dark" : "light");
+  let theme = $state(localStorage.getItem('vynmm.theme') === 'dark' ? 'dark' : 'light');
   $effect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem("vynmm.theme", theme);
+    localStorage.setItem('vynmm.theme', theme);
   });
 
-  let showOutline = $state(localStorage.getItem("vynmm.outline") === "1");
-  $effect(() => { localStorage.setItem("vynmm.outline", showOutline ? "1" : "0"); });
+  let showOutline = $state(localStorage.getItem('vynmm.outline') === '1');
+  $effect(() => {
+    localStorage.setItem('vynmm.outline', showOutline ? '1' : '0');
+  });
 
   // Inspector (right sidebar) visibility — defaults to open on first run, then
   // Inspector (right sidebar) visibility — defaults to open on first run, then
   // remembers the user's choice so it stays out of the way once collapsed.
-  let showInspector = $state(localStorage.getItem("vynmm.inspector") !== "0");
-  $effect(() => { localStorage.setItem("vynmm.inspector", showInspector ? "1" : "0"); });
+  let showInspector = $state(localStorage.getItem('vynmm.inspector') !== '0');
+  $effect(() => {
+    localStorage.setItem('vynmm.inspector', showInspector ? '1' : '0');
+  });
 
   let zenMode = $state(false);
   let presenterMode = $state(false);
-  let isPresenterWindow = $state(window.location.search.includes("presenter=true"));
-  let currentTitle = $state("No topic selected");
-  let currentNote = $state("");
+  let isPresenterWindow = $state(window.location.search.includes('presenter=true'));
+  let currentTitle = $state('No topic selected');
+  let currentNote = $state('');
   let isEditingNote = $state(false);
-  let nextTitle = $state("");
+  let nextTitle = $state('');
   let currentIndex = $state(0);
   let totalTopics = $state(0);
-  let timerText = $state("00:00");
-  let clockText = $state("00:00:00");
+  let timerText = $state('00:00');
+  let clockText = $state('00:00:00');
   let bc = $state<BroadcastChannel | null>(null);
 
   function getPresentationOrder(): string[] {
     if (!sheet) return [];
     const order: string[] = [];
-    
+
     function walk(topic: Topic) {
       order.push(topic.id);
       if (topic.children) {
@@ -150,15 +186,15 @@
         }
       }
     }
-    
+
     walk(sheet.rootTopic);
-    
+
     if (sheet.floatingTopics) {
       for (const float of sheet.floatingTopics) {
         walk(float);
       }
     }
-    
+
     return order;
   }
 
@@ -168,21 +204,21 @@
       const idx = selectedId ? ids.indexOf(selectedId) : -1;
       const nextId = idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null;
       const nextTopic = nextId ? findTopic(sheet!, nextId) : null;
-      
+
       bc.postMessage({
-        action: "update",
-        title: selectedTopic?.title ?? "No topic selected",
-        note: selectedTopic?.note?.plain ?? "",
+        action: 'update',
+        title: selectedTopic?.title ?? 'No topic selected',
+        note: selectedTopic?.note?.plain ?? '',
         index: idx >= 0 ? idx + 1 : 0,
         total: ids.length,
-        nextTitle: nextTopic?.title ?? "End of presentation"
+        nextTitle: nextTopic?.title ?? 'End of presentation'
       });
     }
   }
 
   function uncollapseAncestors(sheet: Sheet, targetId: string): boolean {
     let modified = false;
-    
+
     function walk(topic: Topic): boolean {
       if (topic.id === targetId) {
         return true;
@@ -200,9 +236,9 @@
       }
       return false;
     }
-    
+
     walk(sheet.rootTopic);
-    
+
     if (sheet.floatingTopics) {
       for (const float of sheet.floatingTopics) {
         if (walk(float)) {
@@ -210,23 +246,22 @@
         }
       }
     }
-    
+
     return modified;
   }
 
   function formatMarkdownNotes(text: string): string {
-    if (!text) return "";
-    const safeText = text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-    const lines = safeText.split("\n");
-    return lines.map(line => {
-      if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
-        return `<li style="margin-left: 20px; margin-bottom: 8px;">${line.trim().slice(2)}</li>`;
-      }
-      return `<p style="margin: 0 0 12px 0;">${line}</p>`;
-    }).join("");
+    if (!text) return '';
+    const safeText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const lines = safeText.split('\n');
+    return lines
+      .map((line) => {
+        if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+          return `<li style="margin-left: 20px; margin-bottom: 8px;">${line.trim().slice(2)}</li>`;
+        }
+        return `<p style="margin: 0 0 12px 0;">${line}</p>`;
+      })
+      .join('');
   }
 
   async function openPresenterNotes() {
@@ -247,7 +282,7 @@
     presenterMode = false;
     zenMode = false;
     if (bc) {
-      bc.postMessage({ action: "close" });
+      bc.postMessage({ action: 'close' });
     }
   }
 
@@ -298,11 +333,11 @@
     (window as any).presentPrev = presentPrev;
     (window as any).exitPresenterMode = exitPresenterMode;
 
-    bc = new BroadcastChannel("vynmm-presenter");
-    
+    bc = new BroadcastChannel('vynmm-presenter');
+
     if (isPresenterWindow) {
       bc.onmessage = (e) => {
-        if (e.data.action === "update") {
+        if (e.data.action === 'update') {
           if (currentTitle !== e.data.title) {
             isEditingNote = false;
           }
@@ -313,64 +348,70 @@
           currentIndex = e.data.index;
           totalTopics = e.data.total;
           nextTitle = e.data.nextTitle;
-        } else if (e.data.action === "close") {
+        } else if (e.data.action === 'close') {
           window.close();
         }
       };
-      
-      bc.postMessage({ action: "request_init" });
-      
+
+      bc.postMessage({ action: 'request_init' });
+
       const startTime = Date.now();
       const interval = setInterval(() => {
         const diff = Math.floor((Date.now() - startTime) / 1000);
-        const mins = Math.floor(diff / 60).toString().padStart(2, '0');
+        const mins = Math.floor(diff / 60)
+          .toString()
+          .padStart(2, '0');
         const secs = (diff % 60).toString().padStart(2, '0');
         timerText = `${mins}:${secs}`;
       }, 1000);
 
       const clockInterval = setInterval(() => {
         const now = new Date();
-        clockText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        clockText = now.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
       }, 1000);
 
       const handleKeyDown = (e: KeyboardEvent) => {
         const tag = (e.target as HTMLElement)?.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable) {
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) {
           return;
         }
-        
-        if (e.key === "PageDown" || e.key === "ArrowRight" || e.key === "Space") {
+
+        if (e.key === 'PageDown' || e.key === 'ArrowRight' || e.key === 'Space') {
           e.preventDefault();
-          bc?.postMessage({ action: "next" });
-        } else if (e.key === "PageUp" || e.key === "ArrowLeft") {
+          bc?.postMessage({ action: 'next' });
+        } else if (e.key === 'PageUp' || e.key === 'ArrowLeft') {
           e.preventDefault();
-          bc?.postMessage({ action: "prev" });
+          bc?.postMessage({ action: 'prev' });
         }
       };
 
-      window.addEventListener("keydown", handleKeyDown);
-      
+      window.addEventListener('keydown', handleKeyDown);
+
       window.onbeforeunload = () => {
-        bc?.postMessage({ action: "exit" });
+        bc?.postMessage({ action: 'exit' });
       };
-      
+
       return () => {
         clearInterval(interval);
         clearInterval(clockInterval);
-        window.removeEventListener("keydown", handleKeyDown);
+        window.removeEventListener('keydown', handleKeyDown);
         bc?.close();
       };
     } else {
       bc.onmessage = (e) => {
-        if (e.data.action === "next") {
+        if (e.data.action === 'next') {
           presentNext();
-        } else if (e.data.action === "prev") {
+        } else if (e.data.action === 'prev') {
           presentPrev();
-        } else if (e.data.action === "exit") {
+        } else if (e.data.action === 'exit') {
           exitPresenterMode();
-        } else if (e.data.action === "request_init") {
+        } else if (e.data.action === 'request_init') {
           sendPresenterUpdate();
-        } else if (e.data.action === "edit_note") {
+        } else if (e.data.action === 'edit_note') {
           if (selectedTopic) {
             if (!selectedTopic.note) {
               selectedTopic.note = { plain: e.data.note };
@@ -381,7 +422,7 @@
           }
         }
       };
-      
+
       return () => {
         bc?.close();
       };
@@ -402,14 +443,18 @@
   });
 
   // --- autosave ---------------------------------------------------------------
-  let autosave = $state(localStorage.getItem("vynmm.autosave") === "1");
-  $effect(() => { localStorage.setItem("vynmm.autosave", autosave ? "1" : "0"); });
+  let autosave = $state(localStorage.getItem('vynmm.autosave') === '1');
+  $effect(() => {
+    localStorage.setItem('vynmm.autosave', autosave ? '1' : '0');
+  });
   let autosaveTimer: ReturnType<typeof setTimeout> | undefined;
   function scheduleAutosave() {
     if (!autosave) return;
     if (!currentPath && !fileHandle) return; // nowhere to save silently yet
     clearTimeout(autosaveTimer);
-    autosaveTimer = setTimeout(() => { if (dirty && workbook) save(); }, 1200);
+    autosaveTimer = setTimeout(() => {
+      if (dirty && workbook) save();
+    }, 1200);
   }
 
   // --- external-change watch (Tauri) -----------------------------------------
@@ -429,47 +474,60 @@
   }
 
   function startWatch() {
-    if (!isTauri() || !currentPath) { stopWatch(); return; }
+    if (!isTauri() || !currentPath) {
+      stopWatch();
+      return;
+    }
     if (watchedPath === currentPath) return; // already watching this file
     stopWatch();
     const path = currentPath;
     watchedPath = path;
-    nativeModifiedMs(path).then((m) => { if (watchedPath === path) lastMtime = m; });
+    nativeModifiedMs(path).then((m) => {
+      if (watchedPath === path) lastMtime = m;
+    });
     watchTimer = setInterval(async () => {
       if (watchedPath !== path) return;
       const m = await nativeModifiedMs(path);
       if (m === null || lastMtime === null || m <= lastMtime) return;
       lastMtime = m;
-      if (dirty) { extChange = true; return; } // don't clobber unsaved edits
+      if (dirty) {
+        extChange = true;
+        return;
+      } // don't clobber unsaved edits
       await openNativePath(path); // clean → just pick up the external changes
     }, 2000);
   }
 
   // --- recent files -----------------------------------------------------------
   let recents = $state<RecentEntry[]>([]);
-  async function refreshRecents() { recents = await getRecents(); }
+  async function refreshRecents() {
+    recents = await getRecents();
+  }
 
   function relTime(when: number): string {
     const s = Math.max(0, (Date.now() - when) / 1000);
-    if (s < 60) return "just now";
+    if (s < 60) return 'just now';
     if (s < 3600) return `${Math.floor(s / 60)} min ago`;
     if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
     return `${Math.floor(s / 86400)} d ago`;
   }
 
   async function openRecent(r: RecentEntry) {
-    error = "";
+    error = '';
     try {
-      if (r.kind === "path" && r.path) {
+      if (r.kind === 'path' && r.path) {
         const bytes = await nativeRead(r.path);
         await load(async () => readVmm(bytes), basename(r.path!), r.path);
-      } else if (r.kind === "handle" && r.handle) {
+      } else if (r.kind === 'handle' && r.handle) {
         const h = r.handle;
         // Ask for readwrite up front (we're inside the click gesture) so later
         // saves are silent; settle for read-only if the user declines.
-        if (h.requestPermission && (await h.requestPermission({ mode: "readwrite" })) !== "granted") {
-          if ((await h.requestPermission({ mode: "read" })) !== "granted") {
-            throw new Error("permission denied");
+        if (
+          h.requestPermission &&
+          (await h.requestPermission({ mode: 'readwrite' })) !== 'granted'
+        ) {
+          if ((await h.requestPermission({ mode: 'read' })) !== 'granted') {
+            throw new Error('permission denied');
           }
         }
         const file = await h.getFile();
@@ -491,24 +549,31 @@
   let update = $state<UpdateInfo | null>(null);
   // Manual "check for updates" feedback (the startup check is silent).
   let checkingUpdate = $state(false);
-  let updateMsg = $state("");
+  let updateMsg = $state('');
 
   async function checkUpdatesNow() {
     checkingUpdate = true;
-    updateMsg = "";
+    updateMsg = '';
     const r = await checkForUpdateDetailed();
     checkingUpdate = false;
-    if (r.kind === "update") { update = { version: r.version, url: r.url }; }
-    else if (r.kind === "current") { updateMsg = `You're on the latest version (v${r.version}).`; }
-    else if (r.kind === "unsupported") { updateMsg = "You're running the web version, which is always up to date."; }
-    else { updateMsg = `Couldn't check for updates: ${r.message}.`; }
+    if (r.kind === 'update') {
+      update = { version: r.version, url: r.url };
+    } else if (r.kind === 'current') {
+      updateMsg = `You're on the latest version (v${r.version}).`;
+    } else if (r.kind === 'unsupported') {
+      updateMsg = "You're running the web version, which is always up to date.";
+    } else {
+      updateMsg = `Couldn't check for updates: ${r.message}.`;
+    }
   }
 
   const sheet = $derived<Sheet | null>(
-    workbook && workbook.sheets[activeSheet] ? workbook.sheets[activeSheet]! : null,
+    workbook && workbook.sheets[activeSheet] ? workbook.sheets[activeSheet]! : null
   );
 
-  const selectedTopic = $derived(sheet && selectedId ? findTopic(sheet, selectedId) ?? null : null);
+  const selectedTopic = $derived(
+    sheet && selectedId ? (findTopic(sheet, selectedId) ?? null) : null
+  );
 
   let fileInput = $state<HTMLInputElement>();
 
@@ -522,8 +587,19 @@
     await load(() => readVmmFromUrl(`/${name}`), name);
   }
 
-  async function load(fn: () => Promise<{ workbook: Workbook; resources: Record<string, Uint8Array>; newerMinor: boolean; migrated: boolean }>, name: string, path: string | null = null, handle: FsFileHandle | null = null) {
-    error = ""; warning = "";
+  async function load(
+    fn: () => Promise<{
+      workbook: Workbook;
+      resources: Record<string, Uint8Array>;
+      newerMinor: boolean;
+      migrated: boolean;
+    }>,
+    name: string,
+    path: string | null = null,
+    handle: FsFileHandle | null = null
+  ) {
+    error = '';
+    warning = '';
     try {
       const res = await fn();
       workbook = res.workbook;
@@ -536,8 +612,9 @@
       dirty = false;
       extChange = false;
       resetHistory();
-      if (res.newerMinor) warning = "Opened a file from a newer minor format version (loaded leniently).";
-      if (res.migrated) warning = "File was migrated from an older format version.";
+      if (res.newerMinor)
+        warning = 'Opened a file from a newer minor format version (loaded leniently).';
+      if (res.migrated) warning = 'File was migrated from an older format version.';
       queueFit();
       // Remember where this map lives (recents + external-change watch).
       if (path) {
@@ -554,10 +631,11 @@
   }
 
   function newMap() {
-    error = ""; warning = "";
-    workbook = createWorkbook("Central Topic");
+    error = '';
+    warning = '';
+    workbook = createWorkbook('Central Topic');
     resources = {};
-    fileName = "untitled.vmm";
+    fileName = 'untitled.vmm';
     currentPath = null;
     fileHandle = null;
     activeSheet = 0;
@@ -572,16 +650,21 @@
   // unsaved changes.
   async function closeMap() {
     if (!workbook) return;
-    if (dirty && !(await confirmDialog({
-      title: "Close this map?",
-      message: "You have unsaved changes. Closing will discard them.",
-      confirmLabel: "Close without saving",
-      danger: true,
-    }))) return;
-    error = ""; warning = "";
+    if (
+      dirty &&
+      !(await confirmDialog({
+        title: 'Close this map?',
+        message: 'You have unsaved changes. Closing will discard them.',
+        confirmLabel: 'Close without saving',
+        danger: true
+      }))
+    )
+      return;
+    error = '';
+    warning = '';
     workbook = null;
     resources = {};
-    fileName = "";
+    fileName = '';
     currentPath = null;
     fileHandle = null;
     activeSheet = 0;
@@ -597,7 +680,8 @@
 
   // Read and load a .vmm at a native path (open dialog, launch arg, or file event).
   async function openNativePath(path: string) {
-    error = ""; warning = "";
+    error = '';
+    warning = '';
     try {
       const bytes = await nativeRead(path);
       await load(async () => readVmm(bytes), basename(path), path);
@@ -612,11 +696,21 @@
   async function openFile() {
     if (isTauri()) {
       let path: string | null;
-      try { path = await nativeOpenDialog(); } catch (e) { error = (e as Error).message; return; }
+      try {
+        path = await nativeOpenDialog();
+      } catch (e) {
+        error = (e as Error).message;
+        return;
+      }
       if (path) await openNativePath(path);
     } else if (hasOpenPicker()) {
       let handle: FsFileHandle | null;
-      try { handle = await browserOpenPicker(); } catch (e) { error = (e as Error).message; return; }
+      try {
+        handle = await browserOpenPicker();
+      } catch (e) {
+        error = (e as Error).message;
+        return;
+      }
       if (!handle) return; // user cancelled
       const file = await handle.getFile();
       await load(() => readVmmFromFile(file), file.name, null, handle);
@@ -636,13 +730,16 @@
   }
   async function deleteSheet(i: number) {
     if (!workbook || workbook.sheets.length <= 1) return;
-    const title = workbook.sheets[i]?.title || "this sheet";
-    if (!(await confirmDialog({
-      title: "Delete sheet?",
-      message: `“${title}” and everything on it will be removed. You can undo with Ctrl+Z.`,
-      confirmLabel: "Delete sheet",
-      danger: true,
-    }))) return;
+    const title = workbook.sheets[i]?.title || 'this sheet';
+    if (
+      !(await confirmDialog({
+        title: 'Delete sheet?',
+        message: `“${title}” and everything on it will be removed. You can undo with Ctrl+Z.`,
+        confirmLabel: 'Delete sheet',
+        danger: true
+      }))
+    )
+      return;
     if (!workbook || workbook.sheets.length <= 1) return; // re-check after await
     workbook.sheets.splice(i, 1);
     activeSheet = Math.max(0, Math.min(activeSheet, workbook.sheets.length - 1));
@@ -652,12 +749,15 @@
   }
   let editingTab = $state<number | null>(null);
   function renameSheet(i: number, title: string) {
-    if (workbook && title.trim()) { workbook.sheets[i]!.title = title.trim(); markDirty(); }
+    if (workbook && title.trim()) {
+      workbook.sheets[i]!.title = title.trim();
+      markDirty();
+    }
     editingTab = null;
   }
 
   function defaultSaveName(): string {
-    return fileName && fileName.endsWith(".vmm") ? fileName : "Untitled.vmm";
+    return fileName && fileName.endsWith('.vmm') ? fileName : 'Untitled.vmm';
   }
 
   /** Serialize the workbook (+ a best-effort thumbnail) to .vmm bytes. */
@@ -667,7 +767,7 @@
     return writeVmm(
       $state.snapshot(workbook!) as Workbook,
       $state.snapshot(resources) as Record<string, Uint8Array>,
-      { thumbnail },
+      { thumbnail }
     );
   }
 
@@ -682,12 +782,17 @@
    */
   async function save(forceDialog = false) {
     if (!workbook) return;
-    error = "";
+    error = '';
 
     if (isTauri()) {
       let path = forceDialog ? null : currentPath;
       if (!path) {
-        try { path = await nativeSaveDialog(defaultSaveName()); } catch (e) { error = (e as Error).message; return; }
+        try {
+          path = await nativeSaveDialog(defaultSaveName());
+        } catch (e) {
+          error = (e as Error).message;
+          return;
+        }
         if (!path) return; // user cancelled
       }
       const bytes = await buildVmmBytes();
@@ -708,7 +813,12 @@
       let handle = forceDialog ? null : fileHandle;
       const remembered = handle !== null;
       if (!handle) {
-        try { handle = await browserSavePicker(defaultSaveName()); } catch (e) { error = (e as Error).message; return; }
+        try {
+          handle = await browserSavePicker(defaultSaveName());
+        } catch (e) {
+          error = (e as Error).message;
+          return;
+        }
         if (!handle) return; // user cancelled
       }
       const bytes = await buildVmmBytes();
@@ -718,7 +828,12 @@
         if (remembered) {
           // The remembered handle went stale (file moved/deleted, permission
           // revoked) — re-prompt for a location, like a first save.
-          try { handle = await browserSavePicker(defaultSaveName()); } catch (e2) { error = (e2 as Error).message; return; }
+          try {
+            handle = await browserSavePicker(defaultSaveName());
+          } catch (e2) {
+            error = (e2 as Error).message;
+            return;
+          }
           if (!handle) return;
           try {
             await browserWriteHandle(handle, bytes);
@@ -754,35 +869,39 @@
     fileName = name || defaultSaveName();
     fileHandle = null; // writes don't work; don't pretend we can save silently
     dirty = false;
-    warning = "The browser blocked writing to the file, so the map was saved to your "
-      + "Downloads folder instead. To save in place, allow file editing for this site: "
-      + "click the icon left of the address bar → Site settings → \"Edit files\" → Allow "
-      + "(or Chrome Settings → Privacy → Site settings → Additional permissions → Edit files).";
+    warning =
+      'The browser blocked writing to the file, so the map was saved to your ' +
+      'Downloads folder instead. To save in place, allow file editing for this site: ' +
+      'click the icon left of the address bar → Site settings → "Edit files" → Allow ' +
+      '(or Chrome Settings → Privacy → Site settings → Additional permissions → Edit files).';
   }
 
   function download(name: string, content: string, mime: string) {
     const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = name; a.click();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
     URL.revokeObjectURL(url);
   }
 
   function exportMarkdown() {
     if (!workbook) return;
     const md = workbookToMarkdown($state.snapshot(workbook) as Workbook);
-    download((fileName || "untitled").replace(/\.vmm$/, "") + ".md", md, "text/markdown");
+    download((fileName || 'untitled').replace(/\.vmm$/, '') + '.md', md, 'text/markdown');
   }
 
   let mdInput = $state<HTMLInputElement>();
   async function onPickMarkdown(e: Event) {
     const f = (e.target as HTMLInputElement).files?.[0];
     if (!f) return;
-    error = ""; warning = "";
+    error = '';
+    warning = '';
     try {
       workbook = markdownToWorkbook(await f.text());
       resources = {};
-      fileName = f.name.replace(/\.md$/i, ".vmm");
+      fileName = f.name.replace(/\.md$/i, '.vmm');
       currentPath = null;
       fileHandle = null; // a fresh document — Save must ask where to put it
       activeSheet = 0;
@@ -815,57 +934,65 @@
       onOpenFile((path) => openNativePath(path));
       try {
         const path = await getOpenedFile();
-        if (path) { await openNativePath(path); return; }
+        if (path) {
+          await openNativePath(path);
+          return;
+        }
       } catch (e) {
         error = (e as Error).message;
       }
       return;
     }
     // Deep-link / test hook: /?example=rich auto-loads a bundled example.
-    const name = new URLSearchParams(location.search).get("example");
-    if (name) loadExample(name.endsWith(".vmm") ? name : `${name}.vmm`);
+    const name = new URLSearchParams(location.search).get('example');
+    if (name) loadExample(name.endsWith('.vmm') ? name : `${name}.vmm`);
   });
 
   // Check GitHub for a newer release (native app only).
   onMount(() => {
-    checkForUpdate().then((u) => { if (u) update = u; });
+    checkForUpdate().then((u) => {
+      if (u) update = u;
+    });
     refreshRecents();
   });
 
   $effect(() => {
     function warnUnsaved(e: BeforeUnloadEvent) {
-      if (dirty) { e.preventDefault(); e.returnValue = ""; }
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
     }
-    window.addEventListener("beforeunload", warnUnsaved);
-    return () => window.removeEventListener("beforeunload", warnUnsaved);
+    window.addEventListener('beforeunload', warnUnsaved);
+    return () => window.removeEventListener('beforeunload', warnUnsaved);
   });
 
   // Close the Export menu when clicking elsewhere.
   $effect(() => {
     if (!exportOpen) return;
     const close = (e: PointerEvent) => {
-      if (!(e.target as HTMLElement).closest(".menu-wrap")) exportOpen = false;
+      if (!(e.target as HTMLElement).closest('.menu-wrap')) exportOpen = false;
     };
-    window.addEventListener("pointerdown", close);
-    return () => window.removeEventListener("pointerdown", close);
+    window.addEventListener('pointerdown', close);
+    return () => window.removeEventListener('pointerdown', close);
   });
 
   $effect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return; // let fields do native keys
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return; // let fields do native keys
 
-      if (e.key === "F8") {
+      if (e.key === 'F8') {
         e.preventDefault();
         zenMode = !zenMode;
         return;
       }
-      if (e.key === "PageDown") {
+      if (e.key === 'PageDown') {
         e.preventDefault();
         presentNext();
         return;
       }
-      if (e.key === "PageUp") {
+      if (e.key === 'PageUp') {
         e.preventDefault();
         presentPrev();
         return;
@@ -873,15 +1000,29 @@
 
       if (!(e.ctrlKey || e.metaKey)) return;
       const k = e.key.toLowerCase();
-      if (k === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
-      else if ((k === "z" && e.shiftKey) || k === "y") { e.preventDefault(); redo(); }
-      else if (k === "s") { e.preventDefault(); if (e.shiftKey) saveAs(); else save(); }
-      else if (k === "n") { e.preventDefault(); newMap(); }
-      else if (k === "o") { e.preventDefault(); openFile(); }
-      else if (k === "w") { e.preventDefault(); closeMap(); }
+      if (k === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if ((k === 'z' && e.shiftKey) || k === 'y') {
+        e.preventDefault();
+        redo();
+      } else if (k === 's') {
+        e.preventDefault();
+        if (e.shiftKey) saveAs();
+        else save();
+      } else if (k === 'n') {
+        e.preventDefault();
+        newMap();
+      } else if (k === 'o') {
+        e.preventDefault();
+        openFile();
+      } else if (k === 'w') {
+        e.preventDefault();
+        closeMap();
+      }
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   });
 </script>
 
@@ -896,7 +1037,10 @@
       {#if totalTopics > 0}
         <div class="presenter-progress">
           <div class="progress-bar-bg">
-            <div class="progress-bar-fill" style="width: {(currentIndex / totalTopics) * 100}%"></div>
+            <div
+              class="progress-bar-fill"
+              style="width: {(currentIndex / totalTopics) * 100}%"
+            ></div>
           </div>
           <div class="progress-text">Topic {currentIndex} of {totalTopics}</div>
         </div>
@@ -905,8 +1049,8 @@
       <div class="presenter-notes-container">
         <div class="notes-header">
           <span class="notes-title">Topic Notes</span>
-          <button class="edit-notes-btn" onclick={() => isEditingNote = !isEditingNote}>
-            {isEditingNote ? "Done" : "Edit Notes"}
+          <button class="edit-notes-btn" onclick={() => (isEditingNote = !isEditingNote)}>
+            {isEditingNote ? 'Done' : 'Edit Notes'}
           </button>
         </div>
         <div class="presenter-notes" class:editing={isEditingNote}>
@@ -914,389 +1058,951 @@
             <textarea
               class="notes-textarea"
               bind:value={currentNote}
-              oninput={() => bc?.postMessage({ action: "edit_note", note: currentNote })}
-              placeholder="Type your notes here (Markdown supported)..."
-            ></textarea>
+              oninput={() => bc?.postMessage({ action: 'edit_note', note: currentNote })}
+              placeholder="Type your notes here (Markdown supported)..."></textarea>
           {:else}
             {#if currentNote}
               {@html formatMarkdownNotes(currentNote)}
             {:else}
-              <div class="presenter-placeholder">No notes for this topic. Click "Edit Notes" above to add some.</div>
+              <div class="presenter-placeholder">
+                No notes for this topic. Click "Edit Notes" above to add some.
+              </div>
             {/if}
           {/if}
         </div>
       </div>
       <div class="presenter-next-preview">
-        <span class="next-label">Next:</span> {nextTitle}
+        <span class="next-label">Next:</span>
+        {nextTitle}
       </div>
       <div class="presenter-controls">
-        <button onclick={() => bc?.postMessage({ action: "prev" })}>Previous</button>
-        <button onclick={() => bc?.postMessage({ action: "next" })}>Next</button>
+        <button onclick={() => bc?.postMessage({ action: 'prev' })}>Previous</button>
+        <button onclick={() => bc?.postMessage({ action: 'next' })}>Next</button>
       </div>
     </div>
   {:else}
     {#if !zenMode}
-    <header>
-    <div class="brand"><img class="brand-logo" src={logoUrl} alt="" /><span>VynMindMap</span></div>
+      <header>
+        <div class="brand">
+          <img class="brand-logo" src={logoUrl} alt="" /><span>VynMindMap</span>
+        </div>
 
-    <div class="group">
-      <button class="ic" onclick={newMap} title="New map (Ctrl+N)" aria-label="New"><Icon name="file-plus" /></button>
-      <button class="ic" onclick={openFile} title="Open…  (Ctrl+O)" aria-label="Open"><Icon name="folder-open" /></button>
-      <button class="ic" onclick={() => save()} disabled={!workbook} title="Save (Ctrl+S)" aria-label="Save"><Icon name="save" /></button>
-      <button class="ic" onclick={saveAs} disabled={!workbook} title="Save As… (Ctrl+Shift+S)" aria-label="Save As"><Icon name="save-as" /></button>
-      <button class="ic" onclick={closeMap} disabled={!workbook} title="Close map — back to home (Ctrl+W)" aria-label="Close map"><Icon name="x" /></button>
-    </div>
+        <div class="group">
+          <button class="ic" onclick={newMap} title="New map (Ctrl+N)" aria-label="New"
+            ><Icon name="file-plus" /></button
+          >
+          <button class="ic" onclick={openFile} title="Open…  (Ctrl+O)" aria-label="Open"
+            ><Icon name="folder-open" /></button
+          >
+          <button
+            class="ic"
+            onclick={() => save()}
+            disabled={!workbook}
+            title="Save (Ctrl+S)"
+            aria-label="Save"><Icon name="save" /></button
+          >
+          <button
+            class="ic"
+            onclick={saveAs}
+            disabled={!workbook}
+            title="Save As… (Ctrl+Shift+S)"
+            aria-label="Save As"><Icon name="save-as" /></button
+          >
+          <button
+            class="ic"
+            onclick={closeMap}
+            disabled={!workbook}
+            title="Close map — back to home (Ctrl+W)"
+            aria-label="Close map"><Icon name="x" /></button
+          >
+        </div>
 
-    <div class="divider"></div>
-    <div class="group">
-      <button class="ic" onclick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" aria-label="Undo"><Icon name="undo" /></button>
-      <button class="ic" onclick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)" aria-label="Redo"><Icon name="redo" /></button>
-    </div>
+        <div class="divider"></div>
+        <div class="group">
+          <button
+            class="ic"
+            onclick={undo}
+            disabled={!canUndo}
+            title="Undo (Ctrl+Z)"
+            aria-label="Undo"><Icon name="undo" /></button
+          >
+          <button
+            class="ic"
+            onclick={redo}
+            disabled={!canRedo}
+            title="Redo (Ctrl+Y)"
+            aria-label="Redo"><Icon name="redo" /></button
+          >
+        </div>
 
-    <div class="divider"></div>
-    <div class="group">
-      <button class="ic" onclick={() => mdInput?.click()} title="Import a Markdown outline" aria-label="Import Markdown"><Icon name="upload" /></button>
-      <div class="menu-wrap">
-        <button class="ic chev" disabled={!workbook} onclick={() => (exportOpen = !exportOpen)} title="Export" aria-label="Export">
-          <Icon name="download" /><Icon name="chevron-down" size={14} />
-        </button>
-        {#if exportOpen}
-          <div class="menu" role="menu">
-            <button role="menuitem" onclick={() => { exportMarkdown(); exportOpen = false; }}><Icon name="markdown" size={16} /> Markdown (.md)</button>
-            <button role="menuitem" onclick={() => { view?.exportPng(); exportOpen = false; }}><Icon name="image" size={16} /> Image (.png)</button>
-            <button role="menuitem" onclick={() => { view?.exportPdf(); exportOpen = false; }}><Icon name="file-text" size={16} /> Document (.pdf)</button>
-          </div>
-        {/if}
-      </div>
-    </div>
-
-    <div class="divider"></div>
-    <div class="group">
-      <button class="ic" class:on={showOutline} onclick={() => (showOutline = !showOutline)} disabled={!workbook}
-        title="Toggle outline panel" aria-label="Outline" aria-pressed={showOutline}><Icon name="list" /></button>
-      <button class="ic" class:on={showInspector} onclick={() => (showInspector = !showInspector)} disabled={!workbook}
-        title="Toggle style panel" aria-label="Style panel" aria-pressed={showInspector}><Icon name="panel-right" /></button>
-      <button class="ic" class:on={zenMode} onclick={() => (zenMode = !zenMode)} disabled={!workbook}
-        title="Full Window Mode (F8)" aria-label="Full Window" aria-pressed={zenMode}><Icon name="maximize" /></button>
-      <button class="ic" class:on={presenterMode} onclick={togglePresenterMode} disabled={!workbook}
-        title="Presenter Mode" aria-label="Presenter Mode" aria-pressed={presenterMode}><Icon name="presentation" /></button>
-      <button class="ic" class:on={autosave} onclick={() => { autosave = !autosave; if (autosave && dirty) scheduleAutosave(); }}
-        title={autosave ? "Autosave is on (saves shortly after each change once a file is set)" : "Autosave is off"}
-        aria-label="Autosave" aria-pressed={autosave}><Icon name="autosave" /></button>
-      <button class="ic" onclick={() => (theme = theme === "dark" ? "light" : "dark")}
-        title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-        aria-label="Theme"><Icon name={theme === "dark" ? "sun" : "moon"} /></button>
-      <button class="ic" onclick={checkUpdatesNow} disabled={checkingUpdate}
-        title="Check for updates" aria-label="Check for updates"><Icon name="cloud-download" /></button>
-    </div>
-
-    <input bind:this={fileInput} type="file" accept=".vmm" onchange={onPick} hidden />
-    <input bind:this={mdInput} type="file" accept=".md,.markdown,text/markdown" onchange={onPickMarkdown} hidden />
-
-    {#if fileName}<span class="file">{#if dirty}<span class="dot" title="Unsaved changes"></span>{/if}{fileName}</span>{/if}
-    </header>
-  {/if}
-
-  {#if update}
-    <div class="banner update">
-      <span><strong>Update available</strong> — VynMindMap v{update.version} is out.</span>
-      <span class="update-actions">
-        <button class="update-btn" onclick={() => update && openExternal(update.url)}>Download</button>
-        <button class="update-dismiss" onclick={() => (update = null)} aria-label="Dismiss">✕</button>
-      </span>
-    </div>
-  {:else if checkingUpdate}
-    <div class="banner update"><span>Checking for updates…</span></div>
-  {:else if updateMsg}
-    <div class="banner update">
-      <span>{updateMsg}</span>
-      <span class="update-actions">
-        <button class="update-dismiss" onclick={() => (updateMsg = "")} aria-label="Dismiss">✕</button>
-      </span>
-    </div>
-  {/if}
-  {#if warning}<div class="banner warn">{warning}</div>{/if}
-  {#if error}<div class="banner err">⚠ {error}</div>{/if}
-  {#if extChange}
-    <div class="banner warn extchange">
-      <span><strong>File changed on disk</strong> — this map was edited outside the app.</span>
-      <span class="update-actions">
-        <button class="update-btn" onclick={() => { if (currentPath) openNativePath(currentPath); }}>Reload from disk</button>
-        <button class="update-dismiss" onclick={() => (extChange = false)}>Keep my version</button>
-      </span>
-    </div>
-  {/if}
-
-  {#if workbook}
-    {#if !zenMode}
-      <nav class="tabs">
-        {#each workbook.sheets as s, i (s.id)}
-          <div class="tab" class:active={i === activeSheet}>
-            {#if editingTab === i}
-              <input
-                class="tab-edit"
-                value={s.title}
-                onblur={(e) => renameSheet(i, e.currentTarget.value)}
-                onkeydown={(e) => { if (e.key === "Enter") renameSheet(i, e.currentTarget.value); if (e.key === "Escape") editingTab = null; }}
-                use:focus
-              />
-            {:else}
-              <button class="tab-label" onclick={() => (activeSheet = i)} ondblclick={() => (editingTab = i)}>
-                {s.title}
-              </button>
-              {#if workbook.sheets.length > 1}
-                <button class="tab-x" title="Delete sheet" onclick={() => deleteSheet(i)}>×</button>
-              {/if}
+        <div class="divider"></div>
+        <div class="group">
+          <button
+            class="ic"
+            onclick={() => mdInput?.click()}
+            title="Import a Markdown outline"
+            aria-label="Import Markdown"><Icon name="upload" /></button
+          >
+          <div class="menu-wrap">
+            <button
+              class="ic chev"
+              disabled={!workbook}
+              onclick={() => (exportOpen = !exportOpen)}
+              title="Export"
+              aria-label="Export"
+            >
+              <Icon name="download" /><Icon name="chevron-down" size={14} />
+            </button>
+            {#if exportOpen}
+              <div class="menu" role="menu">
+                <button
+                  role="menuitem"
+                  onclick={() => {
+                    exportMarkdown();
+                    exportOpen = false;
+                  }}><Icon name="markdown" size={16} /> Markdown (.md)</button
+                >
+                <button
+                  role="menuitem"
+                  onclick={() => {
+                    view?.exportPng();
+                    exportOpen = false;
+                  }}><Icon name="image" size={16} /> Image (.png)</button
+                >
+                <button
+                  role="menuitem"
+                  onclick={() => {
+                    view?.exportPdf();
+                    exportOpen = false;
+                  }}><Icon name="file-text" size={16} /> Document (.pdf)</button
+                >
+              </div>
             {/if}
           </div>
-        {/each}
-        <button class="tab-add" title="Add sheet" onclick={addNewSheet}>+</button>
-      </nav>
+        </div>
+
+        <div class="divider"></div>
+        <div class="group">
+          <button
+            class="ic"
+            class:on={showOutline}
+            onclick={() => (showOutline = !showOutline)}
+            disabled={!workbook}
+            title="Toggle outline panel"
+            aria-label="Outline"
+            aria-pressed={showOutline}><Icon name="list" /></button
+          >
+          <button
+            class="ic"
+            class:on={showInspector}
+            onclick={() => (showInspector = !showInspector)}
+            disabled={!workbook}
+            title="Toggle style panel"
+            aria-label="Style panel"
+            aria-pressed={showInspector}><Icon name="panel-right" /></button
+          >
+          <button
+            class="ic"
+            class:on={zenMode}
+            onclick={() => (zenMode = !zenMode)}
+            disabled={!workbook}
+            title="Full Window Mode (F8)"
+            aria-label="Full Window"
+            aria-pressed={zenMode}><Icon name="maximize" /></button
+          >
+          <button
+            class="ic"
+            class:on={presenterMode}
+            onclick={togglePresenterMode}
+            disabled={!workbook}
+            title="Presenter Mode"
+            aria-label="Presenter Mode"
+            aria-pressed={presenterMode}><Icon name="presentation" /></button
+          >
+          <button
+            class="ic"
+            class:on={autosave}
+            onclick={() => {
+              autosave = !autosave;
+              if (autosave && dirty) scheduleAutosave();
+            }}
+            title={autosave
+              ? 'Autosave is on (saves shortly after each change once a file is set)'
+              : 'Autosave is off'}
+            aria-label="Autosave"
+            aria-pressed={autosave}><Icon name="autosave" /></button
+          >
+          <button
+            class="ic"
+            onclick={() => (theme = theme === 'dark' ? 'light' : 'dark')}
+            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-label="Theme"><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button
+          >
+          <button
+            class="ic"
+            onclick={checkUpdatesNow}
+            disabled={checkingUpdate}
+            title="Check for updates"
+            aria-label="Check for updates"><Icon name="cloud-download" /></button
+          >
+        </div>
+
+        <input bind:this={fileInput} type="file" accept=".vmm" onchange={onPick} hidden />
+        <input
+          bind:this={mdInput}
+          type="file"
+          accept=".md,.markdown,text/markdown"
+          onchange={onPickMarkdown}
+          hidden
+        />
+
+        {#if fileName}<span class="file"
+            >{#if dirty}<span class="dot" title="Unsaved changes"></span>{/if}{fileName}</span
+          >{/if}
+      </header>
     {/if}
-    <div class="workspace">
-      {#if showOutline && !zenMode && sheet}
-        <OutlinePanel {sheet} bind:selectedId {markDirty} reveal={(id) => view?.centerOn(id)} />
-      {/if}
-      <div class="viewport" bind:this={viewportEl}>
-        {#if sheet}
-          <MindMapView bind:this={view} {sheet} {resources} {markDirty} bind:selectedId {presenterMode} />
-        {/if}
-        {#if zenMode}
-          <button class="zen-toggle exit" title="Exit full window (F8)" onclick={() => (zenMode = false)}>
-            <Icon name="minimize" size={18} />
-          </button>
-          {#if workbook.sheets.length > 1}
-            <div class="zen-sheets-bar" role="toolbar" tabindex={-1} onpointerdown={(e) => e.stopPropagation()}>
-              {#each workbook.sheets as s, i (s.id)}
+
+    {#if update}
+      <div class="banner update">
+        <span><strong>Update available</strong> — VynMindMap v{update.version} is out.</span>
+        <span class="update-actions">
+          <button class="update-btn" onclick={() => update && openExternal(update.url)}
+            >Download</button
+          >
+          <button class="update-dismiss" onclick={() => (update = null)} aria-label="Dismiss"
+            >✕</button
+          >
+        </span>
+      </div>
+    {:else if checkingUpdate}
+      <div class="banner update"><span>Checking for updates…</span></div>
+    {:else if updateMsg}
+      <div class="banner update">
+        <span>{updateMsg}</span>
+        <span class="update-actions">
+          <button class="update-dismiss" onclick={() => (updateMsg = '')} aria-label="Dismiss"
+            >✕</button
+          >
+        </span>
+      </div>
+    {/if}
+    {#if warning}<div class="banner warn">{warning}</div>{/if}
+    {#if error}<div class="banner err">⚠ {error}</div>{/if}
+    {#if extChange}
+      <div class="banner warn extchange">
+        <span><strong>File changed on disk</strong> — this map was edited outside the app.</span>
+        <span class="update-actions">
+          <button
+            class="update-btn"
+            onclick={() => {
+              if (currentPath) openNativePath(currentPath);
+            }}>Reload from disk</button
+          >
+          <button class="update-dismiss" onclick={() => (extChange = false)}>Keep my version</button
+          >
+        </span>
+      </div>
+    {/if}
+
+    {#if workbook}
+      {#if !zenMode}
+        <nav class="tabs">
+          {#each workbook.sheets as s, i (s.id)}
+            <div class="tab" class:active={i === activeSheet}>
+              {#if editingTab === i}
+                <input
+                  class="tab-edit"
+                  value={s.title}
+                  onblur={(e) => renameSheet(i, e.currentTarget.value)}
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter') renameSheet(i, e.currentTarget.value);
+                    if (e.key === 'Escape') editingTab = null;
+                  }}
+                  use:focus
+                />
+              {:else}
                 <button
-                  class="zen-sheet-tab"
-                  class:active={i === activeSheet}
-                  onclick={() => { activeSheet = i; }}
+                  class="tab-label"
+                  onclick={() => (activeSheet = i)}
+                  ondblclick={() => (editingTab = i)}
                 >
                   {s.title}
                 </button>
-              {/each}
+                {#if workbook.sheets.length > 1}
+                  <button class="tab-x" title="Delete sheet" onclick={() => deleteSheet(i)}
+                    >×</button
+                  >
+                {/if}
+              {/if}
             </div>
+          {/each}
+          <button class="tab-add" title="Add sheet" onclick={addNewSheet}>+</button>
+        </nav>
+      {/if}
+      <div class="workspace">
+        {#if showOutline && !zenMode && sheet}
+          <OutlinePanel {sheet} bind:selectedId {markDirty} reveal={(id) => view?.centerOn(id)} />
+        {/if}
+        <div class="viewport" bind:this={viewportEl}>
+          {#if sheet}
+            <MindMapView
+              bind:this={view}
+              {sheet}
+              {resources}
+              {markDirty}
+              bind:selectedId
+              {presenterMode}
+            />
           {/if}
+          {#if zenMode}
+            <button
+              class="zen-toggle exit"
+              title="Exit full window (F8)"
+              onclick={() => (zenMode = false)}
+            >
+              <Icon name="minimize" size={18} />
+            </button>
+            {#if workbook.sheets.length > 1}
+              <div
+                class="zen-sheets-bar"
+                role="toolbar"
+                tabindex={-1}
+                onpointerdown={(e) => e.stopPropagation()}
+              >
+                {#each workbook.sheets as s, i (s.id)}
+                  <button
+                    class="zen-sheet-tab"
+                    class:active={i === activeSheet}
+                    onclick={() => {
+                      activeSheet = i;
+                    }}
+                  >
+                    {s.title}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          {/if}
+        </div>
+        {#if sheet && showInspector && !zenMode}
+          <Inspector
+            {sheet}
+            topic={selectedTopic}
+            {markDirty}
+            onClose={() => (showInspector = false)}
+          />
+        {:else if sheet && !zenMode}
+          <button
+            class="inspector-open"
+            title="Open style panel"
+            aria-label="Open style panel"
+            onclick={() => (showInspector = true)}><Icon name="sliders" size={18} /></button
+          >
         {/if}
       </div>
-      {#if sheet && showInspector && !zenMode}
-        <Inspector {sheet} topic={selectedTopic} {markDirty} onClose={() => (showInspector = false)} />
-      {:else if sheet && !zenMode}
-        <button class="inspector-open" title="Open style panel" aria-label="Open style panel"
-          onclick={() => (showInspector = true)}><Icon name="sliders" size={18} /></button>
-      {/if}
-    </div>
-  {:else}
-    <div class="welcome">
-      <div class="hero">
-        <div class="logo"><img src={logoUrl} alt="VynMindMap" /></div>
-        <h1>VynMindMap</h1>
-        <p class="tagline">Visual mind mapping, stored as plain <code>.vmm</code> files.</p>
-        <div class="cta">
-          <button class="primary" onclick={newMap}><Icon name="file-plus" size={18} /> New mind map</button>
-          <button class="outlined" onclick={openFile}><Icon name="folder-open" size={18} /> Open file…</button>
+    {:else}
+      <div class="welcome">
+        <div class="hero">
+          <div class="logo"><img src={logoUrl} alt="VynMindMap" /></div>
+          <h1>VynMindMap</h1>
+          <p class="tagline">Visual mind mapping, stored as plain <code>.vmm</code> files.</p>
+          <div class="cta">
+            <button class="primary" onclick={newMap}
+              ><Icon name="file-plus" size={18} /> New mind map</button
+            >
+            <button class="outlined" onclick={openFile}
+              ><Icon name="folder-open" size={18} /> Open file…</button
+            >
+          </div>
         </div>
-      </div>
-      {#if recents.length}
+        {#if recents.length}
+          <div class="samples">
+            <div class="samples-label">Recent files</div>
+            <div class="recent-list">
+              {#each recents as r (r.kind + (r.path ?? r.name) + r.when)}
+                <div class="recent">
+                  <button
+                    class="recent-main"
+                    onclick={() => openRecent(r)}
+                    title={r.path ?? r.name}
+                  >
+                    <span class="recent-icon"><Icon name="clock" size={17} /></span>
+                    <span class="recent-text">
+                      <strong>{r.name}</strong>
+                      <small
+                        >{r.kind === 'path' ? r.path : 'browser file'} · {relTime(r.when)}</small
+                      >
+                    </span>
+                  </button>
+                  <button
+                    class="recent-x"
+                    title="Remove from recent files"
+                    aria-label="Remove"
+                    onclick={() => dropRecent(r)}>×</button
+                  >
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
         <div class="samples">
-          <div class="samples-label">Recent files</div>
-          <div class="recent-list">
-            {#each recents as r (r.kind + (r.path ?? r.name) + r.when)}
-              <div class="recent">
-                <button class="recent-main" onclick={() => openRecent(r)} title={r.path ?? r.name}>
-                  <span class="recent-icon"><Icon name="clock" size={17} /></span>
-                  <span class="recent-text">
-                    <strong>{r.name}</strong>
-                    <small>{r.kind === "path" ? r.path : "browser file"} · {relTime(r.when)}</small>
-                  </span>
-                </button>
-                <button class="recent-x" title="Remove from recent files" aria-label="Remove"
-                  onclick={() => dropRecent(r)}>×</button>
-              </div>
+          <div class="samples-label">Sample maps</div>
+          <div class="sample-grid">
+            {#each SAMPLES as s (s.id)}
+              <button class="sample" onclick={() => loadExample(`${s.id}.vmm`)}>
+                <span class="sample-icon"><Icon name="sitemap" size={20} /></span>
+                <span class="sample-text">
+                  <strong>{s.title}</strong>
+                  <small>{s.note}</small>
+                </span>
+              </button>
             {/each}
           </div>
         </div>
-      {/if}
-
-      <div class="samples">
-        <div class="samples-label">Sample maps</div>
-        <div class="sample-grid">
-          {#each SAMPLES as s (s.id)}
-            <button class="sample" onclick={() => loadExample(`${s.id}.vmm`)}>
-              <span class="sample-icon"><Icon name="sitemap" size={20} /></span>
-              <span class="sample-text">
-                <strong>{s.title}</strong>
-                <small>{s.note}</small>
-              </span>
-            </button>
-          {/each}
-        </div>
       </div>
-    </div>
-  {/if}
+    {/if}
 
     <ConfirmHost />
   {/if}
 </div>
 
 <style>
-  .app { display: flex; flex-direction: column; height: 100%; }
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
 
   /* Material top app bar with grouped icon buttons. */
   header {
-    display: flex; align-items: center; gap: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
     padding: 6px 12px;
     background: var(--md-primary);
     color: var(--md-on-primary);
     box-shadow: var(--elev-2);
     z-index: 5;
   }
-  .brand { display: flex; align-items: center; gap: 9px; font-size: 16px; font-weight: 700; letter-spacing: 0.3px; color: #fff; margin-right: 10px; padding-left: 2px; }
-  .brand-logo { width: 30px; height: 30px; border-radius: 8px; background: #fff; padding: 3px; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); }
-  .group { display: flex; align-items: center; gap: 2px; }
-  .divider { width: 1px; height: 22px; background: rgba(255, 255, 255, 0.26); margin: 0 8px; }
-  header button {
-    display: inline-flex; align-items: center; justify-content: center; gap: 1px;
-    width: 36px; height: 34px; padding: 0;
-    border: none; border-radius: 9px;
-    background: transparent; color: rgba(255, 255, 255, 0.92);
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: #fff;
+    margin-right: 10px;
+    padding-left: 2px;
   }
-  header button.chev { width: auto; padding: 0 7px; }
-  header button.on { background: rgba(255, 255, 255, 0.26); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
-  header button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
-  header button:active:not(:disabled) { background: rgba(255, 255, 255, 0.30); }
-  header button:disabled { color: rgba(255, 255, 255, 0.4); opacity: 1; }
-  .menu-wrap { position: relative; display: inline-flex; }
+  .brand-logo {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: #fff;
+    padding: 3px;
+    box-sizing: border-box;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  }
+  .group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .divider {
+    width: 1px;
+    height: 22px;
+    background: rgba(255, 255, 255, 0.26);
+    margin: 0 8px;
+  }
+  header button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    width: 36px;
+    height: 34px;
+    padding: 0;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.92);
+  }
+  header button.chev {
+    width: auto;
+    padding: 0 7px;
+  }
+  header button.on {
+    background: rgba(255, 255, 255, 0.26);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  }
+  header button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.18);
+  }
+  header button:active:not(:disabled) {
+    background: rgba(255, 255, 255, 0.3);
+  }
+  header button:disabled {
+    color: rgba(255, 255, 255, 0.4);
+    opacity: 1;
+  }
+  .menu-wrap {
+    position: relative;
+    display: inline-flex;
+  }
   .menu {
-    position: absolute; top: calc(100% + 6px); right: 0; min-width: 196px;
-    background: var(--panel); color: var(--text);
-    border: 1px solid var(--border); border-radius: 10px;
-    box-shadow: var(--elev-3); padding: 6px; z-index: 20;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 196px;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--elev-3);
+    padding: 6px;
+    z-index: 20;
   }
   .menu button {
-    display: flex; align-items: center; gap: 10px; width: 100%; height: 36px;
-    justify-content: flex-start; padding: 0 10px; border-radius: 7px;
-    color: var(--text); background: transparent; font-weight: 500; font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 36px;
+    justify-content: flex-start;
+    padding: 0 10px;
+    border-radius: 7px;
+    color: var(--text);
+    background: transparent;
+    font-weight: 500;
+    font-size: 13px;
   }
-  .menu button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-  .file { margin-left: auto; display: flex; align-items: center; gap: 7px; color: rgba(255, 255, 255, 0.94); font-size: 13px; font-weight: 500; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #ffd166; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25); }
+  .menu button:hover {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  .file {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ffd166;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+  }
 
-  .banner { padding: 8px 14px; font-size: 13px; }
-  .banner.warn { background: var(--warn-bg); color: var(--warn-fg); border-bottom: 1px solid var(--warn-border); }
-  .banner.err { background: var(--err-bg); color: var(--err-fg); border-bottom: 1px solid var(--err-border); }
-  .banner.extchange { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .banner {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+  .banner.warn {
+    background: var(--warn-bg);
+    color: var(--warn-fg);
+    border-bottom: 1px solid var(--warn-border);
+  }
+  .banner.err {
+    background: var(--err-bg);
+    color: var(--err-fg);
+    border-bottom: 1px solid var(--err-border);
+  }
+  .banner.extchange {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
   .banner.update {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    background: color-mix(in srgb, var(--accent) 12%, var(--panel)); color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+    color: var(--text);
     border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
   }
-  .update-actions { display: flex; align-items: center; gap: 6px; }
-  .update-btn { background: var(--md-primary); color: #fff; border-color: transparent; border-radius: 18px; padding: 5px 16px; font-size: 12px; }
-  .update-btn:hover:not(:disabled) { background: var(--md-primary-hover); }
-  .update-dismiss { border: none; background: transparent; color: var(--muted); padding: 4px 6px; border-radius: 6px; }
-  .update-dismiss:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .update-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .update-btn {
+    background: var(--md-primary);
+    color: #fff;
+    border-color: transparent;
+    border-radius: 18px;
+    padding: 5px 16px;
+    font-size: 12px;
+  }
+  .update-btn:hover:not(:disabled) {
+    background: var(--md-primary-hover);
+  }
+  .update-dismiss {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    padding: 4px 6px;
+    border-radius: 6px;
+  }
+  .update-dismiss:hover {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
 
   /* Material tabs: surface bar with a primary active indicator. */
-  .tabs { display: flex; align-items: stretch; gap: 2px; padding: 0 10px; background: var(--panel); box-shadow: var(--elev-1); z-index: 4; }
-  .tab { display: flex; align-items: center; position: relative; }
-  .tab.active { box-shadow: inset 0 -3px 0 var(--accent); }
-  .tab-label { border: none; border-radius: 0; padding: 11px 10px 10px 14px; font-size: 13px; background: transparent; color: var(--muted); font-weight: 500; }
-  .tab.active .tab-label { color: var(--accent); font-weight: 600; }
-  .tab-label:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 8%, transparent); border-color: transparent; }
-  .tab-x { border: none; background: none; color: var(--muted); padding: 0 8px; font-size: 15px; line-height: 1; }
-  .tab-x:hover:not(:disabled) { color: #c0392b; background: transparent; }
-  .tab-add { border: none; background: none; color: var(--muted); padding: 9px 12px; font-size: 17px; }
-  .tab-add:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 8%, transparent); border-color: transparent; }
-  .tab-edit { width: 120px; padding: 5px 9px; border: 1px solid var(--accent); border-radius: 6px; font: inherit; margin: 4px 2px; }
-  .workspace { flex: 1; display: flex; min-height: 0; position: relative; }
-  .viewport { position: relative; flex: 1; min-height: 0; min-width: 0; }
+  .tabs {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    padding: 0 10px;
+    background: var(--panel);
+    box-shadow: var(--elev-1);
+    z-index: 4;
+  }
+  .tab {
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+  .tab.active {
+    box-shadow: inset 0 -3px 0 var(--accent);
+  }
+  .tab-label {
+    border: none;
+    border-radius: 0;
+    padding: 11px 10px 10px 14px;
+    font-size: 13px;
+    background: transparent;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .tab.active .tab-label {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .tab-label:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border-color: transparent;
+  }
+  .tab-x {
+    border: none;
+    background: none;
+    color: var(--muted);
+    padding: 0 8px;
+    font-size: 15px;
+    line-height: 1;
+  }
+  .tab-x:hover:not(:disabled) {
+    color: #c0392b;
+    background: transparent;
+  }
+  .tab-add {
+    border: none;
+    background: none;
+    color: var(--muted);
+    padding: 9px 12px;
+    font-size: 17px;
+  }
+  .tab-add:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border-color: transparent;
+  }
+  .tab-edit {
+    width: 120px;
+    padding: 5px 9px;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    font: inherit;
+    margin: 4px 2px;
+  }
+  .workspace {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    position: relative;
+  }
+  .viewport {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+  }
 
   /* Floating button to reopen the style panel once it's been collapsed. */
   .inspector-open {
-    position: absolute; top: 12px; right: 12px; z-index: 5;
-    width: 38px; height: 38px; padding: 0; border-radius: 10px;
-    display: grid; place-items: center;
-    background: var(--panel); color: var(--accent);
-    border: 1px solid var(--border); box-shadow: var(--elev-2);
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 5;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: var(--panel);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    box-shadow: var(--elev-2);
   }
-  .inspector-open:hover:not(:disabled) { background: var(--surface-2); }
-  code { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); padding: 1px 6px; border-radius: 5px; font-size: 0.88em; }
+  .inspector-open:hover:not(:disabled) {
+    background: var(--surface-2);
+  }
+  code {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent);
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-size: 0.88em;
+  }
 
   /* Welcome / empty state */
   .welcome {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    height: 100%; gap: 30px; padding: 24px; text-align: center; overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 30px;
+    padding: 24px;
+    text-align: center;
+    overflow-y: auto;
     background:
-      radial-gradient(1100px 480px at 50% -12%, color-mix(in srgb, var(--accent) 12%, transparent), transparent),
+      radial-gradient(
+        1100px 480px at 50% -12%,
+        color-mix(in srgb, var(--accent) 12%, transparent),
+        transparent
+      ),
       var(--bg);
   }
-  .hero { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
   .logo {
-    width: 88px; height: 88px; border-radius: 22px; display: grid; place-items: center;
-    background: #fff; box-shadow: var(--elev-2); margin-bottom: 8px; padding: 12px;
+    width: 88px;
+    height: 88px;
+    border-radius: 22px;
+    display: grid;
+    place-items: center;
+    background: #fff;
+    box-shadow: var(--elev-2);
+    margin-bottom: 8px;
+    padding: 12px;
     border: 1px solid var(--border);
   }
-  .logo img { width: 100%; height: 100%; object-fit: contain; }
-  .welcome h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: 0.3px; }
-  .tagline { margin: 0; color: var(--muted); font-size: 15px; }
-  .cta { display: flex; gap: 12px; margin-top: 16px; }
-  .cta button { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 22px; border-radius: 22px; font-size: 14px; }
-  .cta .primary { background: var(--md-primary); color: #fff; border-color: transparent; box-shadow: var(--elev-1); }
-  .cta .primary:hover:not(:disabled) { background: var(--md-primary-hover); }
-  .cta .outlined { background: var(--panel); color: var(--accent); border: 1px solid var(--border); }
-  .samples { width: 100%; max-width: 740px; }
-  .samples-label { text-transform: uppercase; letter-spacing: 0.6px; font-size: 11px; color: var(--muted); margin-bottom: 12px; font-weight: 700; }
-  .sample-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .sample {
-    display: flex; align-items: center; gap: 12px; text-align: left;
-    padding: 14px; border-radius: 14px; border: 1px solid var(--border);
-    background: var(--panel); box-shadow: var(--elev-1); color: var(--text);
-    transition: box-shadow 0.15s, border-color 0.15s, transform 0.12s;
+  .logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
-  .sample:hover { box-shadow: var(--elev-2); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); transform: translateY(-1px); }
-  .sample-icon { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); flex: none; }
-  .sample-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .sample-text strong { font-size: 14px; }
-  .sample-text small { color: var(--muted); font-size: 12px; }
+  .welcome h1 {
+    margin: 0;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .tagline {
+    margin: 0;
+    color: var(--muted);
+    font-size: 15px;
+  }
+  .cta {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .cta button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 22px;
+    border-radius: 22px;
+    font-size: 14px;
+  }
+  .cta .primary {
+    background: var(--md-primary);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: var(--elev-1);
+  }
+  .cta .primary:hover:not(:disabled) {
+    background: var(--md-primary-hover);
+  }
+  .cta .outlined {
+    background: var(--panel);
+    color: var(--accent);
+    border: 1px solid var(--border);
+  }
+  .samples {
+    width: 100%;
+    max-width: 740px;
+  }
+  .samples-label {
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    font-weight: 700;
+  }
+  .sample-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .sample {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    box-shadow: var(--elev-1);
+    color: var(--text);
+    transition:
+      box-shadow 0.15s,
+      border-color 0.15s,
+      transform 0.12s;
+  }
+  .sample:hover {
+    box-shadow: var(--elev-2);
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    transform: translateY(-1px);
+  }
+  .sample-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    flex: none;
+  }
+  .sample-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .sample-text strong {
+    font-size: 14px;
+  }
+  .sample-text small {
+    color: var(--muted);
+    font-size: 12px;
+  }
 
   /* Recent files on the welcome screen */
-  .recent-list { display: flex; flex-direction: column; gap: 8px; }
-  .recent {
-    display: flex; align-items: stretch; gap: 0;
-    border: 1px solid var(--border); border-radius: 12px;
-    background: var(--panel); box-shadow: var(--elev-1); overflow: hidden;
-    transition: box-shadow 0.15s, border-color 0.15s;
+  .recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
-  .recent:hover { box-shadow: var(--elev-2); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+  .recent {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--panel);
+    box-shadow: var(--elev-1);
+    overflow: hidden;
+    transition:
+      box-shadow 0.15s,
+      border-color 0.15s;
+  }
+  .recent:hover {
+    box-shadow: var(--elev-2);
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  }
   .recent-main {
-    flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0;
-    border: none; border-radius: 0; background: transparent; color: var(--text);
-    padding: 10px 12px; text-align: left;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text);
+    padding: 10px 12px;
+    text-align: left;
   }
   .recent-icon {
-    width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
-    color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    flex: none;
   }
-  .recent-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-  .recent-text strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .recent-text small { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recent-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .recent-text strong {
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .recent-text small {
+    color: var(--muted);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .recent-x {
-    border: none; border-radius: 0; background: transparent; color: var(--muted);
-    padding: 0 14px; font-size: 16px; line-height: 1;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--muted);
+    padding: 0 14px;
+    font-size: 16px;
+    line-height: 1;
   }
-  .recent-x:hover:not(:disabled) { color: #c0392b; background: color-mix(in srgb, #c0392b 8%, transparent); }
+  .recent-x:hover:not(:disabled) {
+    color: #c0392b;
+    background: color-mix(in srgb, #c0392b 8%, transparent);
+  }
 
   .zen-toggle.exit {
-    position: absolute; top: 12px; left: 12px; z-index: 10;
-    width: 38px; height: 38px; padding: 0; border-radius: 10px;
-    display: grid; place-items: center;
-    background: var(--panel); color: var(--accent);
-    border: 1px solid var(--border); box-shadow: var(--elev-2);
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 10;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: var(--panel);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    box-shadow: var(--elev-2);
     cursor: pointer;
   }
-  .zen-toggle.exit:hover { background: var(--surface-2); }
+  .zen-toggle.exit:hover {
+    background: var(--surface-2);
+  }
 
   /* Presenter view layout */
   .presenter-view {
@@ -1497,7 +2203,9 @@
     padding: 6px 14px;
     border-radius: 14px;
     cursor: pointer;
-    transition: background 0.2s, color 0.2s;
+    transition:
+      background 0.2s,
+      color 0.2s;
   }
   .zen-sheet-tab:hover {
     background: rgba(255, 255, 255, 0.08);

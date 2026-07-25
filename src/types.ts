@@ -12,7 +12,7 @@
 
 export interface Manifest {
   /** Always "vmm". Identifies the container kind. */
-  format: "vmm";
+  format: 'vmm';
   /** Schema version, "MAJOR.MINOR". See DESIGN.md §7. */
   formatVersion: string;
   /** Producing application name. */
@@ -30,33 +30,41 @@ export interface Manifest {
 // ---------------------------------------------------------------------------
 
 export type StructureId =
-  | "map.balanced" | "map.left" | "map.right" | "map.underline"
-  | "logic.right" | "logic.left"
-  | "org.down" | "org.up"
-  | "tree.right" | "tree.left"
-  | "timeline.h" | "timeline.v"
-  | "fishbone.right" | "fishbone.left"
-  | "matrix"
-  | "tree-table"
-  | "brace.right" | "brace.left";
+  | 'map.balanced'
+  | 'map.left'
+  | 'map.right'
+  | 'map.underline'
+  | 'logic.right'
+  | 'logic.left'
+  | 'org.down'
+  | 'org.up'
+  | 'tree.right'
+  | 'tree.left'
+  | 'timeline.h'
+  | 'timeline.v'
+  | 'fishbone.right'
+  | 'fishbone.left'
+  | 'matrix'
+  | 'tree-table'
+  | 'brace.right'
+  | 'brace.left';
 
 /** Visual treatment applied independently from the chart's geometry. */
-export type MapPresentation = "boxed" | "underline";
+export type MapPresentation = 'boxed' | 'underline';
 
 // ---------------------------------------------------------------------------
 // Styling
 // ---------------------------------------------------------------------------
 
-export type TopicShape =
-  | "rounded" | "rect" | "ellipse" | "underline" | "capsule" | "none";
+export type TopicShape = 'rounded' | 'rect' | 'ellipse' | 'underline' | 'capsule' | 'none';
 
 export interface FontStyle {
   family?: string;
   size?: number;
-  weight?: "normal" | "bold";
-  style?: "normal" | "italic";
+  weight?: 'normal' | 'bold';
+  style?: 'normal' | 'italic';
   color?: string;
-  decoration?: "none" | "underline" | "line-through";
+  decoration?: 'none' | 'underline' | 'line-through';
 }
 
 export interface TopicStyle {
@@ -79,7 +87,7 @@ export interface TopicStyle {
 // Attachments / decorations
 // ---------------------------------------------------------------------------
 
-export type HyperlinkType = "web" | "file" | "topic" | "email";
+export type HyperlinkType = 'web' | 'file' | 'topic' | 'email';
 
 export interface Hyperlink {
   type: HyperlinkType;
@@ -146,8 +154,8 @@ export interface Topic {
 export interface RelationshipStyle {
   lineColor?: string;
   lineWidth?: number;
-  lineShape?: "curved" | "straight" | "elbow";
-  arrow?: "none" | "end" | "both";
+  lineShape?: 'curved' | 'straight' | 'elbow';
+  arrow?: 'none' | 'end' | 'both';
 }
 
 export interface Relationship {
@@ -166,7 +174,7 @@ export interface Boundary {
   /** Ids of the contiguous child topics enclosed. */
   childIds: string[];
   title?: string;
-  shape?: "rounded" | "rect" | "scallop" | "polygon";
+  shape?: 'rounded' | 'rect' | 'scallop' | 'polygon';
   style?: { fillColor?: string; borderColor?: string };
 }
 
@@ -175,7 +183,7 @@ export interface Summary {
   parentId: string;
   /** Ids of the contiguous child topics summarized. */
   childIds: string[];
-  shape?: "curly" | "square" | "round";
+  shape?: 'curly' | 'square' | 'round';
   /** The topic produced by the summary bracket. */
   summaryTopic: Topic;
 }

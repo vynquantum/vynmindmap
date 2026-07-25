@@ -8,13 +8,13 @@
  *     that upgrades the parsed content in memory before the model is built.
  */
 
-import type { Workbook } from "./types.js";
+import type { Workbook } from './types.js';
 
 /** The format version this build writes. */
-export const CURRENT_FORMAT_VERSION = "1.0";
+export const CURRENT_FORMAT_VERSION = '1.0';
 
-export const APP_NAME = "VynMM";
-export const APP_VERSION = "0.1.1";
+export const APP_NAME = 'VynMM';
+export const APP_VERSION = '0.1.1';
 
 export interface SemVer {
   major: number;
@@ -35,7 +35,7 @@ export function compareVersions(a: SemVer, b: SemVer): number {
 export class VmmVersionError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "VmmVersionError";
+    this.name = 'VmmVersionError';
   }
 }
 
@@ -81,7 +81,7 @@ export interface MigrationResult {
  */
 export function migrateContent(
   content: Record<string, unknown>,
-  fileVersion: string,
+  fileVersion: string
 ): MigrationResult {
   const current = parseVersion(CURRENT_FORMAT_VERSION);
   let v = parseVersion(fileVersion);
@@ -91,7 +91,7 @@ export function migrateContent(
   if (v.major > current.major) {
     throw new VmmVersionError(
       `File format ${fileVersion} is newer than supported ${CURRENT_FORMAT_VERSION}. ` +
-        `Please update ${APP_NAME}.`,
+        `Please update ${APP_NAME}.`
     );
   }
 
@@ -99,7 +99,7 @@ export function migrateContent(
     const migrator = MIGRATORS.find((m) => m.fromMajor === v.major);
     if (!migrator) {
       throw new VmmVersionError(
-        `No migrator registered to upgrade format major version ${v.major}.`,
+        `No migrator registered to upgrade format major version ${v.major}.`
       );
     }
     working = migrator.migrate(working);
@@ -113,7 +113,7 @@ export function migrateContent(
     content: working,
     version: `${v.major}.${v.minor}`,
     migrated,
-    newerMinor,
+    newerMinor
   };
 }
 

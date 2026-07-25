@@ -1,6 +1,6 @@
 ---
 name: ponytail-debt
-description: "Harvest every ponytail: shortcut comment into one debt ledger, so deferrals get tracked instead of forgotten. One-shot report."
+description: 'Harvest every ponytail: shortcut comment into one debt ledger, so deferrals get tracked instead of forgotten. One-shot report.'
 homepage: https://github.com/DietrichGebert/ponytail
 license: MIT
 ---
@@ -14,7 +14,7 @@ can't quietly become permanent.
 Grep the repo for comment markers, skipping `node_modules`, `.git`, and build
 output:
 
-`grep -rnE '(#|//) ?ponytail:' .`  (add other comment prefixes if your stack uses them)
+`grep -rnE '(#|//) ?ponytail:' .` (add other comment prefixes if your stack uses them)
 
 Each hit is one ledger row. The comment prefix keeps prose that merely mentions
 the convention out of the ledger.

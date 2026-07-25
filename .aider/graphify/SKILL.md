@@ -1,6 +1,6 @@
 ---
 name: graphify
-description: "Use for any question about a codebase, its architecture, file relationships, or project content — especially when graphify-out/ exists, where the question should be treated as a graphify query first. Turns any input (code, docs, papers, images, videos) into a persistent knowledge graph with god nodes, community detection, and query/path/explain tools."
+description: 'Use for any question about a codebase, its architecture, file relationships, or project content — especially when graphify-out/ exists, where the question should be treated as a graphify query first. Turns any input (code, docs, papers, images, videos) into a persistent knowledge graph with god nodes, community detection, and query/path/explain tools.'
 ---
 
 # /graphify
@@ -38,11 +38,13 @@ Turn any folder of files into a navigable knowledge graph with community detecti
 graphify is built around Andrej Karpathy's /raw folder workflow: drop anything into a folder - papers, tweets, screenshots, code, notes - and get a structured knowledge graph that shows you what you didn't know was connected.
 
 Three things it does that your AI assistant alone cannot:
+
 1. **Persistent graph** - relationships are stored in `graphify-out/graph.json` and survive across sessions. Ask questions weeks later without re-reading everything.
 2. **Honest audit trail** - every edge is tagged EXTRACTED, INFERRED, or AMBIGUOUS. You know what was found vs invented.
 3. **Cross-document surprise** - community detection finds connections between concepts in different files that you would never think to ask about directly.
 
 Use it for:
+
 - A codebase you're new to (understand architecture before touching anything)
 - A reading list (papers + tweets + notes → one navigable graph)
 - A research corpus (citation graph + concept graph in one)
@@ -122,6 +124,7 @@ Corpus: X files · ~Y words
 Omit any category with 0 files from the summary.
 
 Then act on it:
+
 - If `total_files` is 0: stop with "No supported files found in [path]."
 - If `skipped_sensitive` is non-empty: report the count and list the skipped file names, so a wrongly-flagged source or doc is visible and can be renamed or moved (#2106).
 - If `total_words` > 2,000,000 OR `total_files` > 200: show the warning and the top 5 subdirectories by file count, then ask which subfolder to run on. Wait for the user's answer before proceeding.
@@ -135,7 +138,7 @@ Video and audio files cannot be read directly. Transcribe them to text first, th
 
 **Strategy:** Read the god nodes from the detect output or analysis file. You are already a language model - write a one-sentence domain hint yourself from those labels. Then pass it to Whisper as the initial prompt. No separate API call needed.
 
-**However**, if the corpus has *only* video files and no other docs/code, use the generic fallback prompt: `"Use proper punctuation and paragraph breaks."`
+**However**, if the corpus has _only_ video files and no other docs/code, use the generic fallback prompt: `"Use proper punctuation and paragraph breaks."`
 
 **Step 1 - Write the Whisper prompt yourself.**
 
@@ -164,6 +167,7 @@ print(json.dumps(transcript_paths))
 ```
 
 After transcription:
+
 - Read the transcript paths from `graphify-out/.graphify_transcripts.json`
 - Add them to the docs list before dispatching semantic subagents in Step 3B
 - Print how many transcripts were created: `Transcribed N video file(s) -> treating as docs`
@@ -282,6 +286,7 @@ For the accumulated result:
 If more than half the chunks failed, stop and tell the user.
 
 Merge all chunk files into `.graphify_semantic_new.json`. **After each Agent call completes, read the real token counts from the Agent tool result's `usage` field and write them back into the chunk JSON before merging** — the chunk JSON itself always has placeholder zeros. Then run:
+
 ```bash
 $(cat graphify-out/.graphify_python) -c "
 import json, glob
@@ -306,6 +311,7 @@ print(f'Merged {len(chunks)} chunks: {total_in:,} in / {total_out:,} out tokens'
 ```
 
 Save new results to cache:
+
 ```bash
 $(cat graphify-out/.graphify_python) -c "
 import json
@@ -320,6 +326,7 @@ print(f'Cached {saved} files')
 ```
 
 Merge cached + new results into `.graphify_semantic.json`:
+
 ```bash
 $(cat graphify-out/.graphify_python) -c "
 import json
@@ -349,6 +356,7 @@ Path('.graphify_semantic.json').write_text(json.dumps(merged, indent=2))
 print(f'Extraction complete - {len(deduped)} nodes, {len(all_edges)} edges ({len(cached[\"nodes\"])} from cache, {len(new.get(\"nodes\",[]))} new)')
 "
 ```
+
 Clean up temp files: `rm -f .graphify_cached.json .graphify_uncached.txt .graphify_semantic_new.json`
 
 #### Part C - Merge AST + semantic into final extraction
@@ -635,6 +643,7 @@ python3 -m graphify.serve graphify-out/graph.json
 This starts a stdio MCP server that exposes tools: `query_graph`, `get_node`, `get_neighbors`, `get_community`, `god_nodes`, `graph_stats`, `shortest_path`. Add to Claude Desktop or any MCP-compatible agent orchestrator so other agents can query the graph live.
 
 To configure in Claude Desktop, add to `claude_desktop_config.json`:
+
 ```json
 {
   "mcpServers": {
@@ -717,6 +726,7 @@ rm -f graphify-out/.needs_update 2>/dev/null || true
 ```
 
 Tell the user (omit the obsidian line unless --obsidian was given):
+
 ```
 Graph complete. Outputs in PATH_TO_DIR/graphify-out/
 
@@ -731,6 +741,7 @@ If graphify saved you time, consider supporting it: https://github.com/sponsors/
 Replace PATH_TO_DIR with the actual absolute path of the directory that was processed.
 
 Then paste these sections from GRAPH_REPORT.md directly into the chat:
+
 - God Nodes
 - Surprising Connections
 - Suggested Questions
@@ -792,7 +803,6 @@ If `code_only` is True: print `[graphify update] Code-only changes detected - sk
 
 If `code_only` is False (any changed file is a doc/paper/image): run the full Steps 3A–3C pipeline as normal.
 
-
 If no new files exist (only deletions), create an empty extraction so the merge step can prune:
 
 ```bash
@@ -805,7 +815,6 @@ Path('graphify-out/.graphify_extract.json').write_text(json.dumps({'nodes':[],'e
 "
 fi
 ```
-
 
 Then:
 
@@ -829,7 +838,7 @@ G_new = build_from_json(new_extraction, directed=IS_DIRECTED)
 # Merge: new nodes/edges into existing graph
 G_existing.update(G_new)
 print(f'Merged: {G_existing.number_of_nodes()} nodes, {G_existing.number_of_edges()} edges')
-" 
+"
 ```
 
 Then run Steps 4–8 on the merged graph as normal.
@@ -917,12 +926,13 @@ Then run Steps 5–9 as normal (label communities, generate viz, benchmark, clea
 
 Two traversal modes - choose based on the question:
 
-| Mode | Flag | Best for |
-|------|------|----------|
+| Mode          | Flag     | Best for                                                           |
+| ------------- | -------- | ------------------------------------------------------------------ |
 | BFS (default) | _(none)_ | "What is X connected to?" - broad context, nearest neighbors first |
-| DFS | `--dfs` | "How does X reach Y?" - trace a specific chain or dependency path |
+| DFS           | `--dfs`  | "How does X reach Y?" - trace a specific chain or dependency path  |
 
 First check the graph exists:
+
 ```bash
 $(cat graphify-out/.graphify_python) -c "
 from pathlib import Path
@@ -931,6 +941,7 @@ if not Path('graphify-out/graph.json').exists():
     raise SystemExit(1)
 "
 ```
+
 If it fails, stop and tell the user to run `/graphify <path>` first.
 
 Load `graphify-out/graph.json`, then:
@@ -1045,6 +1056,7 @@ Replace `QUESTION` with the question, `ANSWER` with your full answer text, `SOUR
 Find the shortest path between two named concepts in the graph.
 
 First check the graph exists:
+
 ```bash
 $(cat graphify-out/.graphify_python) -c "
 from pathlib import Path
@@ -1053,6 +1065,7 @@ if not Path('graphify-out/graph.json').exists():
     raise SystemExit(1)
 "
 ```
+
 If it fails, stop and tell the user to run `/graphify <path>` first.
 
 ```bash
@@ -1118,6 +1131,7 @@ $(cat graphify-out/.graphify_python) -m graphify save-result --question "Path fr
 Give a plain-language explanation of a single node - everything connected to it.
 
 First check the graph exists:
+
 ```bash
 $(cat graphify-out/.graphify_python) -c "
 from pathlib import Path
@@ -1126,6 +1140,7 @@ if not Path('graphify-out/graph.json').exists():
     raise SystemExit(1)
 "
 ```
+
 If it fails, stop and tell the user to run `/graphify <path>` first.
 
 ```bash
@@ -1204,8 +1219,9 @@ except RuntimeError as e:
 Replace `URL` with the actual URL, `AUTHOR` with the user's name if provided, `CONTRIBUTOR` likewise. If the command exits with an error, tell the user what went wrong - do not silently continue. After a successful save, automatically run the `--update` pipeline on `./raw` to merge the new file into the existing graph.
 
 Supported URL types (auto-detected):
+
 - Twitter/X → fetched via oEmbed, saved as `.md` with tweet text and author
-- arXiv → abstract + metadata saved as `.md`  
+- arXiv → abstract + metadata saved as `.md`
 - PDF → downloaded as `.pdf`
 - Images (.png/.jpg/.webp) → downloaded, vision extraction runs on next build
 - Any webpage → converted to markdown via html2text

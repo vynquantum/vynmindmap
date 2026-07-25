@@ -13,8 +13,8 @@ import {
   type StructureId,
   type Summary,
   type Topic,
-  type Workbook,
-} from "./types.js";
+  type Workbook
+} from './types.js';
 
 // ---------------------------------------------------------------------------
 // Id generation
@@ -24,7 +24,7 @@ import {
  * Stable, URL-safe unique id. Uses crypto.randomUUID where available (Node 19+,
  * modern browsers / Tauri webview) and falls back to a random string otherwise.
  */
-export function newId(prefix = "id"): string {
+export function newId(prefix = 'id'): string {
   const g = globalThis as { crypto?: { randomUUID?: () => string } };
   const uuid =
     g.crypto?.randomUUID?.() ??
@@ -37,23 +37,26 @@ export function newId(prefix = "id"): string {
 // ---------------------------------------------------------------------------
 
 export function createTopic(title: string, partial: Partial<Topic> = {}): Topic {
-  return { id: newId("t"), title, children: [], ...partial };
+  return { id: newId('t'), title, children: [], ...partial };
 }
 
 export function createSheet(title: string, partial: Partial<Sheet> = {}): Sheet {
-  const structure: StructureId = partial.structure ?? "map.balanced";
+  const structure: StructureId = partial.structure ?? 'map.balanced';
   return {
-    id: newId("sheet"),
+    id: newId('sheet'),
     title,
     structure,
-    theme: partial.theme ?? "classic",
+    theme: partial.theme ?? 'classic',
     rootTopic: partial.rootTopic ?? createTopic(title),
-    ...partial,
+    ...partial
   };
 }
 
-export function createWorkbook(rootTitle = "Central Topic"): Workbook {
-  return { id: newId("wb"), sheets: [createSheet("Sheet 1", { rootTopic: createTopic(rootTitle) })] };
+export function createWorkbook(rootTitle = 'Central Topic'): Workbook {
+  return {
+    id: newId('wb'),
+    sheets: [createSheet('Sheet 1', { rootTopic: createTopic(rootTitle) })]
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +85,7 @@ export function findTopic(sheet: Sheet, id: string): Topic | undefined {
 /** Find a topic and its parent (parent is undefined for roots/floating roots). */
 export function findWithParent(
   sheet: Sheet,
-  id: string,
+  id: string
 ): { topic: Topic; parent?: Topic } | undefined {
   const roots = [sheet.rootTopic, ...(sheet.floatingTopics ?? [])];
   for (const root of roots) {
@@ -93,10 +96,7 @@ export function findWithParent(
   return undefined;
 }
 
-function searchParent(
-  node: Topic,
-  id: string,
-): { topic: Topic; parent: Topic } | undefined {
+function searchParent(node: Topic, id: string): { topic: Topic; parent: Topic } | undefined {
   for (const list of [node.children, node.callouts]) {
     for (const child of list ?? []) {
       if (child.id === id) return { topic: child, parent: node };
@@ -122,7 +122,7 @@ export function addFloatingTopic(
   sheet: Sheet,
   title: string,
   position: { x: number; y: number },
-  partial: Partial<Topic> = {},
+  partial: Partial<Topic> = {}
 ): Topic {
   const topic = createTopic(title, { position, ...partial });
   (sheet.floatingTopics ??= []).push(topic);
@@ -133,7 +133,7 @@ export function addSibling(
   sheet: Sheet,
   siblingId: string,
   title: string,
-  partial: Partial<Topic> = {},
+  partial: Partial<Topic> = {}
 ): Topic {
   const found = findWithParent(sheet, siblingId);
   if (!found?.parent) {
@@ -157,7 +157,7 @@ export function deleteTopic(sheet: Sheet, id: string): boolean {
     // A floating root can be removed; the central root cannot.
     const floats = sheet.floatingTopics ?? [];
     const idx = floats.findIndex((t) => t.id === id);
-    if (idx === -1) throw new ModelError("Cannot delete the central root topic.");
+    if (idx === -1) throw new ModelError('Cannot delete the central root topic.');
     floats.splice(idx, 1);
   } else {
     removeChildRef(found.parent, id);
@@ -167,7 +167,7 @@ export function deleteTopic(sheet: Sheet, id: string): boolean {
 }
 
 function removeChildRef(parent: Topic, id: string): void {
-  for (const key of ["children", "callouts"] as const) {
+  for (const key of ['children', 'callouts'] as const) {
     const list = parent[key];
     if (!list) continue;
     const idx = list.findIndex((t) => t.id === id);
@@ -184,24 +184,19 @@ function removeChildRef(parent: Topic, id: string): void {
  * subtree. A floating root may be moved too: it is detached from
  * `floatingTopics` and attached under the new parent.
  */
-export function moveTopic(
-  sheet: Sheet,
-  id: string,
-  newParentId: string,
-  index?: number,
-): void {
+export function moveTopic(sheet: Sheet, id: string, newParentId: string, index?: number): void {
   const node = findWithParent(sheet, id);
   if (!node) throw new ModelError(`Move failed: topic "${id}" not found.`);
   const floats = sheet.floatingTopics ?? [];
   const floatIdx = node.parent ? -1 : floats.findIndex((t) => t.id === id);
   if (!node.parent && floatIdx === -1) {
-    throw new ModelError("Cannot move the central root topic.");
+    throw new ModelError('Cannot move the central root topic.');
   }
 
   const target = findTopic(sheet, newParentId);
   if (!target) throw new ModelError(`Move failed: new parent "${newParentId}" not found.`);
   if (id === newParentId || isDescendant(node.topic, newParentId)) {
-    throw new ModelError("Cannot move a topic into itself or its own descendant.");
+    throw new ModelError('Cannot move a topic into itself or its own descendant.');
   }
 
   if (node.parent) {
@@ -220,14 +215,10 @@ export function moveTopic(
  * canvas position (the inverse of attaching via `moveTopic`). Roots and
  * already-floating topics are rejected.
  */
-export function detachTopic(
-  sheet: Sheet,
-  id: string,
-  position: { x: number; y: number },
-): Topic {
+export function detachTopic(sheet: Sheet, id: string, position: { x: number; y: number }): Topic {
   const node = findWithParent(sheet, id);
   if (!node) throw new ModelError(`Detach failed: topic "${id}" not found.`);
-  if (!node.parent) throw new ModelError("Topic is already a root/floating topic.");
+  if (!node.parent) throw new ModelError('Topic is already a root/floating topic.');
   removeChildRef(node.parent, id);
   node.topic.position = { ...position };
   (sheet.floatingTopics ??= []).push(node.topic);
@@ -251,7 +242,7 @@ function isDescendant(topic: Topic, candidateId: string): boolean {
  */
 export function cloneTopicWithNewIds(topic: Topic): Topic {
   const copy = structuredClone(topic);
-  for (const t of walkTopic(copy)) t.id = newId("t");
+  for (const t of walkTopic(copy)) t.id = newId('t');
   return copy;
 }
 
@@ -268,12 +259,12 @@ export function addRelationship(
   sheet: Sheet,
   end1Id: string,
   end2Id: string,
-  title?: string,
+  title?: string
 ): Relationship {
   if (!findTopic(sheet, end1Id) || !findTopic(sheet, end2Id)) {
-    throw new ModelError("Relationship endpoints must both exist in the sheet.");
+    throw new ModelError('Relationship endpoints must both exist in the sheet.');
   }
-  const rel: Relationship = { id: newId("r"), end1Id, end2Id, title };
+  const rel: Relationship = { id: newId('r'), end1Id, end2Id, title };
   (sheet.relationships ??= []).push(rel);
   return rel;
 }
@@ -282,10 +273,10 @@ export function addBoundary(
   sheet: Sheet,
   parentId: string,
   childIds: string[],
-  title?: string,
+  title?: string
 ): Boundary {
-  validateContiguousChildren(sheet, parentId, childIds, "boundary");
-  const boundary: Boundary = { id: newId("b"), parentId, childIds, title };
+  validateContiguousChildren(sheet, parentId, childIds, 'boundary');
+  const boundary: Boundary = { id: newId('b'), parentId, childIds, title };
   (sheet.boundaries ??= []).push(boundary);
   return boundary;
 }
@@ -294,14 +285,14 @@ export function addSummary(
   sheet: Sheet,
   parentId: string,
   childIds: string[],
-  summaryTitle: string,
+  summaryTitle: string
 ): Summary {
-  validateContiguousChildren(sheet, parentId, childIds, "summary");
+  validateContiguousChildren(sheet, parentId, childIds, 'summary');
   const summary: Summary = {
-    id: newId("s"),
+    id: newId('s'),
     parentId,
     childIds,
-    summaryTopic: createTopic(summaryTitle),
+    summaryTopic: createTopic(summaryTitle)
   };
   (sheet.summaries ??= []).push(summary);
   return summary;
@@ -311,7 +302,7 @@ function validateContiguousChildren(
   sheet: Sheet,
   parentId: string,
   childIds: string[],
-  kind: string,
+  kind: string
 ): void {
   const parent = findTopic(sheet, parentId);
   if (!parent) throw new ModelError(`${kind}: parent "${parentId}" not found.`);
@@ -352,18 +343,16 @@ export function pruneDanglingConnectors(sheet: Sheet): void {
   for (const t of walkSheetTopics(sheet)) ids.add(t.id);
 
   if (sheet.relationships) {
-    sheet.relationships = sheet.relationships.filter(
-      (r) => ids.has(r.end1Id) && ids.has(r.end2Id),
-    );
+    sheet.relationships = sheet.relationships.filter((r) => ids.has(r.end1Id) && ids.has(r.end2Id));
   }
   if (sheet.boundaries) {
     sheet.boundaries = sheet.boundaries.filter(
-      (b) => ids.has(b.parentId) && b.childIds.every((c) => ids.has(c)),
+      (b) => ids.has(b.parentId) && b.childIds.every((c) => ids.has(c))
     );
   }
   if (sheet.summaries) {
     sheet.summaries = sheet.summaries.filter(
-      (s) => ids.has(s.parentId) && s.childIds.every((c) => ids.has(c)),
+      (s) => ids.has(s.parentId) && s.childIds.every((c) => ids.has(c))
     );
   }
 }
@@ -389,7 +378,7 @@ export function addSheet(workbook: Workbook, title: string, structure?: Structur
 export class ModelError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "ModelError";
+    this.name = 'ModelError';
   }
 }
 
@@ -410,7 +399,7 @@ export function findDuplicateIds(workbook: Workbook): string[] {
 export function ensureIds(workbook: Workbook): void {
   for (const sheet of workbook.sheets) {
     for (const t of walkSheetTopics(sheet)) {
-      if (!t.id) t.id = newId("t");
+      if (!t.id) t.id = newId('t');
     }
   }
 }

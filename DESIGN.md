@@ -10,7 +10,7 @@ the single source of truth.
 ## 1. Guiding principles
 
 1. **One canonical file, structured.** `.vmm` is a versioned ZIP container holding
-   structured JSON. It can represent *everything* XMind can: multiple structures,
+   structured JSON. It can represent _everything_ XMind can: multiple structures,
    floating topics, relationships, boundaries, summaries, styles, attachments.
 2. **One core model.** The GUI and the AI tooling both load → mutate → save the
    same in-memory workbook. No second source of truth.
@@ -24,13 +24,13 @@ the single source of truth.
 
 ## 2. Tech stack (decided)
 
-| Layer        | Choice                                               |
-|--------------|------------------------------------------------------|
+| Layer        | Choice                                                |
+| ------------ | ----------------------------------------------------- |
 | Shell        | **Tauri** (Rust core + web UI), Win/Linux/Mac         |
 | UI           | Web frontend, SVG canvas rendering                    |
 | File I/O     | Rust side: zip read/write, native dialogs, file watch |
-| Format       | **`.vmm`** = versioned ZIP container (see §4)          |
-| AI interface | MCP server + CLI + Markdown lane — *phase 2*           |
+| Format       | **`.vmm`** = versioned ZIP container (see §4)         |
+| AI interface | MCP server + CLI + Markdown lane — _phase 2_          |
 
 ---
 
@@ -96,72 +96,98 @@ mymap.vmm
     {
       "id": "sheet-uuid",
       "title": "Sheet 1",
-      "structure": "map.balanced",   // see §5 structure ids
+      "structure": "map.balanced", // see §5 structure ids
       "theme": "classic",
       "background": { "color": "#fff", "image": null },
       "settings": { "rainbowBranches": true },
 
-      "rootTopic": { /* Topic, see below */ },
+      "rootTopic": {/* Topic, see below */},
 
-      "floatingTopics": [ /* Topic[] with explicit position */ ],
-      "relationships":  [ /* Relationship[] */ ],
-      "boundaries":     [ /* Boundary[] */ ],
-      "summaries":      [ /* Summary[] */ ]
+      "floatingTopics": [/* Topic[] with explicit position */],
+      "relationships": [/* Relationship[] */],
+      "boundaries": [/* Boundary[] */],
+      "summaries": [/* Summary[] */]
     }
   ]
 }
 ```
 
 **Topic**
+
 ```jsonc
 {
   "id": "t-uuid",
-  "title": "Topic text",            // inline markdown allowed
-  "structureClass": null,           // optional per-subtree layout override
+  "title": "Topic text", // inline markdown allowed
+  "structureClass": null, // optional per-subtree layout override
   "collapsed": false,
-  "position": null,                 // {x,y} for floating/manual; else auto
+  "position": null, // {x,y} for floating/manual; else auto
 
-  "children": [ /* Topic[] (ordered) */ ],
-  "callouts": [ /* Topic[] attached as callouts */ ],
+  "children": [/* Topic[] (ordered) */],
+  "callouts": [/* Topic[] attached as callouts */],
 
   "style": {
-    "shape": "rounded",             // rounded|rect|ellipse|underline|none…
+    "shape": "rounded", // rounded|rect|ellipse|underline|none…
     "fillColor": "#3aa",
     "borderColor": "#288",
     "borderWidth": 1,
-    "lineColor": "#288",            // branch line to children
+    "lineColor": "#288", // branch line to children
     "lineWidth": 2,
     "lineTaper": true,
-    "font": { "family":"Inter","size":14,"weight":"normal",
-              "style":"normal","color":"#111","decoration":"none" }
+    "font": {
+      "family": "Inter",
+      "size": 14,
+      "weight": "normal",
+      "style": "normal",
+      "color": "#111",
+      "decoration": "none"
+    }
   },
 
   "markers": ["priority-1", "flag-red", "task-25%"],
-  "labels":  ["needs review"],
-  "note":    { "plain": "long note text", "rich": null },
+  "labels": ["needs review"],
+  "note": { "plain": "long note text", "rich": null },
   "hyperlink": { "type": "web", "value": "https://…" }, // web|file|topic|email
-  "image":   { "resource":"resources/img-a1.png","width":160,"height":90 },
-  "attachments": [ { "resource":"resources/doc-b2.pdf","name":"spec.pdf" } ]
+  "image": { "resource": "resources/img-a1.png", "width": 160, "height": 90 },
+  "attachments": [{ "resource": "resources/doc-b2.pdf", "name": "spec.pdf" }]
 }
 ```
 
 **Relationship** (cross-link between any two topics)
+
 ```jsonc
-{ "id":"r-uuid","end1Id":"t-1","end2Id":"t-2","title":"causes",
-  "style":{"lineColor":"#888","lineWidth":2,"lineShape":"curved","arrow":"end"},
-  "controlPoints": null }
+{
+  "id": "r-uuid",
+  "end1Id": "t-1",
+  "end2Id": "t-2",
+  "title": "causes",
+  "style": { "lineColor": "#888", "lineWidth": 2, "lineShape": "curved", "arrow": "end" },
+  "controlPoints": null
+}
 ```
 
 **Boundary** (outline around a range of siblings)
+
 ```jsonc
-{ "id":"b-uuid","parentId":"t-1","childIds":["t-2","t-3"],
-  "title":"Phase 1","shape":"rounded","style":{ "fillColor":"#eef","borderColor":"#88a" } }
+{
+  "id": "b-uuid",
+  "parentId": "t-1",
+  "childIds": ["t-2", "t-3"],
+  "title": "Phase 1",
+  "shape": "rounded",
+  "style": { "fillColor": "#eef", "borderColor": "#88a" }
+}
 ```
 
 **Summary** (bracket summarizing a range → produces a summary topic)
+
 ```jsonc
-{ "id":"s-uuid","parentId":"t-1","childIds":["t-2","t-3"],
-  "shape":"curly","summaryTopic": { /* Topic */ } }
+{
+  "id": "s-uuid",
+  "parentId": "t-1",
+  "childIds": ["t-2", "t-3"],
+  "shape": "curly",
+  "summaryTopic": {/* Topic */}
+}
 ```
 
 ### 4.4 Markdown lane (LLM / text export)
@@ -173,8 +199,11 @@ either dropped on export or added in-app after import.
 
 ```markdown
 # Central Topic
+
 ## Main Topic A
-- subtopic   <!-- vmm: {marker:"priority-1"} -->
+
+- subtopic <!-- vmm: {marker:"priority-1"} -->
+
 ## Main Topic B
 ```
 
@@ -183,6 +212,7 @@ either dropped on export or added in-app after import.
 ## 5. XMind feature inventory (parity target)
 
 ### 5.1 Structures (per sheet) — `structure` ids
+
 - `map.balanced`, `map.left`, `map.right` — classic mind map
 - `logic.right`, `logic.left` — logic chart
 - `org.down`, `org.up` — org chart
@@ -194,23 +224,28 @@ either dropped on export or added in-app after import.
 - `brace.right`, `brace.left` — brace map
 
 ### 5.2 Topic elements
+
 Central topic · main topics · subtopics · **floating topics** · **callouts** ·
 collapse/expand · multi-line text · topic images.
 
 ### 5.3 Connectors & groupings
+
 **Relationships** (curved cross-links + label) · **Boundaries** · **Summaries**.
 
 ### 5.4 Decorations
+
 **Markers/icons** (priority, task progress, flags, stars, smileys, people, arrows,
 symbols, months/weeks) · **labels** · **notes** (rich text) · **hyperlinks**
 (web/file/topic/email) · **attachments** (images, files, audio) · stickers.
 
 ### 5.5 Styling & themes
+
 Themes · per-topic shape/fill/border · branch line color/width/taper ·
 fonts (family/size/weight/style/color/decoration) · **rainbow branches** ·
 sheet background color/image.
 
 ### 5.6 Workbook & app features
+
 Multiple **sheets** per file · drilldown/focus mode · outline view ·
 zen mode · presentation/pitch mode · brainstorming mode ·
 export (PNG, PDF, Markdown, OPML, …) · optional password/encryption.
@@ -258,6 +293,7 @@ Operations the GUI and AI both call:
 ## 9. AI interface (phase 2 — designed now)
 
 All three produce/consume the same model, never the raw zip:
+
 1. **MCP server** (bundled): `create_map`, `read_map`, `add_topic`, `edit_topic`,
    `add_relationship`, `set_structure`, … operating on `.vmm` files.
 2. **CLI** (`vynmm`): scriptable; `vynmm import plan.md -o plan.vmm`, `vynmm export`.
@@ -269,27 +305,32 @@ All three produce/consume the same model, never the raw zip:
 ## 10. Roadmap (lean core first, then breadth)
 
 **M1 — Format + core model (no UI)**
+
 - [ ] Lock `manifest.json` + `content.json` v1.0 schema; write example `.vmm` files
 - [ ] Reader/writer: zip ↔ Workbook model (round-trips cleanly)
 - [ ] Version check + migration scaffold + tests
 
 **M2 — App shell + read-only render**
+
 - [ ] Tauri scaffold builds on Win/Linux/Mac
 - [ ] Open/Save `.vmm` via native dialogs
 - [ ] Render `map.balanced` on SVG canvas (read-only)
 
 **M3 — Core editing (one structure)**
+
 - [ ] Select / add child / sibling / edit / delete / collapse
 - [ ] Drag reparent/reorder · explicit save + dirty state
 - [ ] Zoom / pan / keyboard shortcuts
 
 **M4 — XMind breadth (iterative, feature by feature)**
+
 - [ ] More structures: logic, org, tree, timeline, fishbone, brace, matrix, tree-table
 - [ ] Relationships · boundaries · summaries · floating topics · callouts
 - [ ] Styles & themes · rainbow branches · markers · labels · notes · links · images
 - [ ] Multiple sheets · outline view · export (PNG/PDF/MD/OPML)
 
 **Phase 2 — AI**
+
 - [ ] Markdown import/export lane
 - [ ] MCP server + CLI over the model
 - [ ] Markdown-format skill doc
@@ -303,5 +344,7 @@ All three produce/consume the same model, never the raw zip:
   fishbone/matrix/brace need custom layout regardless.
 - Theme system: ship a few built-in themes first; user-defined themes later.
 - Encryption: AES on the zip if password set — defer to post-M4.
+
 ```
 
+```

@@ -11,11 +11,11 @@ See [DESIGN.md](DESIGN.md) for the full design.
 Grab the installer for your OS from the
 [**latest release**](https://github.com/vynquantum/vynmindmap/releases/latest):
 
-| OS | File |
-|----|------|
-| Windows | `VynMindMap_x.y.z_x64-setup.exe` (or the `.msi`) |
-| macOS (Apple Silicon) | `VynMindMap_x.y.z_aarch64.dmg` |
-| Linux | `.AppImage`, `.deb`, or `.rpm` |
+| OS                    | File                                             |
+| --------------------- | ------------------------------------------------ |
+| Windows               | `VynMindMap_x.y.z_x64-setup.exe` (or the `.msi`) |
+| macOS (Apple Silicon) | `VynMindMap_x.y.z_aarch64.dmg`                   |
+| Linux                 | `.AppImage`, `.deb`, or `.rpm`                   |
 
 ### "Windows protected your PC" / unknown publisher
 
@@ -28,10 +28,10 @@ is just the OS noticing there's no paid signing certificate. To proceed:
   Unblock → OK** before running it.
 - **Windows — Smart App Control** (stricter Win 11 mode, no "Run anyway"): it
   blocks unsigned apps outright. Either build from source (below), or turn Smart
-  App Control off in *Windows Security → App & browser control* (note: it can't
+  App Control off in _Windows Security → App & browser control_ (note: it can't
   be re-enabled without reinstalling Windows).
 - **macOS — Gatekeeper**: right-click the app → **Open**, then confirm; or allow
-  it under *System Settings → Privacy & Security*.
+  it under _System Settings → Privacy & Security_.
 
 Prefer not to click through a warning? Build it yourself from source — see
 [Run it](#run-it) — which never trips SmartScreen.
@@ -109,16 +109,16 @@ Prefer not to click through a warning? Build it yourself from source — see
 
 Select a node, then:
 
-| Action | Shortcut |
-|--------|----------|
-| Add child | `Tab` |
-| Add sibling | `Enter` |
-| Rename | `F2` or double-click |
-| Delete | `Delete` / `Backspace` |
-| Collapse / expand | `Space` or the `±` toggle |
-| Navigate | arrow keys |
-| Reparent | drag a node onto another |
-| Save | **Save** button → downloads a `.vmm` (native Save arrives with the Tauri shell) |
+| Action            | Shortcut                                                                        |
+| ----------------- | ------------------------------------------------------------------------------- |
+| Add child         | `Tab`                                                                           |
+| Add sibling       | `Enter`                                                                         |
+| Rename            | `F2` or double-click                                                            |
+| Delete            | `Delete` / `Backspace`                                                          |
+| Collapse / expand | `Space` or the `±` toggle                                                       |
+| Navigate          | arrow keys                                                                      |
+| Reparent          | drag a node onto another                                                        |
+| Save              | **Save** button → downloads a `.vmm` (native Save arrives with the Tauri shell) |
 
 A `●` dirty indicator and an unsaved-changes warning on close round it out.
 
@@ -127,13 +127,13 @@ A `●` dirty indicator and an unsaved-changes warning on close round it out.
 LLMs (and humans) author maps as **Markdown**, which converts to/from the canonical
 `.vmm`. See [docs/vmm-markdown-format.md](docs/vmm-markdown-format.md).
 
-| Surface | Where | Use |
-|---------|-------|-----|
-| Markdown lane | `src/markdown.ts` | `.vmm` ⇄ Markdown in code |
-| CLI | `src/cli.ts` | `vynmm new / import / export / info` |
-| MCP server | `mcp/server.ts` | tools: `create_map`, `read_map`, `update_map`, `add_topics`, `map_info` |
-| Skill | `.claude/skills/vynmm-mindmap/` | teaches an LLM to author maps |
-| App | Import MD / Export MD buttons | round-trip Markdown in the UI |
+| Surface       | Where                           | Use                                                                     |
+| ------------- | ------------------------------- | ----------------------------------------------------------------------- |
+| Markdown lane | `src/markdown.ts`               | `.vmm` ⇄ Markdown in code                                               |
+| CLI           | `src/cli.ts`                    | `vynmm new / import / export / info`                                    |
+| MCP server    | `mcp/server.ts`                 | tools: `create_map`, `read_map`, `update_map`, `add_topics`, `map_info` |
+| Skill         | `.claude/skills/vynmm-mindmap/` | teaches an LLM to author maps                                           |
+| App           | Import MD / Export MD buttons   | round-trip Markdown in the UI                                           |
 
 ```bash
 npm run vynmm -- new "My Map" -o my.vmm     # CLI
@@ -150,21 +150,21 @@ Register the MCP server in an MCP client with:
 The foundation: the data model, the `.vmm` reader/writer, and versioning — pure
 logic, runs in Node and in the browser/Tauri webview unchanged.
 
-| Module | Purpose |
-|--------|---------|
+| Module           | Purpose                                                       |
+| ---------------- | ------------------------------------------------------------- |
 | `src/types.ts`   | The `Workbook → Sheet → Topic` model (mirrors `content.json`) |
-| `src/version.ts` | `formatVersion` parsing, gate, and migration registry |
+| `src/version.ts` | `formatVersion` parsing, gate, and migration registry         |
 | `src/model.ts`   | Factories, traversal, and mutations (add/move/delete/relate…) |
-| `src/vmm.ts`     | `.vmm` (zip) read/write via `fflate` |
+| `src/vmm.ts`     | `.vmm` (zip) read/write via `fflate`                          |
 
 ### M2 — app (`app/`, `src-tauri/`)
 
-| Module | Purpose |
-|--------|---------|
-| `app/src/lib/layout.ts`        | `map.balanced` layout (pure geometry → boxes + edges) |
-| `app/src/lib/MindMapView.svelte` | SVG renderer with pan / zoom |
-| `app/src/App.svelte`           | Toolbar, sheet tabs, `.vmm` file loader |
-| `src-tauri/`                   | Tauri v2 native shell (Rust) + icons + capabilities |
+| Module                           | Purpose                                               |
+| -------------------------------- | ----------------------------------------------------- |
+| `app/src/lib/layout.ts`          | `map.balanced` layout (pure geometry → boxes + edges) |
+| `app/src/lib/MindMapView.svelte` | SVG renderer with pan / zoom                          |
+| `app/src/App.svelte`             | Toolbar, sheet tabs, `.vmm` file loader               |
+| `src-tauri/`                     | Tauri v2 native shell (Rust) + icons + capabilities   |
 
 The web UI runs in a plain browser **and** inside the Tauri window — identical
 code. There is **no server** in the product: the built UI is static files the
@@ -219,19 +219,19 @@ npm run examples    # regenerate examples/*.vmm
 ## Example
 
 ```ts
-import { createWorkbook, addChild, writeVmm, readVmm } from "vynmm-core";
+import { createWorkbook, addChild, writeVmm, readVmm } from 'vynmm-core';
 
-const wb = createWorkbook("My Map");
-addChild(wb.sheets[0].rootTopic, "First idea");
+const wb = createWorkbook('My Map');
+addChild(wb.sheets[0].rootTopic, 'First idea');
 
-const bytes = writeVmm(wb);        // → .vmm file bytes (write to disk)
+const bytes = writeVmm(wb); // → .vmm file bytes (write to disk)
 const { workbook } = readVmm(bytes); // ← parse a .vmm back into the model
 ```
 
 ## Next
 
 - **Native shell** — install Rust, then `npm run app:dev` for the desktop window
-  + native Open/Save dialogs
+  - native Open/Save dialogs
 - **M4** — XMind breadth (more structures, styles, markers, relationships, …)
 - **Phase 2** — Markdown lane + MCP/CLI for LLMs
 

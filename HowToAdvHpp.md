@@ -7,6 +7,7 @@ theme: classic
 # Ho'oponopono Statement Generator <!-- vmm: {"note": "A framework for emotional awareness using Ho'oponopono prayers. Every emotion affects different areas of our life. Instead of asking 'What should I say?', ask 'Which area of my life is this emotion affecting?'"} -->
 
 ## Inner World <!-- vmm: {"note": "What's happening inside me?", "markers": ["priority-1"]} -->
+
 - Self <!-- vmm: {"note": "How you relate to yourself (self-talk, self-worth, self-care, confidence, identity)."} -->
   - Ask Yourself <!-- vmm: {"collapsed": true} -->
     - How am I treating myself?
@@ -46,6 +47,7 @@ theme: classic
     - I love myself beyond every limiting belief.
 
 ## Outer World <!-- vmm: {"note": "How I'm relating to life.", "markers": ["priority-2"]} -->
+
 - Others <!-- vmm: {"note": "Your relationship with other people (comparison, expectations, approval, validation, judgments, relationships)."} -->
   - Ask Yourself <!-- vmm: {"collapsed": true} -->
     - Who am I blaming?
@@ -76,6 +78,7 @@ theme: classic
     - I love myself as I surrender.
 
 ## Life Journey <!-- vmm: {"note": "My experience through time.", "markers": ["priority-3"]} -->
+
 - Time <!-- vmm: {"note": "How your mind relates to Past, Present, and Future."} -->
   - Ask Yourself <!-- vmm: {"collapsed": true} -->
     - Am I stuck in the past?
@@ -106,5 +109,6 @@ theme: classic
     - I love the person I am becoming.
 
 ## Core Guidelines <!-- vmm: {"markers": ["star"]} -->
+
 - The Master Formula <!-- vmm: {"note": "When experiencing any emotion, ask:\n1. How am I treating myself? (Self)\n2. How am I relating to others? (Others)\n3. How am I relating to time? (Time)\n4. What am I thinking? (Thoughts)\n5. What am I feeling? (Emotions)\n6. What do I believe? (Beliefs)\n7. What am I doing? (Actions)\n8. What keeps repeating? (Patterns)\n9. What am I trying to control? (Control)\n10. What is life teaching me? (Growth)"} -->
 - The Golden Rule <!-- vmm: {"note": "Don't try to write beautiful prayers. Write honest ones.\nYour goal is awareness, not perfection.\nThe most healing statement is usually the simplest and most truthful one."} -->

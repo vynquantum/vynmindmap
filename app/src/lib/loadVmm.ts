@@ -4,7 +4,7 @@
  * the eventual Tauri app parse files identically.
  */
 
-import { readVmm, type ReadResult } from "../../../src/index.js";
+import { readVmm, type ReadResult } from '../../../src/index.js';
 
 export async function readVmmFromFile(file: File): Promise<ReadResult> {
   const buf = new Uint8Array(await file.arrayBuffer());

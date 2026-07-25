@@ -19,12 +19,14 @@ theme: classic
 # Project Plan
 
 ## Research
+
 - Competitors
   - Tool A
   - Tool B
 - User interviews
 
 ## Build
+
 - Frontend
 - Backend
   - API
@@ -58,6 +60,7 @@ Attach a trailing HTML comment to any heading or list item to add metadata:
 
 ```markdown
 ## Build <!-- vmm: {"markers":["priority-1"],"note":"Start Monday","collapsed":true} -->
+
 - API <!-- vmm: {"link":"https://api.example.com"} -->
 ```
 

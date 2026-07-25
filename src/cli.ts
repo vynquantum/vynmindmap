@@ -11,8 +11,8 @@
  *   vynmm info map.vmm                   summarize a .vmm
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
-import { basename } from "node:path";
+import { readFileSync, writeFileSync } from 'node:fs';
+import { basename } from 'node:path';
 
 import {
   createWorkbook,
@@ -20,22 +20,27 @@ import {
   readVmm,
   walkSheetTopics,
   workbookToMarkdown,
-  writeVmm,
-} from "./index.js";
+  writeVmm
+} from './index.js';
 
 function parseArgs(argv: string[]): { _: string[]; out?: string } {
   const positional: string[] = [];
   let out: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
-    if (a === "-o" || a === "--out") out = argv[++i];
+    if (a === '-o' || a === '--out') out = argv[++i];
     else positional.push(a);
   }
   return { _: positional, out };
 }
 
 function slug(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "untitled";
+  return (
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'untitled'
+  );
 }
 
 const USAGE = `vynmm — mind-map (.vmm) command-line tool
@@ -52,27 +57,27 @@ function main(): void {
   const { _, out } = parseArgs(rest);
 
   switch (cmd) {
-    case "new": {
-      const title = _[0] ?? "Central Topic";
+    case 'new': {
+      const title = _[0] ?? 'Central Topic';
       const wb = createWorkbook(title);
       const file = out ?? `${slug(title)}.vmm`;
       writeFileSync(file, writeVmm(wb));
       console.log(`Created ${file}`);
       break;
     }
-    case "import": {
+    case 'import': {
       const input = _[0];
-      if (!input) fail("import: missing <input.md>");
-      const md = readFileSync(input!, "utf8");
+      if (!input) fail('import: missing <input.md>');
+      const md = readFileSync(input!, 'utf8');
       const wb = markdownToWorkbook(md);
-      const file = out ?? input!.replace(/\.md$/i, "") + ".vmm";
+      const file = out ?? input!.replace(/\.md$/i, '') + '.vmm';
       writeFileSync(file, writeVmm(wb));
       console.log(`Imported ${input} → ${file} (${wb.sheets.length} sheet(s))`);
       break;
     }
-    case "export": {
+    case 'export': {
       const input = _[0];
-      if (!input) fail("export: missing <input.vmm>");
+      if (!input) fail('export: missing <input.vmm>');
       const { workbook } = readVmm(readFileSync(input!));
       const md = workbookToMarkdown(workbook);
       if (out) {
@@ -83,9 +88,9 @@ function main(): void {
       }
       break;
     }
-    case "info": {
+    case 'info': {
       const input = _[0];
-      if (!input) fail("info: missing <input.vmm>");
+      if (!input) fail('info: missing <input.vmm>');
       const { workbook, manifest } = readVmm(readFileSync(input!));
       console.log(`${basename(input!)}`);
       console.log(`  format version: ${manifest.formatVersion}`);
@@ -98,8 +103,8 @@ function main(): void {
       break;
     }
     case undefined:
-    case "-h":
-    case "--help":
+    case '-h':
+    case '--help':
       process.stdout.write(USAGE);
       break;
     default:

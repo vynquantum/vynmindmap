@@ -28,10 +28,14 @@ file. You never write the binary format by hand.
    ---
 
    # Launch Plan
+
    ## Marketing
+
    - Landing page
    - Email campaign
+
    ## Engineering
+
    - API
    - Frontend
    ```

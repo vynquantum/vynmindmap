@@ -5,7 +5,7 @@ name: Release
 # dispatch — not on every push.
 on:
   push:
-    tags: ["v*"]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -36,7 +36,7 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: './src-tauri -> target'
 
       - name: Install Linux system dependencies
         if: matrix.os == 'ubuntu-latest'
@@ -62,7 +62,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "VynMindMap ${{ github.ref_name }}"
+          releaseName: 'VynMindMap ${{ github.ref_name }}'
           args: ${{ matrix.os == 'macos-latest' && '--target universal-apple-darwin' || '' }}
           releaseBody: |
             Download the installer for your operating system below.

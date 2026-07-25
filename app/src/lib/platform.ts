@@ -7,12 +7,12 @@
  * available, otherwise a download.
  */
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from '@tauri-apps/api/core';
 
-const VMM_FILTER = [{ name: "VynMindMap mind map", extensions: ["vmm"] }];
+const VMM_FILTER = [{ name: 'VynMindMap mind map', extensions: ['vmm'] }];
 
 export function isTauri(): boolean {
-  return typeof (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ !== "undefined";
+  return typeof (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ !== 'undefined';
 }
 
 export function basename(p: string): string {
@@ -21,23 +21,23 @@ export function basename(p: string): string {
 
 // --- native (Tauri) -------------------------------------------------------
 export async function nativeSaveDialog(defaultName: string): Promise<string | null> {
-  const { save } = await import("@tauri-apps/plugin-dialog");
+  const { save } = await import('@tauri-apps/plugin-dialog');
   const path = await save({ defaultPath: defaultName, filters: VMM_FILTER });
   return path ?? null;
 }
 
 export async function nativeOpenDialog(): Promise<string | null> {
-  const { open } = await import("@tauri-apps/plugin-dialog");
+  const { open } = await import('@tauri-apps/plugin-dialog');
   const res = await open({ multiple: false, directory: false, filters: VMM_FILTER });
-  return typeof res === "string" ? res : null;
+  return typeof res === 'string' ? res : null;
 }
 
 export async function nativeWrite(path: string, bytes: Uint8Array): Promise<void> {
-  await invoke("write_file_bytes", { path, contents: Array.from(bytes) });
+  await invoke('write_file_bytes', { path, contents: Array.from(bytes) });
 }
 
 export async function nativeRead(path: string): Promise<Uint8Array> {
-  const arr = await invoke<number[]>("read_file_bytes", { path });
+  const arr = await invoke<number[]>('read_file_bytes', { path });
   return new Uint8Array(arr);
 }
 
@@ -48,7 +48,7 @@ export async function nativeRead(path: string): Promise<Uint8Array> {
  */
 export async function nativeModifiedMs(path: string): Promise<number | null> {
   try {
-    return await invoke<number>("file_modified_ms", { path });
+    return await invoke<number>('file_modified_ms', { path });
   } catch {
     return null;
   }
@@ -56,26 +56,26 @@ export async function nativeModifiedMs(path: string): Promise<number | null> {
 
 /** Path of a `.vmm` the app was launched with (file association), or null. */
 export async function getOpenedFile(): Promise<string | null> {
-  return (await invoke<string | null>("get_opened_file")) ?? null;
+  return (await invoke<string | null>('get_opened_file')) ?? null;
 }
 
 /** Subscribe to "open this .vmm" events from a second launch (single-instance). */
 export async function onOpenFile(cb: (path: string) => void): Promise<() => void> {
-  const { listen } = await import("@tauri-apps/api/event");
-  return listen<string>("open-file", (e) => cb(e.payload));
+  const { listen } = await import('@tauri-apps/api/event');
+  return listen<string>('open-file', (e) => cb(e.payload));
 }
 
 /** Open a URL in the user's default browser (native) or a new tab (browser). */
 export async function openExternal(url: string): Promise<void> {
-  if (isTauri()) await invoke("open_external", { url });
-  else window.open(url, "_blank", "noopener");
+  if (isTauri()) await invoke('open_external', { url });
+  else window.open(url, '_blank', 'noopener');
 }
 
 // ---------------------------------------------------------------------------
 // Update check against GitHub Releases
 // ---------------------------------------------------------------------------
 
-const REPO = "vynquantum/vynmindmap";
+const REPO = 'vynquantum/vynmindmap';
 
 export interface UpdateInfo {
   version: string;
@@ -84,8 +84,8 @@ export interface UpdateInfo {
 
 /** Compare dotted numeric versions; true if `a` is newer than `b`. */
 export function isNewer(a: string, b: string): boolean {
-  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
-  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+  const pa = a.split('.').map((n) => parseInt(n, 10) || 0);
+  const pb = b.split('.').map((n) => parseInt(n, 10) || 0);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
     const d = (pa[i] ?? 0) - (pb[i] ?? 0);
     if (d !== 0) return d > 0;
@@ -95,43 +95,50 @@ export function isNewer(a: string, b: string): boolean {
 
 async function currentVersion(): Promise<string> {
   try {
-    const { getVersion } = await import("@tauri-apps/api/app");
+    const { getVersion } = await import('@tauri-apps/api/app');
     return await getVersion();
   } catch {
-    return "0.0.0";
+    return '0.0.0';
   }
 }
 
 /** Detailed result of a manual update check, so the UI can give feedback. */
 export type UpdateCheck =
-  | { kind: "update"; version: string; url: string }
-  | { kind: "current"; version: string }
-  | { kind: "unsupported" }
-  | { kind: "error"; message: string };
+  | { kind: 'update'; version: string; url: string }
+  | { kind: 'current'; version: string }
+  | { kind: 'unsupported' }
+  | { kind: 'error'; message: string };
 
 /**
  * Ask GitHub for the latest published release and classify it against the
  * running app. Drives both the silent startup check and the manual button.
  */
 export async function checkForUpdateDetailed(): Promise<UpdateCheck> {
-  if (!isTauri()) return { kind: "unsupported" };
+  if (!isTauri()) return { kind: 'unsupported' };
   try {
     const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { Accept: "application/vnd.github+json" },
+      headers: { Accept: 'application/vnd.github+json' }
     });
     if (!res.ok) {
-      return { kind: "error", message: res.status === 404 ? "no releases published yet" : `GitHub returned ${res.status}` };
+      return {
+        kind: 'error',
+        message: res.status === 404 ? 'no releases published yet' : `GitHub returned ${res.status}`
+      };
     }
     const data = (await res.json()) as { tag_name?: string; html_url?: string };
-    const latest = (data.tag_name ?? "").replace(/^v/i, "");
-    if (!latest) return { kind: "error", message: "could not read the latest version" };
+    const latest = (data.tag_name ?? '').replace(/^v/i, '');
+    if (!latest) return { kind: 'error', message: 'could not read the latest version' };
     const current = await currentVersion();
     if (isNewer(latest, current)) {
-      return { kind: "update", version: latest, url: data.html_url ?? `https://github.com/${REPO}/releases/latest` };
+      return {
+        kind: 'update',
+        version: latest,
+        url: data.html_url ?? `https://github.com/${REPO}/releases/latest`
+      };
     }
-    return { kind: "current", version: current };
+    return { kind: 'current', version: current };
   } catch (e) {
-    return { kind: "error", message: (e as Error).message || "network error" };
+    return { kind: 'error', message: (e as Error).message || 'network error' };
   }
 }
 
@@ -142,7 +149,7 @@ export async function checkForUpdateDetailed(): Promise<UpdateCheck> {
  */
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
   const r = await checkForUpdateDetailed();
-  return r.kind === "update" ? { version: r.version, url: r.url } : null;
+  return r.kind === 'update' ? { version: r.version, url: r.url } : null;
 }
 
 // --- browser File System Access API (Chromium) ----------------------------
@@ -155,8 +162,8 @@ export interface FsFileHandle {
   readonly name: string;
   getFile(): Promise<File>;
   createWritable(): Promise<{ write(data: BlobPart): Promise<void>; close(): Promise<void> }>;
-  queryPermission?(opts: { mode: "read" | "readwrite" }): Promise<PermissionState>;
-  requestPermission?(opts: { mode: "read" | "readwrite" }): Promise<PermissionState>;
+  queryPermission?(opts: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
+  requestPermission?(opts: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
 }
 
 interface PickerWindow {
@@ -165,14 +172,14 @@ interface PickerWindow {
 }
 
 const VMM_PICKER_TYPES = [
-  { description: "VynMindMap mind map", accept: { "application/octet-stream": [".vmm"] } },
+  { description: 'VynMindMap mind map', accept: { 'application/octet-stream': ['.vmm'] } }
 ];
 
 export function hasFilePicker(): boolean {
-  return typeof (window as unknown as PickerWindow).showSaveFilePicker === "function";
+  return typeof (window as unknown as PickerWindow).showSaveFilePicker === 'function';
 }
 export function hasOpenPicker(): boolean {
-  return typeof (window as unknown as PickerWindow).showOpenFilePicker === "function";
+  return typeof (window as unknown as PickerWindow).showOpenFilePicker === 'function';
 }
 
 /** Prompt for a save location. Returns the handle (keep it!), or null if cancelled. */
@@ -180,10 +187,10 @@ export async function browserSavePicker(defaultName: string): Promise<FsFileHand
   try {
     return await (window as unknown as PickerWindow).showSaveFilePicker!({
       suggestedName: defaultName,
-      types: VMM_PICKER_TYPES,
+      types: VMM_PICKER_TYPES
     });
   } catch (e) {
-    if ((e as DOMException)?.name === "AbortError") return null;
+    if ((e as DOMException)?.name === 'AbortError') return null;
     throw e;
   }
 }
@@ -193,11 +200,11 @@ export async function browserOpenPicker(): Promise<FsFileHandle | null> {
   try {
     const [handle] = await (window as unknown as PickerWindow).showOpenFilePicker!({
       multiple: false,
-      types: VMM_PICKER_TYPES,
+      types: VMM_PICKER_TYPES
     });
     return handle ?? null;
   } catch (e) {
-    if ((e as DOMException)?.name === "AbortError") return null;
+    if ((e as DOMException)?.name === 'AbortError') return null;
     throw e;
   }
 }
@@ -218,11 +225,11 @@ export async function browserWriteHandle(handle: FsFileHandle, bytes: Uint8Array
     await write();
   } catch (e) {
     const name = (e as DOMException)?.name;
-    if ((name === "NotAllowedError" || name === "SecurityError") && handle.requestPermission) {
+    if ((name === 'NotAllowedError' || name === 'SecurityError') && handle.requestPermission) {
       // Re-request and retry once. Note: without live user activation the
       // browser auto-denies this, so callers should treat a second failure
       // as "this site isn't allowed to edit files" and fall back.
-      if ((await handle.requestPermission({ mode: "readwrite" })) === "granted") {
+      if ((await handle.requestPermission({ mode: 'readwrite' })) === 'granted') {
         await write();
         return;
       }
@@ -233,8 +240,10 @@ export async function browserWriteHandle(handle: FsFileHandle, bytes: Uint8Array
 }
 
 export function browserDownload(name: string, bytes: Uint8Array): void {
-  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/octet-stream" }));
-  const a = document.createElement("a");
+  const url = URL.createObjectURL(
+    new Blob([bytes as BlobPart], { type: 'application/octet-stream' })
+  );
+  const a = document.createElement('a');
   a.href = url;
   a.download = name;
   a.click();
@@ -243,8 +252,12 @@ export function browserDownload(name: string, bytes: Uint8Array): void {
 
 export async function openPresenterWindow(): Promise<void> {
   if (isTauri()) {
-    await invoke("open_presenter_window");
+    await invoke('open_presenter_window');
   } else {
-    window.open(window.location.origin + "?presenter=true", "VynPresenterNotes", "width=500,height=600");
+    window.open(
+      window.location.origin + '?presenter=true',
+      'VynPresenterNotes',
+      'width=500,height=600'
+    );
   }
 }

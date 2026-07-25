@@ -20,7 +20,8 @@
     "app:build": "tauri build",
     "make:icon": "tsx scripts/make-icon.ts",
     "vynmm": "tsx src/cli.ts",
-    "mcp": "tsx mcp/server.ts"
+    "mcp": "tsx mcp/server.ts",
+    "format": "prettier --write ."
   },
   "bin": {
     "vynmm": "dist/cli.js"
@@ -38,6 +39,8 @@
     "@tauri-apps/cli": "^2.1.0",
     "@tsconfig/svelte": "^5.0.4",
     "@types/node": "^26.0.1",
+    "prettier": "^3.9.6",
+    "prettier-plugin-svelte": "^4.1.1",
     "svelte": "^5.16.0",
     "svelte-check": "^4.1.1",
     "tsx": "^4.19.2",

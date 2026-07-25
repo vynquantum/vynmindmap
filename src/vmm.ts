@@ -11,31 +11,27 @@
  * only for getting the bytes to/from disk.
  */
 
-import { unzipSync, zipSync, strToU8, strFromU8 } from "fflate";
-import {
-  type Manifest,
-  type VmmDocument,
-  type Workbook,
-} from "./types.js";
+import { unzipSync, zipSync, strToU8, strFromU8 } from 'fflate';
+import { type Manifest, type VmmDocument, type Workbook } from './types.js';
 import {
   APP_NAME,
   APP_VERSION,
   CURRENT_FORMAT_VERSION,
   migrateContent,
   parseVersion,
-  VmmVersionError,
-} from "./version.js";
-import { findDuplicateIds } from "./model.js";
+  VmmVersionError
+} from './version.js';
+import { findDuplicateIds } from './model.js';
 
-const MANIFEST_PATH = "manifest.json";
-const CONTENT_PATH = "content.json";
-const RESOURCE_PREFIX = "resources/";
-export const THUMBNAIL_PATH = "thumbnails/thumbnail.png";
+const MANIFEST_PATH = 'manifest.json';
+const CONTENT_PATH = 'content.json';
+const RESOURCE_PREFIX = 'resources/';
+export const THUMBNAIL_PATH = 'thumbnails/thumbnail.png';
 
 export class VmmFormatError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "VmmFormatError";
+    this.name = 'VmmFormatError';
   }
 }
 
@@ -60,11 +56,11 @@ export function readVmm(bytes: Uint8Array): ReadResult {
   }
 
   const manifestBytes = entries[MANIFEST_PATH];
-  if (!manifestBytes) throw new VmmFormatError("Missing manifest.json.");
+  if (!manifestBytes) throw new VmmFormatError('Missing manifest.json.');
   const manifest = parseManifest(manifestBytes);
 
   const contentBytes = entries[CONTENT_PATH];
-  if (!contentBytes) throw new VmmFormatError("Missing content.json.");
+  if (!contentBytes) throw new VmmFormatError('Missing content.json.');
 
   let rawContent: Record<string, unknown>;
   try {
@@ -79,7 +75,7 @@ export function readVmm(bytes: Uint8Array): ReadResult {
 
   const dups = findDuplicateIds(workbook);
   if (dups.length) {
-    throw new VmmFormatError(`Duplicate topic ids in content.json: ${dups.join(", ")}`);
+    throw new VmmFormatError(`Duplicate topic ids in content.json: ${dups.join(', ')}`);
   }
 
   const resources: Record<string, Uint8Array> = {};
@@ -92,7 +88,7 @@ export function readVmm(bytes: Uint8Array): ReadResult {
     workbook,
     resources,
     newerMinor: result.newerMinor,
-    migrated: result.migrated,
+    migrated: result.migrated
   };
 }
 
@@ -103,20 +99,20 @@ function parseManifest(bytes: Uint8Array): Manifest {
   } catch (e) {
     throw new VmmFormatError(`manifest.json is not valid JSON: ${(e as Error).message}`);
   }
-  if (raw.format !== "vmm") {
+  if (raw.format !== 'vmm') {
     throw new VmmFormatError(`manifest.format must be "vmm", got ${JSON.stringify(raw.format)}.`);
   }
-  if (typeof raw.formatVersion !== "string") {
-    throw new VmmFormatError("manifest.formatVersion must be a string.");
+  if (typeof raw.formatVersion !== 'string') {
+    throw new VmmFormatError('manifest.formatVersion must be a string.');
   }
   parseVersion(raw.formatVersion); // validate shape early
   return {
-    format: "vmm",
+    format: 'vmm',
     formatVersion: raw.formatVersion,
-    app: typeof raw.app === "string" ? raw.app : "unknown",
-    appVersion: typeof raw.appVersion === "string" ? raw.appVersion : "0.0.0",
-    created: typeof raw.created === "string" ? raw.created : new Date().toISOString(),
-    modified: typeof raw.modified === "string" ? raw.modified : new Date().toISOString(),
+    app: typeof raw.app === 'string' ? raw.app : 'unknown',
+    appVersion: typeof raw.appVersion === 'string' ? raw.appVersion : '0.0.0',
+    created: typeof raw.created === 'string' ? raw.created : new Date().toISOString(),
+    modified: typeof raw.modified === 'string' ? raw.modified : new Date().toISOString()
   };
 }
 
@@ -127,12 +123,12 @@ function parseManifest(bytes: Uint8Array): Manifest {
  */
 function toWorkbook(content: Record<string, unknown>): Workbook {
   if (!Array.isArray(content.sheets)) {
-    throw new VmmFormatError("content.sheets must be an array.");
+    throw new VmmFormatError('content.sheets must be an array.');
   }
   const { id, sheets, ...rest } = content;
   const workbook: Workbook = {
-    id: typeof id === "string" ? id : "",
-    sheets: sheets as Workbook["sheets"],
+    id: typeof id === 'string' ? id : '',
+    sheets: sheets as Workbook['sheets']
   };
   if (Object.keys(rest).length) workbook._unknown = rest;
   return workbook;
@@ -160,21 +156,21 @@ export interface WriteOptions {
 export function writeVmm(
   workbook: Workbook,
   resources: Record<string, Uint8Array> = {},
-  options: WriteOptions = {},
+  options: WriteOptions = {}
 ): Uint8Array {
   const dups = findDuplicateIds(workbook);
   if (dups.length) {
-    throw new VmmFormatError(`Refusing to write: duplicate topic ids: ${dups.join(", ")}`);
+    throw new VmmFormatError(`Refusing to write: duplicate topic ids: ${dups.join(', ')}`);
   }
 
   const now = new Date().toISOString();
   const manifest: Manifest = {
-    format: "vmm",
+    format: 'vmm',
     formatVersion: CURRENT_FORMAT_VERSION,
     app: APP_NAME,
     appVersion: APP_VERSION,
     created: options.created ?? now,
-    modified: options.modified ?? now,
+    modified: options.modified ?? now
   };
 
   // Re-merge any preserved unknown fields back into the written content.
@@ -184,7 +180,7 @@ export function writeVmm(
   const indent = options.pretty === false ? undefined : 2;
   const files: Record<string, Uint8Array> = {
     [MANIFEST_PATH]: strToU8(JSON.stringify(manifest, null, indent)),
-    [CONTENT_PATH]: strToU8(JSON.stringify(content, null, indent)),
+    [CONTENT_PATH]: strToU8(JSON.stringify(content, null, indent))
   };
   for (const [path, data] of Object.entries(resources)) {
     const normalized = path.startsWith(RESOURCE_PREFIX) ? path : RESOURCE_PREFIX + path;
@@ -204,15 +200,15 @@ export function newDocument(workbook: Workbook): VmmDocument {
   const now = new Date().toISOString();
   return {
     manifest: {
-      format: "vmm",
+      format: 'vmm',
       formatVersion: CURRENT_FORMAT_VERSION,
       app: APP_NAME,
       appVersion: APP_VERSION,
       created: now,
-      modified: now,
+      modified: now
     },
     workbook,
-    resources: {},
+    resources: {}
   };
 }
 

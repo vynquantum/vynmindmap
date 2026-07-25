@@ -27,7 +27,7 @@ const { parseCommandFile } = require('./ponytail-frontmatter.cjs');
 const statePath = path.join(
   process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'),
   'opencode',
-  '.ponytail-active',
+  '.ponytail-active'
 );
 
 function readMode() {
@@ -45,7 +45,9 @@ function writeMode(mode) {
 
 export default async ({ client } = {}) => {
   const log = (level, message) => {
-    try { client && client.app && client.app.log({ body: { service: 'ponytail', level, message } }); } catch (e) {}
+    try {
+      client && client.app && client.app.log({ body: { service: 'ponytail', level, message } });
+    } catch (e) {}
   };
 
   const ponytailSkillsDir = path.resolve(__dirname, '../../skills');
@@ -94,6 +96,6 @@ export default async ({ client } = {}) => {
       if (!mode) return;
       writeMode(mode);
       log('info', 'ponytail ' + mode);
-    },
+    }
   };
 };

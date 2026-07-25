@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { Sheet, Topic } from "../../../src/index.js";
-  import { toggleCollapse } from "../../../src/index.js";
+  import type { Sheet, Topic } from '../../../src/index.js';
+  import { toggleCollapse } from '../../../src/index.js';
 
   let {
     sheet,
     selectedId = $bindable(null),
     markDirty,
-    reveal,
+    reveal
   }: {
     sheet: Sheet;
     selectedId?: string | null;
@@ -16,7 +16,7 @@
   } = $props();
 
   let editingId = $state<string | null>(null);
-  let editValue = $state("");
+  let editValue = $state('');
   let editEl = $state<HTMLInputElement | null>(null);
 
   function select(t: Topic) {
@@ -33,20 +33,31 @@
   function beginEdit(t: Topic) {
     editingId = t.id;
     editValue = t.title;
-    requestAnimationFrame(() => { editEl?.focus(); editEl?.select(); });
+    requestAnimationFrame(() => {
+      editEl?.focus();
+      editEl?.select();
+    });
   }
 
   function commitEdit(t: Topic) {
     if (editingId === t.id) {
       const v = editValue.trim();
-      if (v && v !== t.title) { t.title = v; markDirty(); }
+      if (v && v !== t.title) {
+        t.title = v;
+        markDirty();
+      }
     }
     editingId = null;
   }
 
   function onEditKey(e: KeyboardEvent, t: Topic) {
-    if (e.key === "Enter") { e.preventDefault(); commitEdit(t); }
-    else if (e.key === "Escape") { e.preventDefault(); editingId = null; }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitEdit(t);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      editingId = null;
+    }
   }
 </script>
 
@@ -60,13 +71,22 @@
     onclick={() => select(t)}
     ondblclick={() => beginEdit(t)}
     onkeydown={(e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(t); }
-      else if (e.key === "F2") { e.preventDefault(); beginEdit(t); }
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        select(t);
+      } else if (e.key === 'F2') {
+        e.preventDefault();
+        beginEdit(t);
+      }
     }}
   >
     {#if t.children?.length}
-      <button class="chev" class:closed={t.collapsed} aria-label={t.collapsed ? "Expand" : "Collapse"}
-        onclick={(e) => chevron(e, t)}>▾</button>
+      <button
+        class="chev"
+        class:closed={t.collapsed}
+        aria-label={t.collapsed ? 'Expand' : 'Collapse'}
+        onclick={(e) => chevron(e, t)}>▾</button
+      >
     {:else}
       <span class="dot">•</span>
     {/if}
@@ -79,7 +99,7 @@
         onclick={(e) => e.stopPropagation()}
       />
     {:else}
-      <span class="title">{t.title || " "}</span>
+      <span class="title">{t.title || ' '}</span>
     {/if}
   </div>
   {#if !t.collapsed}
@@ -102,42 +122,91 @@
 
 <style>
   .outline {
-    width: 232px; flex: none; height: 100%; overflow-y: auto;
-    background: var(--panel); border-right: 1px solid var(--border);
+    width: 232px;
+    flex: none;
+    height: 100%;
+    overflow-y: auto;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
     box-shadow: var(--elev-1);
-    padding: 12px 8px; font-size: 13px;
+    padding: 12px 8px;
+    font-size: 13px;
   }
   h3 {
-    margin: 0 6px 10px; font-size: 12px; text-transform: uppercase;
-    letter-spacing: 0.6px; color: var(--accent); font-weight: 700;
+    margin: 0 6px 10px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--accent);
+    font-weight: 700;
   }
   h4 {
-    margin: 14px 6px 6px; font-size: 11px; text-transform: uppercase;
-    letter-spacing: 0.4px; color: var(--muted);
+    margin: 14px 6px 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--muted);
   }
   .row {
-    display: flex; align-items: center; gap: 5px;
-    padding: 4px 8px 4px 8px; border-radius: 7px; cursor: pointer;
-    color: var(--text); user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px 4px 8px;
+    border-radius: 7px;
+    cursor: pointer;
+    color: var(--text);
+    user-select: none;
   }
-  .row:hover { background: var(--surface-2); }
-  .row.sel { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .row:hover {
+    background: var(--surface-2);
+  }
+  .row.sel {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+  }
   .title {
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    flex: 1; min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
   }
   .chev {
-    flex: none; width: 18px; height: 18px; padding: 0;
-    border: none; background: none; color: var(--muted);
-    font-size: 11px; line-height: 1; border-radius: 4px;
+    flex: none;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1;
+    border-radius: 4px;
     transition: transform 0.12s ease;
   }
-  .chev.closed { transform: rotate(-90deg); }
-  .chev:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
-  .dot { flex: none; width: 18px; text-align: center; color: var(--border); font-size: 10px; }
+  .chev.closed {
+    transform: rotate(-90deg);
+  }
+  .chev:hover {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent);
+  }
+  .dot {
+    flex: none;
+    width: 18px;
+    text-align: center;
+    color: var(--border);
+    font-size: 10px;
+  }
   input {
-    flex: 1; min-width: 0; font: inherit; font-size: 12px;
-    border: 1px solid var(--accent); border-radius: 5px; padding: 2px 6px;
-    background: var(--panel); color: var(--text); outline: none;
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 12px;
+    border: 1px solid var(--accent);
+    border-radius: 5px;
+    padding: 2px 6px;
+    background: var(--panel);
+    color: var(--text);
+    outline: none;
   }
 </style>

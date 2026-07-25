@@ -15,10 +15,10 @@
  *   - Per-topic extras ride in a trailing `<!-- vmm: {json} -->` comment.
  */
 
-import { createSheet, createTopic } from "./model.js";
-import type { Sheet, StructureId, Topic, Workbook } from "./types.js";
+import { createSheet, createTopic } from './model.js';
+import type { Sheet, StructureId, Topic, Workbook } from './types.js';
 
-const SHEET_SEPARATOR = "<!-- vmm:sheet -->";
+const SHEET_SEPARATOR = '<!-- vmm:sheet -->';
 
 // ---------------------------------------------------------------------------
 // Per-topic metadata carried in a trailing HTML comment
@@ -51,7 +51,7 @@ function applyMeta(topic: Topic, meta?: TopicMeta): void {
   if (meta.labels?.length) topic.labels = meta.labels;
   if (meta.note) topic.note = { plain: meta.note };
   if (meta.collapsed) topic.collapsed = true;
-  if (meta.link) topic.hyperlink = { type: "web", value: meta.link };
+  if (meta.link) topic.hyperlink = { type: 'web', value: meta.link };
 }
 
 function collectMeta(topic: Topic): TopicMeta | undefined {
@@ -66,7 +66,7 @@ function collectMeta(topic: Topic): TopicMeta | undefined {
 
 function titleWithMeta(topic: Topic): string {
   const meta = collectMeta(topic);
-  const title = topic.title.replace(/\r?\n/g, " ");
+  const title = topic.title.replace(/\r?\n/g, ' ');
   return meta ? `${title} <!-- vmm: ${JSON.stringify(meta)} -->` : title;
 }
 
@@ -91,10 +91,10 @@ function parseFrontmatter(md: string): { body: string; fm: Frontmatter } {
     const kv = /^(\w+):\s*(.*)$/.exec(line.trim());
     if (!kv) continue;
     const key = kv[1]!;
-    const value = kv[2]!.replace(/^["']|["']$/g, "").trim();
-    if (key === "title") fm.title = value;
-    else if (key === "structure") fm.structure = value as StructureId;
-    else if (key === "theme") fm.theme = value;
+    const value = kv[2]!.replace(/^["']|["']$/g, '').trim();
+    if (key === 'title') fm.title = value;
+    else if (key === 'structure') fm.structure = value as StructureId;
+    else if (key === 'theme') fm.theme = value;
   }
   return { body: text.slice(m[0].length), fm };
 }
@@ -117,7 +117,7 @@ export function markdownToSheet(md: string): Sheet {
 
   const ensureRoot = (): Topic => {
     if (!root) {
-      root = createTopic(fm.title ?? "Untitled");
+      root = createTopic(fm.title ?? 'Untitled');
       currentHeading = root;
       headingStack[1] = root;
     }
@@ -146,7 +146,10 @@ export function markdownToSheet(md: string): Sheet {
       ensureRoot();
       let parent: Topic | undefined;
       for (let l = level - 1; l >= 1; l--) {
-        if (headingStack[l]) { parent = headingStack[l]; break; }
+        if (headingStack[l]) {
+          parent = headingStack[l];
+          break;
+        }
       }
       parent = parent ?? root!;
       (parent.children ??= []).push(topic);
@@ -160,13 +163,14 @@ export function markdownToSheet(md: string): Sheet {
     const list = LIST_RE.exec(raw);
     if (list) {
       ensureRoot();
-      const indent = list[1]!.replace(/\t/g, "  ").length;
+      const indent = list[1]!.replace(/\t/g, '  ').length;
       const depth = Math.floor(indent / 2);
       const { title, meta } = splitMeta(list[2]!);
       const topic = createTopic(title);
       applyMeta(topic, meta);
 
-      const parent = depth === 0 ? currentHeading ?? root! : listStack[depth - 1] ?? currentHeading ?? root!;
+      const parent =
+        depth === 0 ? (currentHeading ?? root!) : (listStack[depth - 1] ?? currentHeading ?? root!);
       (parent.children ??= []).push(topic);
       listStack.length = depth + 1;
       listStack[depth] = topic;
@@ -181,11 +185,11 @@ export function markdownToSheet(md: string): Sheet {
     }
   }
 
-  const rootTopic = root ?? createTopic(fm.title ?? "Untitled");
+  const rootTopic = root ?? createTopic(fm.title ?? 'Untitled');
   return createSheet(fm.title ?? rootTopic.title, {
     rootTopic,
-    structure: fm.structure ?? "map.balanced",
-    theme: fm.theme ?? "classic",
+    structure: fm.structure ?? 'map.balanced',
+    theme: fm.theme ?? 'classic'
   });
 }
 
@@ -208,32 +212,33 @@ export function sheetToMarkdown(sheet: Sheet, opts: ToMarkdownOptions = {}): str
   const out: string[] = [];
 
   if (opts.frontmatter !== false) {
-    out.push("---");
-    out.push(`title: ${sheet.rootTopic.title.replace(/\r?\n/g, " ")}`);
+    out.push('---');
+    out.push(`title: ${sheet.rootTopic.title.replace(/\r?\n/g, ' ')}`);
     out.push(`structure: ${sheet.structure}`);
     out.push(`theme: ${sheet.theme}`);
-    out.push("---", "");
+    out.push('---', '');
   }
 
   out.push(`# ${titleWithMeta(sheet.rootTopic)}`);
 
   const emitList = (topic: Topic, depth: number) => {
     for (const child of topic.children ?? []) {
-      out.push(`${"  ".repeat(depth)}- ${titleWithMeta(child)}`);
+      out.push(`${'  '.repeat(depth)}- ${titleWithMeta(child)}`);
       emitList(child, depth + 1);
     }
   };
 
   for (const branch of sheet.rootTopic.children ?? []) {
-    out.push("", `## ${titleWithMeta(branch)}`);
+    out.push('', `## ${titleWithMeta(branch)}`);
     emitList(branch, 0);
   }
 
-  return out.join("\n") + "\n";
+  return out.join('\n') + '\n';
 }
 
 export function workbookToMarkdown(wb: Workbook, opts: ToMarkdownOptions = {}): string {
-  return wb.sheets
-    .map((s) => sheetToMarkdown(s, opts).trimEnd())
-    .join(`\n\n${SHEET_SEPARATOR}\n\n`) + "\n";
+  return (
+    wb.sheets.map((s) => sheetToMarkdown(s, opts).trimEnd()).join(`\n\n${SHEET_SEPARATOR}\n\n`) +
+    '\n'
+  );
 }
