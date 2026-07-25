@@ -94,6 +94,10 @@
   let pressed = $state<{ id: string; sx: number; sy: number } | null>(null);
   let lastPoint = { x: 0, y: 0 };
 
+  // Resize-to-wrap state: dragging the corner handle gives the topic an
+  // explicit width (controls wrapping) and minimum height.
+  let resizing = $state<{ id: string; sx: number; sy: number; w: number; h: number } | null>(null);
+
   let startX = 0,
     startY = 0,
     startTx = 0,
@@ -322,6 +326,16 @@
       }
       return;
     }
+    if (resizing) {
+      const t = findTopic(sheet, resizing.id);
+      if (t) {
+        const w = resizing.w + (e.clientX - resizing.sx) / scale;
+        const h = resizing.h + (e.clientY - resizing.sy) / scale;
+        (t.style ??= {}).width = Math.max(56, Math.min(800, Math.round(w)));
+        t.style.minHeight = Math.max(34, Math.round(h));
+      }
+      return;
+    }
     if (pressed) {
       // Promote a press into a drag once the pointer moves enough.
       const moved = Math.hypot(e.clientX - pressed.sx, e.clientY - pressed.sy);
@@ -351,6 +365,11 @@
   }
 
   function onContainerPointerUp() {
+    if (resizing) {
+      notify();
+      resizing = null;
+      return;
+    }
     if (relDragId) {
       if (relDragged) notify();
       relDragId = null;
@@ -457,6 +476,20 @@
   function onToggle(e: PointerEvent, t: Topic) {
     e.stopPropagation();
     toggleCollapse(t);
+    notify();
+  }
+
+  function onResizePointerDown(e: PointerEvent, n: LaidOutNode) {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    resizing = { id: n.id, sx: e.clientX, sy: e.clientY, w: n.w, h: n.h };
+  }
+
+  function resetSize(e: Event, t: Topic) {
+    e.stopPropagation();
+    if (!t.style) return;
+    delete t.style.width;
+    delete t.style.minHeight;
     notify();
   }
 
@@ -1835,6 +1868,25 @@
               </text>
             </g>
           {/if}
+
+          {#if n.id === selectedId && n.id !== editingId && !presenterMode && !dragId}
+            <rect
+              class="resize-handle"
+              x={n.w - 5}
+              y={n.h - 5}
+              width="10"
+              height="10"
+              rx="2"
+              fill="#fff"
+              stroke="#1d4ed8"
+              stroke-width="1.5"
+              role="button"
+              tabindex={-1}
+              aria-label="Resize topic (double-click for auto size)"
+              onpointerdown={(e) => onResizePointerDown(e, n)}
+              ondblclick={(e) => resetSize(e, n.topic)}
+            />
+          {/if}
         </g>
       {/each}
 
@@ -2195,6 +2247,9 @@
   }
   .toggle {
     cursor: pointer;
+  }
+  .resize-handle {
+    cursor: nwse-resize;
   }
   text {
     pointer-events: none;
