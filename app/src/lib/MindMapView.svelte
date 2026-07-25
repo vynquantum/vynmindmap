@@ -1351,7 +1351,7 @@
     // This layout treats every topic as text positioned on a connector line.
     // Keep an explicitly selected topic shape as an intentional override.
     if (isTextOnLines(sheet)) return 'none';
-    return 'rounded';
+    return sheet.settings?.defaultShape ?? 'rounded';
   }
 
   // --- styling / decoration helpers ----------------------------------------

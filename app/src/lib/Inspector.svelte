@@ -401,20 +401,24 @@
   const underlineActive = $derived(
     sheet.settings?.mapPresentation === 'underline' || sheet.structure === 'map.underline'
   );
+  function isItemActive(item: StructurePreview): boolean {
+    if (item.presentation === 'underline') return underlineActive;
+    if (sheet.structure !== item.id || (underlineActive && item.id === 'map.right')) return false;
+    if (!item.preset) return true;
+    return (
+      (item.preset.branchStyle ?? 'curve') === (sheet.settings?.branchStyle ?? 'curve') &&
+      (item.preset.defaultShape ?? 'rounded') === (sheet.settings?.defaultShape ?? 'rounded')
+    );
+  }
   const activePreview = $derived(
-    underlineActive && (sheet.structure === 'map.right' || sheet.structure === 'map.underline')
-      ? STRUCTURE_PREVIEWS.get('map.text-on-lines')
-      : STRUCTURE_PREVIEWS.get(sheet.structure)
+    STRUCTURE_CATEGORIES.flatMap((c) => c.items).find(isItemActive) ??
+      STRUCTURE_PREVIEWS.get(sheet.structure)
   );
   const currentStructureLabel = $derived(
     activePreview?.label ??
       STRUCTURES.find((s) => s.id === sheet.structure)?.label ??
       'Mind map · underline (legacy)'
   );
-  function isItemActive(item: StructurePreview): boolean {
-    if (item.presentation === 'underline') return underlineActive;
-    return sheet.structure === item.id && !(underlineActive && item.id === 'map.right');
-  }
   function pickStructure(item: StructurePreview) {
     if (item.presentation === 'underline') {
       setMapPresentation('underline');
@@ -422,6 +426,10 @@
       setStructure(item.id);
       // A boxed card was chosen explicitly, so leave the underline treatment.
       if (sheet.settings?.mapPresentation === 'underline') setMapPresentation('boxed');
+      if (item.preset) {
+        setBranchStyle(item.preset.branchStyle ?? '');
+        setDefaultShape(item.preset.defaultShape ?? '');
+      }
     }
     structurePickerOpen = false;
   }
@@ -621,6 +629,16 @@
   }
   function setColoredBranches(v: boolean) {
     (sheet.settings ??= {}).coloredBranches = v;
+    markDirty();
+  }
+  function setBranchStyle(v: string) {
+    if (v === '') delete sheet.settings?.branchStyle;
+    else (sheet.settings ??= {}).branchStyle = v as 'curve' | 'straight' | 'elbow';
+    markDirty();
+  }
+  function setDefaultShape(v: string) {
+    if (v === '') delete sheet.settings?.defaultShape;
+    else (sheet.settings ??= {}).defaultShape = v as TopicShape;
     markDirty();
   }
   function setBranchColor(v: string) {
@@ -871,6 +889,27 @@
         >
           <option value="">Default</option>
           {#each LINE_WIDTHS as width (width)}<option value={width}>{width} px</option>{/each}
+        </select>
+      </label>
+      <label class="stack"
+        >Branch Style
+        <select
+          value={sheet.settings?.branchStyle ?? ''}
+          onchange={(e) => setBranchStyle(e.currentTarget.value)}
+        >
+          <option value="">Curved (default)</option>
+          <option value="straight">Straight</option>
+          <option value="elbow">Elbow</option>
+        </select>
+      </label>
+      <label class="stack"
+        >Default Topic Shape
+        <select
+          value={sheet.settings?.defaultShape ?? ''}
+          onchange={(e) => setDefaultShape(e.currentTarget.value)}
+        >
+          <option value="">Rounded (default)</option>
+          {#each SHAPES as s (s.id)}<option value={s.id}>{s.label}</option>{/each}
         </select>
       </label>
 

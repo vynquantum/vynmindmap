@@ -102,6 +102,23 @@ describe('layoutBalanced', () => {
     expect(kids[0]!.y + kids[0]!.h).toBeLessThanOrEqual(kids[1]!.y);
   });
 
+  it('honors the sheet branch style for mind-map edges', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    sheet.structure = 'map.balanced';
+    addChild(sheet.rootTopic, 'A');
+    addChild(sheet.rootTopic, 'B');
+
+    expect(layoutSheet(sheet).edges.every((e) => e.kind === 'bezier')).toBe(true);
+    sheet.settings = { branchStyle: 'straight' };
+    expect(layoutSheet(sheet).edges.every((e) => e.kind === 'straight')).toBe(true);
+    sheet.settings.branchStyle = 'elbow';
+    expect(layoutSheet(sheet).edges.every((e) => e.kind === 'elbow-h')).toBe(true);
+    // Non-map structures keep their own geometry regardless of branch style.
+    sheet.structure = 'logic.right';
+    expect(layoutSheet(sheet).edges.every((e) => e.kind === 'elbow-h')).toBe(true);
+  });
+
   it('lays out the grid structure as non-overlapping cards with separators', () => {
     const wb = createWorkbook('Root');
     const sheet = wb.sheets[0]!;

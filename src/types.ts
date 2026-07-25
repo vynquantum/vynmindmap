@@ -210,6 +210,10 @@ export interface SheetSettings {
   globalFont?: string;
   /** Node presentation, deliberately separate from chart structure. */
   mapPresentation?: MapPresentation;
+  /** Branch line geometry for mind-map structures ('curve' when unset). */
+  branchStyle?: 'curve' | 'straight' | 'elbow';
+  /** Default shape for topics without a topic-specific override. */
+  defaultShape?: TopicShape;
   [key: string]: unknown;
 }
 

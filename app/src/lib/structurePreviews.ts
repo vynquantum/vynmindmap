@@ -1,7 +1,7 @@
 /** Line-drawing thumbnails for the chart-type picker, one per structure.
  * SVG fragments render inside a `<g fill="none" stroke="currentColor">` on an
  * 84×54 viewBox; filled bars opt out of the inherited stroke explicitly. */
-import type { MapPresentation, StructureId } from '../../../src/index.js';
+import type { MapPresentation, SheetSettings, StructureId } from '../../../src/index.js';
 
 const bar = (x: number, y: number, w = 13) =>
   `<rect x="${x}" y="${y}" width="${w}" height="5" rx="2.5" fill="currentColor" opacity=".25" stroke="none"/>`;
@@ -13,6 +13,8 @@ export interface StructurePreview {
   label: string;
   svg: string;
   presentation?: MapPresentation;
+  /** Style bundle the card applies; unset fields reset to their defaults. */
+  preset?: Pick<SheetSettings, 'branchStyle' | 'defaultShape'>;
 }
 
 export interface StructureCategory {
@@ -27,6 +29,7 @@ export const STRUCTURE_CATEGORIES: StructureCategory[] = [
       {
         id: 'map.balanced',
         label: 'Mind map · balanced',
+        preset: {},
         svg:
           '<rect x="31" y="21" width="22" height="12" rx="3.5"/>' +
           '<path d="M53 27 C60 27 60 12 66 12"/><path d="M53 27h13"/><path d="M53 27 C60 27 60 42 66 42"/>' +
@@ -41,6 +44,7 @@ export const STRUCTURE_CATEGORIES: StructureCategory[] = [
       {
         id: 'map.right',
         label: 'Mind map · right',
+        preset: {},
         svg:
           '<rect x="6" y="21" width="22" height="12" rx="3.5"/>' +
           '<path d="M28 27 C42 27 42 8 56 8"/><path d="M28 27 C42 27 42 20 56 20"/>' +
@@ -53,6 +57,7 @@ export const STRUCTURE_CATEGORIES: StructureCategory[] = [
       {
         id: 'map.left',
         label: 'Mind map · left',
+        preset: {},
         svg:
           '<rect x="56" y="21" width="22" height="12" rx="3.5"/>' +
           '<path d="M56 27 C42 27 42 8 28 8"/><path d="M56 27 C42 27 42 20 28 20"/>' +
@@ -76,6 +81,54 @@ export const STRUCTURE_CATEGORIES: StructureCategory[] = [
           bar(56, 20, 16) +
           '<path d="M30 27 C42 27 42 44 52 44 H78"/>' +
           bar(56, 37, 16)
+      },
+      {
+        id: 'map.balanced',
+        key: 'map.capsule',
+        label: 'Mind map · capsule',
+        preset: { defaultShape: 'capsule' },
+        svg:
+          '<rect x="31" y="21" width="22" height="12" rx="6"/>' +
+          '<path d="M53 27 C60 27 60 12 66 12"/><path d="M53 27h13"/><path d="M53 27 C60 27 60 42 66 42"/>' +
+          '<rect x="66" y="8" width="14" height="8" rx="4"/>' +
+          '<rect x="66" y="23" width="14" height="8" rx="4"/>' +
+          '<rect x="66" y="38" width="14" height="8" rx="4"/>' +
+          '<path d="M31 27 C24 27 24 12 18 12"/><path d="M18 27h13"/><path d="M31 27 C24 27 24 42 18 42"/>' +
+          '<rect x="4" y="8" width="14" height="8" rx="4"/>' +
+          '<rect x="4" y="23" width="14" height="8" rx="4"/>' +
+          '<rect x="4" y="38" width="14" height="8" rx="4"/>'
+      },
+      {
+        id: 'map.balanced',
+        key: 'map.straight',
+        label: 'Mind map · straight lines',
+        preset: { branchStyle: 'straight' },
+        svg:
+          '<rect x="31" y="21" width="22" height="12" rx="3.5"/>' +
+          '<path d="M53 27 66 12"/><path d="M53 27h13"/><path d="M53 27 66 42"/>' +
+          bar(66, 9.5) +
+          bar(66, 24.5) +
+          bar(66, 39.5) +
+          '<path d="M31 27 18 12"/><path d="M18 27h13"/><path d="M31 27 18 42"/>' +
+          bar(5, 9.5) +
+          bar(5, 24.5) +
+          bar(5, 39.5)
+      },
+      {
+        id: 'map.balanced',
+        key: 'map.elbow',
+        label: 'Mind map · elbow',
+        preset: { branchStyle: 'elbow' },
+        svg:
+          '<rect x="31" y="21" width="22" height="12" rx="3.5"/>' +
+          '<path d="M53 27 H60 V12 H66"/><path d="M53 27h13"/><path d="M53 27 H60 V42 H66"/>' +
+          bar(66, 9.5) +
+          bar(66, 24.5) +
+          bar(66, 39.5) +
+          '<path d="M31 27 H24 V12 H18"/><path d="M18 27h13"/><path d="M31 27 H24 V42 H18"/>' +
+          bar(5, 9.5) +
+          bar(5, 24.5) +
+          bar(5, 39.5)
       }
     ]
   },

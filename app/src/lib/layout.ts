@@ -751,6 +751,14 @@ function grid(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
   return { nodes, gridLines: lines };
 }
 
+/** Edge geometry for mind-map structures, from the sheet's branch style. */
+function mapBranchKind(sheet: Sheet): LaidOutEdge['kind'] {
+  const style = sheet.settings?.branchStyle;
+  if (style === 'straight') return 'straight';
+  if (style === 'elbow') return 'elbow-h';
+  return 'bezier';
+}
+
 export function layoutSheet(sheet: Sheet): Layout {
   const s: StructureId = sheet.structure;
   let nodes: LaidOutNode[];
@@ -783,10 +791,11 @@ export function layoutSheet(sheet: Sheet): Layout {
     kind = 'underline';
     nodes = horizontal(sheet, 'right');
   } else if (s === 'map.balanced') {
+    kind = mapBranchKind(sheet);
     nodes = horizontal(sheet, 'balanced');
   } else {
     const left = s.endsWith('.left');
-    kind = s.startsWith('map.') ? 'bezier' : 'elbow-h';
+    kind = s.startsWith('map.') ? mapBranchKind(sheet) : 'elbow-h';
     nodes = horizontal(sheet, left ? 'left' : 'right');
   }
 
