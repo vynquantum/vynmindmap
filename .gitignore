@@ -7,3 +7,7 @@ dist-app/
 # Rust / Tauri build output
 src-tauri/target/
 src-tauri/gen/
+
+# Graphify
+graphify-out/
+.graphify/
