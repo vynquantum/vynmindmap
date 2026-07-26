@@ -6,6 +6,7 @@
 </script>
 
 <script lang="ts">
+  import { untrack } from 'svelte';
   import type { Sheet, Topic } from '../../../src/index.js';
   import {
     addChild,
@@ -237,6 +238,24 @@
   function fitView() {
     if (viewW > 0) fit(viewW, viewH);
   }
+
+  // The layout re-normalizes whenever the bounding box changes — a branch is
+  // detached, a topic grows — and that slides every node on screen. Absorb the
+  // new shift into the pan so the map stays put and only what really moved
+  // moves. Without this a detached branch lands a whole shift away from the
+  // cursor and looks like it vanished. `fit()` runs in a later frame, so a
+  // sheet switch still overrides this.
+  let lastShift: { x: number; y: number } | null = null;
+  $effect(() => {
+    const shift = { x: layout.shiftX, y: layout.shiftY };
+    const prev = lastShift;
+    lastShift = shift;
+    if (!prev || (prev.x === shift.x && prev.y === shift.y)) return;
+    untrack(() => {
+      tx -= (shift.x - prev.x) * scale;
+      ty -= (shift.y - prev.y) * scale;
+    });
+  });
 
   function onWheel(e: WheelEvent) {
     e.preventDefault();
