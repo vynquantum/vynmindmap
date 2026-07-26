@@ -128,6 +128,40 @@ function applySettings(sheet: Sheet): void {
   }
 }
 
+/**
+ * Honor explicit positions on attached topics ('Free Branch Position'). The
+ * whole subtree moves with the topic, so a repositioned branch keeps its shape
+ * and only its anchor changes; connectors are built from node coordinates, so
+ * they follow on their own.
+ *
+ * Parents are visited before their children, so a child's own position is
+ * applied on top of wherever its parent just moved it.
+ */
+function applyFreePositions(sheet: Sheet, nodes: LaidOutNode[]): void {
+  if (sheet.settings?.freeBranchPosition !== true) return;
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  for (const t of everyTopic(sheet)) {
+    const n = byId.get(t.id);
+    // The root anchors the map and floating topics already place themselves.
+    if (!t.position || !n || n.floating || t === sheet.rootTopic) continue;
+    const dx = t.position.x - n.x;
+    const dy = t.position.y - n.y;
+    if (dx === 0 && dy === 0) continue;
+    for (const d of subtreeOf(t)) {
+      const dn = byId.get(d.id);
+      if (!dn) continue;
+      dn.x += dx;
+      dn.y += dy;
+    }
+  }
+}
+
+/** A topic and every visible descendant, the topic first. */
+function* subtreeOf(t: Topic): Generator<Topic> {
+  yield t;
+  for (const c of visibleChildren(t)) yield* subtreeOf(c);
+}
+
 /** Every topic the sheet can place, root subtree plus floating subtrees. */
 function* everyTopic(sheet: Sheet): Generator<Topic> {
   const stack: Topic[] = [sheet.rootTopic, ...(sheet.floatingTopics ?? [])];
@@ -893,6 +927,10 @@ export function layoutSheet(sheet: Sheet): Layout {
   );
 
   nodes.push(...floating);
+
+  // Before the decorations are measured, so a boundary still wraps the branch
+  // it encloses after the branch has been moved.
+  applyFreePositions(sheet, nodes);
 
   // Boundaries and summaries are read off the placed nodes, so they work for
   // every chart type — no structure may silently drop them either.

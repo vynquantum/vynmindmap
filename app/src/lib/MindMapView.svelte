@@ -413,14 +413,25 @@
             lastPoint.y > node.y + node.h + 24
           : false;
         if (hasParent && farEnough && node) {
-          try {
-            detachTopic(sheet, dragId, {
-              x: lastPoint.x - layout.shiftX - node.w / 2,
-              y: lastPoint.y - layout.shiftY - node.h / 2
-            });
-            notify();
-          } catch {
-            /* central root — ignore */
+          const at = {
+            x: lastPoint.x - layout.shiftX - node.w / 2,
+            y: lastPoint.y - layout.shiftY - node.h / 2
+          };
+          if (sheet.settings?.freeBranchPosition) {
+            // Same gesture, non-destructive: the branch keeps its parent and
+            // its connector, and only its anchor moves.
+            const found = findWithParent(sheet, dragId);
+            if (found) {
+              found.topic.position = at;
+              notify();
+            }
+          } else {
+            try {
+              detachTopic(sheet, dragId, at);
+              notify();
+            } catch {
+              /* central root — ignore */
+            }
           }
         }
         dragId = null;

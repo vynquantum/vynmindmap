@@ -370,6 +370,39 @@ describe('map display settings', () => {
   });
 });
 
+describe('free branch position', () => {
+  it('moves the whole subtree to the anchor and leaves the connector attached', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    const branch = addChild(sheet.rootTopic, 'Branch');
+    const leaf = addChild(branch, 'Leaf');
+    const auto = layoutSheet(sheet);
+    const gap = {
+      x:
+        auto.nodes.find((n) => n.id === leaf.id)!.x - auto.nodes.find((n) => n.id === branch.id)!.x,
+      y: auto.nodes.find((n) => n.id === leaf.id)!.y - auto.nodes.find((n) => n.id === branch.id)!.y
+    };
+
+    branch.position = { x: 400, y: -300 };
+    // Ignored until the option is on, so a stale position can't move a branch.
+    const off = layoutSheet(sheet);
+    expect(off.nodes.find((n) => n.id === branch.id)!.x).toBe(
+      auto.nodes.find((n) => n.id === branch.id)!.x
+    );
+
+    sheet.settings = { freeBranchPosition: true };
+    const on = layoutSheet(sheet);
+    const movedBranch = on.nodes.find((n) => n.id === branch.id)!;
+    const movedLeaf = on.nodes.find((n) => n.id === leaf.id)!;
+    // Normalization shifts the whole map, so check the branch's own shape held.
+    expect(movedLeaf.x - movedBranch.x).toBeCloseTo(gap.x);
+    expect(movedLeaf.y - movedBranch.y).toBeCloseTo(gap.y);
+    // Still a child, so the parent-child connector is still drawn.
+    expect(on.edges.some((e) => e.id.includes(branch.id))).toBe(true);
+    expect(movedBranch.floating).toBeFalsy();
+  });
+});
+
 describe('boxed first level', () => {
   it('only applies on top of the text-on-lines treatment', () => {
     const wb = createWorkbook('Root');

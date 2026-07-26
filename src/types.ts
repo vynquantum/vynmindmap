@@ -223,6 +223,9 @@ export interface SheetSettings {
   autoColorFloating?: boolean;
   /** Draw relationship lines in their source topic's color. */
   relationLineFollowTopic?: boolean;
+  /** Let an attached branch keep an explicit canvas position: dragging one to
+   * empty space moves it there instead of detaching it from its parent. */
+  freeBranchPosition?: boolean;
   /** Branch line geometry for connector-based structures; each structure
    * family keeps its own default when unset. Vertical charts (org, vertical
    * timeline) support 'straight' and otherwise stay elbowed. */

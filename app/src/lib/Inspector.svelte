@@ -1012,6 +1012,16 @@
       {@render toggleRow('Line Colour Follow Topic', flag('relationLineFollowTopic'), (v) =>
         setFlag('relationLineFollowTopic', v)
       )}
+
+      <div class="map-divider"></div>
+      <div class="groupname strong">Advanced</div>
+      {@render toggleRow('Free Branch Position', flag('freeBranchPosition'), (v) =>
+        setFlag('freeBranchPosition', v)
+      )}
+      <p class="hint">
+        Dragging a branch to empty space moves it there and keeps its connector, instead of
+        detaching it into a floating topic.
+      </p>
     </div>
   {:else if activeTab === 'pitch'}
     <div class="tabbody">
