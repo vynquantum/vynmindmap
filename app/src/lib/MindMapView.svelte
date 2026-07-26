@@ -38,7 +38,8 @@
     clampTopicWidth,
     NOTE_LINE_H,
     type Layout,
-    type LaidOutNode
+    type LaidOutNode,
+    type Rect
   } from './layout.js';
   import { isBoxedLevelOne, isTextOnLines } from './mapAppearance.js';
 
@@ -179,6 +180,32 @@
       if (cx >= n.x && cx <= n.x + n.w && cy >= n.y && cy <= n.y + n.h) return n;
     }
     return undefined;
+  }
+
+  /**
+   * The node a dragged box has landed on when the pointer itself misses
+   * everything. Since the drag preview follows the pointer, people aim the box,
+   * not the cursor — and a wide topic held near one end covers a small parent
+   * long before the cursor reaches it.
+   *
+   * Only a box covering most of a node counts, so a topic dragged clear of the
+   * map still detaches instead of grabbing a neighbour it merely grazed.
+   */
+  function nodeUnderBox(box: Rect, exceptId: string): LaidOutNode | undefined {
+    let best: LaidOutNode | undefined;
+    let bestFrac = 0.5;
+    for (const n of layout.nodes) {
+      if (n.id === exceptId) continue;
+      const w = Math.min(box.x + box.w, n.x + n.w) - Math.max(box.x, n.x);
+      const h = Math.min(box.y + box.h, n.y + n.h) - Math.max(box.y, n.y);
+      if (w <= 0 || h <= 0) continue;
+      const frac = (w * h) / (n.w * n.h);
+      if (frac > bestFrac) {
+        bestFrac = frac;
+        best = n;
+      }
+    }
+    return best;
   }
 
   function isDescendant(rootId: string, candidateId: string): boolean {
@@ -380,10 +407,16 @@
     if (dragId) {
       const p = canvasPoint(e, e.currentTarget as HTMLElement);
       lastPoint = p;
-      const over = nodeAt(p.x, p.y);
+      const d = nodeById.get(dragId);
+      const box = d ? { x: p.x - grab.x, y: p.y - grab.y, w: d.w, h: d.h } : null;
+      const hit = nodeAt(p.x, p.y);
+      const over = hit ?? (box ? nodeUnderBox(box, dragId) : undefined);
       if (over && over.id !== dragId && !isDescendant(dragId, over.id)) {
         dragOverId = over.id;
-        const rel = (p.y - over.y) / over.h;
+        // Whichever found the target decides where "into" is: the pointer when
+        // it is on the node, otherwise the middle of the box covering it.
+        const y = hit ? p.y : box!.y + box!.h / 2;
+        const rel = (y - over.y) / over.h;
         const hasParent = !!findWithParent(sheet, over.id)?.parent;
         dropMode = !hasParent ? 'child' : rel < 0.3 ? 'before' : rel > 0.7 ? 'after' : 'child';
       } else {
