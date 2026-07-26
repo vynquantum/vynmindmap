@@ -4,10 +4,26 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { addChild, createWorkbook, readVmm } from '../src/index.js';
+import type { Topic } from '../src/index.js';
 import { layoutBalanced, layoutSheet, edgePath, sizeOf } from '../app/src/lib/layout.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const examples = join(here, '..', 'examples');
+
+/** One chart type per layout family, so a family that draws its own geometry
+ * can't quietly stop honoring the structure-independent extras. */
+const EVERY_FAMILY = [
+  'map.balanced',
+  'logic.right',
+  'org.down',
+  'tree.right',
+  'timeline.h',
+  'fishbone.right',
+  'matrix',
+  'tree-table',
+  'grid',
+  'brace.right'
+] as const;
 
 describe('layoutBalanced', () => {
   it('produces a node per visible topic and an edge per parent-child link', () => {
@@ -222,6 +238,56 @@ describe('layoutBalanced', () => {
     expect(layout.nodes.find((n) => n.depth === 0)!.color).toBe('#075985');
     expect(layout.edges.every((e) => e.color === '#123456' && e.width === 4)).toBe(true);
     expect(layout.edges.some((e) => e.id.endsWith('-line'))).toBe(true);
+  });
+
+  it('draws boundaries and summaries in every chart type, not just the tree-like ones', () => {
+    for (const structure of EVERY_FAMILY) {
+      const wb = createWorkbook('Root');
+      const sheet = wb.sheets[0]!;
+      sheet.structure = structure;
+      const a = addChild(sheet.rootTopic, 'A');
+      const b = addChild(sheet.rootTopic, 'B');
+      const parentId = sheet.rootTopic.id;
+      sheet.boundaries = [{ id: 'bd', parentId, childIds: [a.id, b.id], title: 'Scope' }];
+      sheet.summaries = [
+        {
+          id: 'sm',
+          parentId,
+          childIds: [a.id, b.id],
+          summaryTopic: { id: 'sum', title: 'Total', children: [] }
+        }
+      ];
+
+      const layout = layoutSheet(sheet);
+      expect(layout.boundaries, structure).toHaveLength(1);
+      expect(layout.summaries, structure).toHaveLength(1);
+      expect(
+        layout.nodes.map((n) => n.id),
+        structure
+      ).toContain('sum');
+    }
+  });
+
+  it('places floating topics in every chart type, not just the tree-like ones', () => {
+    for (const structure of EVERY_FAMILY) {
+      const wb = createWorkbook('Root');
+      const sheet = wb.sheets[0]!;
+      sheet.structure = structure;
+      addChild(sheet.rootTopic, 'Branch');
+      const note = { id: 'float-1', title: 'Parking lot', children: [] as Topic[] };
+      note.children.push({ id: 'float-2', title: 'Later idea', children: [] });
+      sheet.floatingTopics = [note];
+
+      const layout = layoutSheet(sheet);
+      const ids = layout.nodes.map((n) => n.id);
+      expect(ids, structure).toContain('float-1');
+      expect(ids, structure).toContain('float-2');
+      // The floating subtree brings its own connector whatever the chart draws.
+      expect(
+        layout.edges.some((e) => e.id.includes('float-1') && e.id.includes('float-2')),
+        structure
+      ).toBe(true);
+    }
   });
 
   it('lays out the rich example without errors', () => {

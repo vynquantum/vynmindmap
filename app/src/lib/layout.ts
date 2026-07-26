@@ -584,23 +584,27 @@ function fishbone(
       kind: 'straight',
       width: 2
     });
+    // Sub-bones stack outward from the bone. Each connector starts at the
+    // previous box's outer edge, so none of them crosses a box it doesn't touch.
+    let edgeX = cxB;
     let edgeY = cyB + (above ? -bs.h / 2 : bs.h / 2);
     for (const c of visibleChildren(b)) {
       const cs = sizeOf(c);
       const cyC = above ? edgeY - 12 - cs.h / 2 : edgeY + 12 + cs.h / 2;
-      edgeY = above ? cyC - cs.h / 2 : cyC + cs.h / 2;
       const cxC = cxB - sgn * 26;
       nodes.push(mkNode(c, cxC - cs.w / 2, cyC - cs.h / 2, cs, 2, 'right', color));
       edges.push({
         id: `fb-${c.id}`,
-        x1: cxB,
-        y1: cyB,
+        x1: edgeX,
+        y1: edgeY,
         x2: cxC,
-        y2: cyC,
+        y2: above ? cyC + cs.h / 2 : cyC - cs.h / 2,
         color,
         kind: 'straight',
         width: 1.5
       });
+      edgeX = cxC;
+      edgeY = above ? cyC - cs.h / 2 : cyC + cs.h / 2;
     }
   });
   return { nodes, edges };
@@ -613,16 +617,22 @@ function matrix(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
   const root = sheet.rootTopic;
   const cols = visibleChildren(root);
   const gap = 12;
+  const indent = 20;
   const rootS = sizeOf(root);
   nodes.push(mkNode(root, 0, 0, rootS, 0, 'down', rootColorForSheet(sheet)));
   const headerY = rootS.h + 20;
 
-  // Measure every cell first so each row can size to its tallest member.
-  const colData = cols.map((c) => ({
-    topic: c,
-    header: sizeOf(c),
-    cells: visibleChildren(c).map((g) => ({ topic: g, size: sizeOf(g) }))
-  }));
+  // Measure every cell first so each row can size to its tallest member. A
+  // column lists its whole subtree, indented, so no topic is dropped for depth.
+  const colData = cols.map((c) => {
+    const cells: { topic: Topic; size: ReturnType<typeof sizeOf>; depth: number }[] = [];
+    const walk = (t: Topic, depth: number) => {
+      cells.push({ topic: t, size: sizeOf(t), depth });
+      for (const g of visibleChildren(t)) walk(g, depth + 1);
+    };
+    for (const g of visibleChildren(c)) walk(g, 0);
+    return { topic: c, header: sizeOf(c), cells };
+  });
   const maxRows = Math.max(0, ...colData.map((c) => c.cells.length));
   const headerH = Math.max(NODE_H, ...colData.map((c) => c.header.h));
   const rowHs: number[] = [];
@@ -633,11 +643,12 @@ function matrix(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
 
   let x = 0;
   colData.forEach((c, j) => {
-    const cw = Math.max(c.header.w, ...c.cells.map((g) => g.size.w), 90);
+    const cw = Math.max(c.header.w, ...c.cells.map((g) => g.size.w + g.depth * indent), 90);
     const color = colorFor(j, paletteForSheet(sheet));
     nodes.push(mkNode(c.topic, x, headerY, { ...c.header, w: cw }, 1, 'down', color));
     c.cells.forEach((g, r) => {
-      nodes.push(mkNode(g.topic, x, rowY(r), { ...g.size, w: cw }, 2, 'down', color));
+      const off = g.depth * indent;
+      nodes.push(mkNode(g.topic, x + off, rowY(r), { ...g.size, w: cw - off }, 2, 'down', color));
     });
     if (j > 0) lines.push({ x1: x - gap / 2, y1: headerY - 6, x2: x - gap / 2, y2: rowY(maxRows) });
     x += cw + gap;
@@ -800,23 +811,15 @@ export function layoutSheet(sheet: Sheet): Layout {
     nodes = horizontal(sheet, left ? 'left' : 'right');
   }
 
-  if (!treeLike) {
-    return normalize({
-      nodes,
-      edges,
-      boundaries: [],
-      summaries: [],
-      braces,
-      gridLines,
-      width: 0,
-      height: 0,
-      shiftX: 0,
-      shiftY: 0
-    });
-  }
+  // Floating topics carry their own canvas position and their own subtree, so
+  // they belong on every chart type — no structure may silently drop them.
+  const floating: LaidOutNode[] = [];
+  (sheet.floatingTopics ?? []).forEach((f, i) => placeFloating(f, i, floating));
 
-  // Tree-like extras: floating topics, boundaries, summaries.
-  (sheet.floatingTopics ?? []).forEach((f, i) => placeFloating(f, i, nodes));
+  nodes.push(...floating);
+
+  // Boundaries and summaries are read off the placed nodes, so they work for
+  // every chart type — no structure may silently drop them either.
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
 
@@ -868,7 +871,11 @@ export function layoutSheet(sheet: Sheet): Layout {
     nodes.push(mkNode(sm.summaryTopic, nodeX, midY - ss.h / 2, ss, 2, side, SUMMARY_COLOR));
   }
 
-  edges = buildEdges(sheet, nodes, kind);
+  edges = treeLike
+    ? buildEdges(sheet, nodes, kind)
+    : // These structures draw their own edges, so the floating subtrees — the
+      // only topics they didn't place themselves — bring only their own.
+      [...edges, ...buildEdges(sheet, floating, styleKind(sheet, 'bezier'))];
   return normalize({
     nodes,
     edges,

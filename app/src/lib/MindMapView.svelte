@@ -1412,10 +1412,11 @@
     return n.depth === 0 && !n.topic.style?.fillColor ? 0 : (n.topic.style?.borderWidth ?? 1.5);
   }
   function textFill(n: LaidOutNode): string {
-    if (isTextOnLines(sheet)) return n.topic.style?.font?.color ?? '#171750';
-    return (
-      n.topic.style?.font?.color ?? (n.depth === 0 || isDark(nodeFill(n)) ? '#ffffff' : '#1c2230')
-    );
+    // Contrast follows the fill actually painted. A transparent topic (text on
+    // lines, or shape 'none') sits on the canvas, not on its branch color, so
+    // the root is not a special case — its usual dark fill is what earns the
+    // light text.
+    return n.topic.style?.font?.color ?? (isDark(nodeFill(n)) ? '#ffffff' : '#1c2230');
   }
   function isDark(hex: string): boolean {
     const m = /^#?([0-9a-f]{6})$/i.exec(hex);
