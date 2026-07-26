@@ -11,3 +11,6 @@ src-tauri/gen/
 # Graphify
 graphify-out/
 .graphify/
+
+# Personal scratch maps (examples/ are the tracked fixtures)
+/*.vmm
