@@ -152,7 +152,8 @@ export function markdownToSheet(md: string): Sheet {
         }
       }
       parent = parent ?? root!;
-      (parent.children ??= []).push(topic);
+      parent.children ??= [];
+      parent.children.push(topic);
       headingStack.length = level + 1;
       headingStack[level] = topic;
       currentHeading = topic;
@@ -171,7 +172,8 @@ export function markdownToSheet(md: string): Sheet {
 
       const parent =
         depth === 0 ? (currentHeading ?? root!) : (listStack[depth - 1] ?? currentHeading ?? root!);
-      (parent.children ??= []).push(topic);
+      parent.children ??= [];
+      parent.children.push(topic);
       listStack.length = depth + 1;
       listStack[depth] = topic;
       continue;

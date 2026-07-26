@@ -363,7 +363,8 @@
     if (resizing) {
       const t = findTopic(sheet, resizing.id);
       if (t) {
-        (t.style ??= {}).width = clampTopicWidth(resizing.w + (e.clientX - resizing.sx) / scale);
+        t.style ??= {};
+        t.style.width = clampTopicWidth(resizing.w + (e.clientX - resizing.sx) / scale);
         t.style.minHeight = clampTopicMinHeight(resizing.h + (e.clientY - resizing.sy) / scale);
       }
       return;
@@ -749,7 +750,8 @@
       for (const t of clipboard) {
         const clone = cloneTopicWithNewIds(t);
         delete clone.position;
-        (parent.children ??= []).push(clone);
+        parent.children ??= [];
+        parent.children.push(clone);
         lastId = clone.id;
       }
     } else {
@@ -760,7 +762,8 @@
       clipboard.forEach((t, i) => {
         const clone = cloneTopicWithNewIds(t);
         clone.position = { x: at.x + i * 24, y: at.y + i * 24 };
-        (sheet.floatingTopics ??= []).push(clone);
+        sheet.floatingTopics ??= [];
+        sheet.floatingTopics.push(clone);
         lastId = clone.id;
       });
     }
@@ -788,7 +791,8 @@
           x: (fp.topic.position?.x ?? 0) + 24,
           y: (fp.topic.position?.y ?? 0) + 24
         };
-        (sheet.floatingTopics ??= []).push(clone);
+        sheet.floatingTopics ??= [];
+        sheet.floatingTopics.push(clone);
       } else {
         continue; // the central root can't be duplicated in place
       }

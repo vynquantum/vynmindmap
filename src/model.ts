@@ -109,11 +109,18 @@ function searchParent(node: Topic, id: string): { topic: Topic; parent: Topic } 
 
 // ---------------------------------------------------------------------------
 // Topic mutations
+//
+// Create a missing container and read it back in two statements, never
+// `(obj.list ??= []).push(x)`. An assignment expression evaluates to the raw
+// value assigned, but the app's sheets are Svelte $state proxies that hold
+// their own tracked container — so the push would land outside it and the
+// change would silently vanish.
 // ---------------------------------------------------------------------------
 
 export function addChild(parent: Topic, title: string, partial: Partial<Topic> = {}): Topic {
   const child = createTopic(title, partial);
-  (parent.children ??= []).push(child);
+  parent.children ??= [];
+  parent.children.push(child);
   return child;
 }
 
@@ -125,7 +132,8 @@ export function addFloatingTopic(
   partial: Partial<Topic> = {}
 ): Topic {
   const topic = createTopic(title, { position, ...partial });
-  (sheet.floatingTopics ??= []).push(topic);
+  sheet.floatingTopics ??= [];
+  sheet.floatingTopics.push(topic);
   return topic;
 }
 
@@ -205,7 +213,8 @@ export function moveTopic(sheet: Sheet, id: string, newParentId: string, index?:
     floats.splice(floatIdx, 1);
     delete node.topic.position; // attached topics are laid out automatically
   }
-  const siblings = (target.children ??= []);
+  target.children ??= [];
+  const siblings = target.children;
   const at = index === undefined ? siblings.length : Math.max(0, Math.min(index, siblings.length));
   siblings.splice(at, 0, node.topic);
 }
@@ -221,7 +230,8 @@ export function detachTopic(sheet: Sheet, id: string, position: { x: number; y: 
   if (!node.parent) throw new ModelError('Topic is already a root/floating topic.');
   removeChildRef(node.parent, id);
   node.topic.position = { ...position };
-  (sheet.floatingTopics ??= []).push(node.topic);
+  sheet.floatingTopics ??= [];
+  sheet.floatingTopics.push(node.topic);
   // Boundaries/summaries listing this topic as a direct child are no longer
   // valid (it left that sibling range), even though the id still resolves.
   if (sheet.boundaries) sheet.boundaries = sheet.boundaries.filter((b) => !b.childIds.includes(id));
@@ -265,7 +275,8 @@ export function addRelationship(
     throw new ModelError('Relationship endpoints must both exist in the sheet.');
   }
   const rel: Relationship = { id: newId('r'), end1Id, end2Id, title };
-  (sheet.relationships ??= []).push(rel);
+  sheet.relationships ??= [];
+  sheet.relationships.push(rel);
   return rel;
 }
 
@@ -277,7 +288,8 @@ export function addBoundary(
 ): Boundary {
   validateContiguousChildren(sheet, parentId, childIds, 'boundary');
   const boundary: Boundary = { id: newId('b'), parentId, childIds, title };
-  (sheet.boundaries ??= []).push(boundary);
+  sheet.boundaries ??= [];
+  sheet.boundaries.push(boundary);
   return boundary;
 }
 
@@ -294,7 +306,8 @@ export function addSummary(
     childIds,
     summaryTopic: createTopic(summaryTitle)
   };
-  (sheet.summaries ??= []).push(summary);
+  sheet.summaries ??= [];
+  sheet.summaries.push(summary);
   return summary;
 }
 

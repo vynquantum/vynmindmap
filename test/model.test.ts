@@ -201,6 +201,28 @@ describe('detach & reattach', () => {
     expect(detached.children!.map((c) => c.title)).toEqual(['A1', 'A2']);
   });
 
+  it('detaches into a sheet that has no floatingTopics array yet', () => {
+    // Stands in for a Svelte $state sheet: what the object ends up holding is
+    // not the value the assignment expression handed back. So
+    // `(sheet.floatingTopics ??= []).push(t)` pushes into a stray array and the
+    // topic is lost — removed from its parent and filed nowhere. (Svelte gets
+    // there by keeping its own tracked container rather than by copying, but
+    // the effect on a write that bypasses it is the same.)
+    const wrap = <T extends object>(o: T): T =>
+      new Proxy(o, {
+        set(t, k, v) {
+          Reflect.set(t, k, Array.isArray(v) ? wrap([...v]) : v);
+          return true;
+        }
+      });
+    const { sheet } = fixture();
+    delete sheet.floatingTopics;
+    const proxied = wrap(sheet);
+    const a = proxied.rootTopic.children![0]!;
+    detachTopic(proxied, a.id, { x: 10, y: 20 });
+    expect(proxied.floatingTopics?.map((t) => t.id)).toEqual([a.id]);
+  });
+
   it('refuses to detach the central root or a floating topic', () => {
     const { sheet } = fixture();
     expect(() => detachTopic(sheet, sheet.rootTopic.id, { x: 0, y: 0 })).toThrow(ModelError);

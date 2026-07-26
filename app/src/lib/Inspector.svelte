@@ -484,18 +484,34 @@
       markDirty();
     }
   }
+  // Create-then-read: `(topic.style ??= {}).x = v` assigns into the raw literal,
+  // but the sheet is a Svelte $state proxy that stores a wrapped copy, so the
+  // write would land in a stray object and the first edit would do nothing.
+  function styleOf(t: Topic): NonNullable<Topic['style']> {
+    t.style ??= {};
+    return t.style;
+  }
+  function fontOf(t: Topic): NonNullable<NonNullable<Topic['style']>['font']> {
+    const s = styleOf(t);
+    s.font ??= {};
+    return s.font;
+  }
+  function settingsOf(): NonNullable<Sheet['settings']> {
+    sheet.settings ??= {};
+    return sheet.settings;
+  }
   function setNodeWidth(v: string) {
     if (!topic) return;
     const n = Number(v);
     if (v === '' || !Number.isFinite(n)) delete topic.style?.width;
-    else (topic.style ??= {}).width = clampTopicWidth(n);
+    else styleOf(topic).width = clampTopicWidth(n);
     markDirty();
   }
   function setNodeMinHeight(v: string) {
     if (!topic) return;
     const n = Number(v);
     if (v === '' || !Number.isFinite(n)) delete topic.style?.minHeight;
-    else (topic.style ??= {}).minHeight = clampTopicMinHeight(n);
+    else styleOf(topic).minHeight = clampTopicMinHeight(n);
     markDirty();
   }
   function resetNodeSize() {
@@ -506,13 +522,13 @@
   }
   function setShape(v: TopicShape) {
     if (topic) {
-      (topic.style ??= {}).shape = v;
+      styleOf(topic).shape = v;
       markDirty();
     }
   }
   function setFill(v: string) {
     if (topic) {
-      (topic.style ??= {}).fillColor = v;
+      styleOf(topic).fillColor = v;
       markDirty();
     }
   }
@@ -524,7 +540,7 @@
   }
   function setBorder(v: string) {
     if (topic) {
-      (topic.style ??= {}).borderColor = v;
+      styleOf(topic).borderColor = v;
       markDirty();
     }
   }
@@ -536,13 +552,13 @@
   }
   function setBorderWidth(v: number) {
     if (topic) {
-      (topic.style ??= {}).borderWidth = v;
+      styleOf(topic).borderWidth = v;
       markDirty();
     }
   }
   function setLineColor(v: string) {
     if (topic) {
-      (topic.style ??= {}).lineColor = v;
+      styleOf(topic).lineColor = v;
       markDirty();
     }
   }
@@ -554,13 +570,13 @@
   }
   function setLineWidth(v: number) {
     if (topic) {
-      (topic.style ??= {}).lineWidth = v;
+      styleOf(topic).lineWidth = v;
       markDirty();
     }
   }
   function setFontColor(v: string) {
     if (topic) {
-      ((topic.style ??= {}).font ??= {}).color = v;
+      fontOf(topic).color = v;
       markDirty();
     }
   }
@@ -583,31 +599,31 @@
   }
   function toggleBold() {
     if (!topic) return;
-    const font = ((topic.style ??= {}).font ??= {});
+    const font = fontOf(topic);
     font.weight = font.weight === 'bold' ? 'normal' : 'bold';
     markDirty();
   }
   function toggleItalic() {
     if (!topic) return;
-    const font = ((topic.style ??= {}).font ??= {});
+    const font = fontOf(topic);
     font.style = font.style === 'italic' ? 'normal' : 'italic';
     markDirty();
   }
   function setDecoration(d: 'none' | 'underline' | 'line-through') {
     if (!topic) return;
-    const font = ((topic.style ??= {}).font ??= {});
+    const font = fontOf(topic);
     font.decoration = font.decoration === d ? 'none' : d;
     markDirty();
   }
   function setFontFamily(v: string) {
     if (topic) {
-      ((topic.style ??= {}).font ??= {}).family = v || undefined;
+      fontOf(topic).family = v || undefined;
       markDirty();
     }
   }
   function setFontSize(v: number) {
     if (topic) {
-      ((topic.style ??= {}).font ??= {}).size = v;
+      fontOf(topic).size = v;
       markDirty();
     }
   }
@@ -626,46 +642,46 @@
     markDirty();
   }
   function setGlobalFont(v: string) {
-    (sheet.settings ??= {}).globalFont = v || undefined;
+    settingsOf().globalFont = v || undefined;
     markDirty();
   }
   function setBranchLineWidth(v: string) {
     if (v === '') delete sheet.settings?.branchLineWidth;
-    else (sheet.settings ??= {}).branchLineWidth = Number(v);
+    else settingsOf().branchLineWidth = Number(v);
     markDirty();
   }
   function setColoredBranches(v: boolean) {
-    (sheet.settings ??= {}).coloredBranches = v;
+    settingsOf().coloredBranches = v;
     markDirty();
   }
   function setBranchStyle(v: string) {
     if (v === '') delete sheet.settings?.branchStyle;
-    else (sheet.settings ??= {}).branchStyle = v as 'curve' | 'straight' | 'elbow';
+    else settingsOf().branchStyle = v as 'curve' | 'straight' | 'elbow';
     markDirty();
   }
   function setDefaultShape(v: string) {
     if (v === '') delete sheet.settings?.defaultShape;
-    else (sheet.settings ??= {}).defaultShape = v as TopicShape;
+    else settingsOf().defaultShape = v as TopicShape;
     markDirty();
   }
   function setBranchColor(v: string) {
-    (sheet.settings ??= {}).branchColor = v;
+    settingsOf().branchColor = v;
     markDirty();
   }
   function setBoxedLevelOne(v: boolean) {
-    (sheet.settings ??= {}).boxedLevelOne = v;
+    settingsOf().boxedLevelOne = v;
     markDirty();
   }
   /** Plain on/off sheet settings that need no migration or side effect. */
   function setFlag(key: keyof SheetSettings, v: boolean) {
-    (sheet.settings ??= {})[key] = v;
+    settingsOf()[key] = v;
     markDirty();
   }
   function flag(key: keyof SheetSettings): boolean {
     return sheet.settings?.[key] === true;
   }
   function setMapPresentation(v: MapPresentation) {
-    (sheet.settings ??= {}).mapPresentation = v;
+    settingsOf().mapPresentation = v;
     // Turning the treatment off needs a migration for legacy documents: in
     // map.underline the geometry itself is the treatment.
     if (v === 'boxed' && sheet.structure === 'map.underline') {
@@ -679,7 +695,8 @@
   }
   function toggleMarker(id: string) {
     if (!topic) return;
-    const arr = (topic.markers ??= []);
+    topic.markers ??= [];
+    const arr = topic.markers;
     const i = arr.indexOf(id);
     if (i >= 0) arr.splice(i, 1);
     else arr.push(id);
