@@ -74,6 +74,13 @@ export function isTextOnLines(sheet: Sheet): boolean {
   return sheet.settings?.mapPresentation === 'underline' && supportsTextOnLines(sheet.structure);
 }
 
+/** Opt-in exception to text-on-lines: the root and its immediate branches keep
+ * a filled box. Only meaningful while the treatment is on, since every topic is
+ * already boxed otherwise. */
+export function isBoxedLevelOne(sheet: Sheet): boolean {
+  return sheet.settings?.boxedLevelOne === true && isTextOnLines(sheet);
+}
+
 export function paletteForSheet(sheet: Sheet): readonly string[] {
   const theme = colorThemeFor(sheet);
   if (sheet.settings?.coloredBranches === false) {

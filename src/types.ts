@@ -210,6 +210,9 @@ export interface SheetSettings {
   globalFont?: string;
   /** Node presentation, deliberately separate from chart structure. */
   mapPresentation?: MapPresentation;
+  /** With 'underline' presentation, keep a filled color box on the root and the
+   * branches directly under it instead of stripping every topic to bare text. */
+  boxedLevelOne?: boolean;
   /** Branch line geometry for connector-based structures; each structure
    * family keeps its own default when unset. Vertical charts (org, vertical
    * timeline) support 'straight' and otherwise stay elbowed. */

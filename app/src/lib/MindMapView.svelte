@@ -36,7 +36,7 @@
     type Layout,
     type LaidOutNode
   } from './layout.js';
-  import { isTextOnLines } from './mapAppearance.js';
+  import { isBoxedLevelOne, isTextOnLines } from './mapAppearance.js';
 
   let {
     sheet,
@@ -1385,18 +1385,26 @@
     return { w, h };
   }
 
+  const boxedLevelOne = $derived(isBoxedLevelOne(sheet));
+  /** Topics painted as a filled color chip rather than an outlined white box.
+   * The boxed-first-level option extends that to the branches directly under
+   * the root — floating topics included, since layout places them at depth 1. */
+  function colorChip(n: LaidOutNode): boolean {
+    return n.depth === 0 || (boxedLevelOne && n.depth === 1);
+  }
+
   function nodeShape(n: LaidOutNode): string {
     if (n.topic.style?.shape) return n.topic.style.shape;
     // This layout treats every topic as text positioned on a connector line.
     // Keep an explicitly selected topic shape as an intentional override.
-    if (isTextOnLines(sheet)) return 'none';
+    if (isTextOnLines(sheet)) return boxedLevelOne && colorChip(n) ? 'rounded' : 'none';
     return sheet.settings?.defaultShape ?? 'rounded';
   }
 
   // --- styling / decoration helpers ----------------------------------------
   function nodeFill(n: LaidOutNode): string {
     if (nodeShape(n) === 'none') return 'transparent';
-    return n.topic.style?.fillColor ?? (n.depth === 0 ? n.color : '#ffffff');
+    return n.topic.style?.fillColor ?? (colorChip(n) ? n.color : '#ffffff');
   }
   function nodeStroke(n: LaidOutNode): string {
     if (n.id === dragOverId && dropMode === 'child') return '#16a34a';
@@ -1409,7 +1417,7 @@
     if (n.id === selectedId || (n.id === dragOverId && dropMode === 'child')) return 3;
     if (inSelection(n.id)) return 2.5;
     if (nodeShape(n) === 'none') return 0;
-    return n.depth === 0 && !n.topic.style?.fillColor ? 0 : (n.topic.style?.borderWidth ?? 1.5);
+    return colorChip(n) && !n.topic.style?.fillColor ? 0 : (n.topic.style?.borderWidth ?? 1.5);
   }
   function textFill(n: LaidOutNode): string {
     // Contrast follows the fill actually painted. A transparent topic (text on

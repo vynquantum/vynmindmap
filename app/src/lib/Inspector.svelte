@@ -6,7 +6,12 @@
     TopicShape,
     StructureId
   } from '../../../src/index.js';
-  import { COLOR_THEMES, isTextOnLines, supportsTextOnLines } from './mapAppearance.js';
+  import {
+    COLOR_THEMES,
+    isBoxedLevelOne,
+    isTextOnLines,
+    supportsTextOnLines
+  } from './mapAppearance.js';
   import { clampTopicMinHeight, clampTopicWidth } from './layout.js';
   import {
     STRUCTURE_CATEGORIES,
@@ -400,6 +405,7 @@
   let structurePickerOpen = $state(false);
   let collapsedCats = $state<Record<string, boolean>>({});
   const underlineActive = $derived(isTextOnLines(sheet));
+  const boxedLevelOneActive = $derived(isBoxedLevelOne(sheet));
   function isItemActive(item: StructurePreview): boolean {
     if (sheet.structure !== item.id) return false;
     // A card is a geometry plus a treatment, so both have to match. Geometries
@@ -643,6 +649,10 @@
   }
   function setBranchColor(v: string) {
     (sheet.settings ??= {}).branchColor = v;
+    markDirty();
+  }
+  function setBoxedLevelOne(v: boolean) {
+    (sheet.settings ??= {}).boxedLevelOne = v;
     markDirty();
   }
   function setMapPresentation(v: MapPresentation) {
@@ -957,6 +967,18 @@
           aria-label="Text on lines"
           disabled={!supportsTextOnLines(sheet.structure)}
           onclick={() => setMapPresentation(underlineActive ? 'boxed' : 'underline')}
+        ></button>
+      </div>
+      <div class="rowline">
+        <span class="rowlabel">Boxed First Level</span>
+        <button
+          class="switch"
+          class:on={boxedLevelOneActive}
+          role="switch"
+          aria-checked={boxedLevelOneActive}
+          aria-label="Boxed first level"
+          disabled={!underlineActive}
+          onclick={() => setBoxedLevelOne(!boxedLevelOneActive)}
         ></button>
       </div>
     </div>

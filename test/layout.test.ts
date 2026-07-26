@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { addChild, createWorkbook, readVmm } from '../src/index.js';
 import type { Topic } from '../src/index.js';
 import { layoutBalanced, layoutSheet, edgePath, sizeOf } from '../app/src/lib/layout.js';
+import { isBoxedLevelOne } from '../app/src/lib/mapAppearance.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const examples = join(here, '..', 'examples');
@@ -296,5 +297,36 @@ describe('layoutBalanced', () => {
     const layout = layoutBalanced(workbook.sheets[0]!);
     expect(layout.nodes.length).toBeGreaterThan(3);
     expect(edgePath(layout.edges[0]!)).toMatch(/^M /);
+  });
+});
+
+describe('boxed first level', () => {
+  it('only applies on top of the text-on-lines treatment', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    sheet.settings = { boxedLevelOne: true };
+    // Boxed presentation already draws every topic in a box, so the option has
+    // nothing to add and must not report itself as active.
+    expect(isBoxedLevelOne(sheet)).toBe(false);
+
+    sheet.settings.mapPresentation = 'underline';
+    expect(isBoxedLevelOne(sheet)).toBe(true);
+
+    // A chart type that draws its own geometry ignores the treatment entirely.
+    sheet.structure = 'org.down';
+    expect(isBoxedLevelOne(sheet)).toBe(false);
+  });
+
+  it('places floating topics at the depth the option boxes', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    const child = addChild(sheet.rootTopic, 'Branch');
+    sheet.floatingTopics = [{ id: 'park', title: 'Parking lot', children: [] } as Topic];
+
+    const byId = new Map(layoutSheet(sheet).nodes.map((n) => [n.id, n.depth]));
+    expect(byId.get(child.id)).toBe(1);
+    // Floating topics read as first-level branches, so they pick up the same
+    // box rather than being singled out as bare text.
+    expect(byId.get('park')).toBe(1);
   });
 });
