@@ -636,6 +636,19 @@
     editingId = null;
   }
 
+  /**
+   * Close an open editor when the press lands anywhere else on the canvas.
+   *
+   * The pointerdown handlers below call preventDefault() so a drag is never a
+   * text selection, and that also suppresses the browser's focus transfer — so
+   * the editor never blurs and its onblur never commits. Capture phase, because
+   * the node handler stops propagation before the container ever sees it.
+   */
+  function onCanvasPointerDownCapture(e: PointerEvent) {
+    if (editingId && e.target !== editInput) commitEdit();
+    if (editingRelId && e.target !== relEditInput) commitRelEdit();
+  }
+
   function onEditKey(e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -1724,6 +1737,7 @@
   ondblclick={onCanvasDblClick}
   oncontextmenu={onContextMenu}
   onwheel={onWheel}
+  onpointerdowncapture={onCanvasPointerDownCapture}
   onpointerdown={onBgPointerDown}
   onpointermove={onContainerPointerMove}
   onpointerup={onContainerPointerUp}
