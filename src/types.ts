@@ -213,6 +213,16 @@ export interface SheetSettings {
   /** With 'underline' presentation, keep a filled color box on the root and the
    * branches directly under it instead of stripping every topic to bare text. */
   boxedLevelOne?: boolean;
+  /** Tighten the gaps between topics and between levels. */
+  compactMap?: boolean;
+  /** Widen every topic to match the widest one, so titles line up in columns. */
+  uniformTopicLength?: boolean;
+  /** Show each topic's note under its title instead of only the 📝 badge. */
+  displayAllNotes?: boolean;
+  /** Give floating topics a palette color instead of the neutral gray. */
+  autoColorFloating?: boolean;
+  /** Draw relationship lines in their source topic's color. */
+  relationLineFollowTopic?: boolean;
   /** Branch line geometry for connector-based structures; each structure
    * family keeps its own default when unset. Vertical charts (org, vertical
    * timeline) support 'straight' and otherwise stay elbowed. */

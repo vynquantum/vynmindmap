@@ -2,6 +2,7 @@
   import type {
     MapPresentation,
     Sheet,
+    SheetSettings,
     Topic,
     TopicShape,
     StructureId
@@ -655,6 +656,14 @@
     (sheet.settings ??= {}).boxedLevelOne = v;
     markDirty();
   }
+  /** Plain on/off sheet settings that need no migration or side effect. */
+  function setFlag(key: keyof SheetSettings, v: boolean) {
+    (sheet.settings ??= {})[key] = v;
+    markDirty();
+  }
+  function flag(key: keyof SheetSettings): boolean {
+    return sheet.settings?.[key] === true;
+  }
   function setMapPresentation(v: MapPresentation) {
     (sheet.settings ??= {}).mapPresentation = v;
     // Turning the treatment off needs a migration for legacy documents: in
@@ -742,6 +751,21 @@
         onclick={() => set(c)}
       ></button>
     {/each}
+  </div>
+{/snippet}
+
+{#snippet toggleRow(label: string, on: boolean, set: (v: boolean) => void, disabled = false)}
+  <div class="rowline">
+    <span class="rowlabel">{label}</span>
+    <button
+      class="switch"
+      class:on
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      {disabled}
+      onclick={() => set(!on)}
+    ></button>
   </div>
 {/snippet}
 
@@ -957,30 +981,37 @@
             setStructure(sheet.structure === 'map.balanced' ? 'map.right' : 'map.balanced')}
         ></button>
       </div>
-      <div class="rowline">
-        <span class="rowlabel">Text on Lines</span>
-        <button
-          class="switch"
-          class:on={underlineActive}
-          role="switch"
-          aria-checked={underlineActive}
-          aria-label="Text on lines"
-          disabled={!supportsTextOnLines(sheet.structure)}
-          onclick={() => setMapPresentation(underlineActive ? 'boxed' : 'underline')}
-        ></button>
-      </div>
-      <div class="rowline">
-        <span class="rowlabel">Boxed First Level</span>
-        <button
-          class="switch"
-          class:on={boxedLevelOneActive}
-          role="switch"
-          aria-checked={boxedLevelOneActive}
-          aria-label="Boxed first level"
-          disabled={!underlineActive}
-          onclick={() => setBoxedLevelOne(!boxedLevelOneActive)}
-        ></button>
-      </div>
+      {@render toggleRow(
+        'Text on Lines',
+        underlineActive,
+        (v) => setMapPresentation(v ? 'underline' : 'boxed'),
+        !supportsTextOnLines(sheet.structure)
+      )}
+      {@render toggleRow(
+        'Boxed First Level',
+        boxedLevelOneActive,
+        setBoxedLevelOne,
+        !underlineActive
+      )}
+      {@render toggleRow('Compact Map', flag('compactMap'), (v) => setFlag('compactMap', v))}
+
+      <div class="map-divider"></div>
+      <div class="groupname strong">Topic Display</div>
+      {@render toggleRow('Uniform Topic Length', flag('uniformTopicLength'), (v) =>
+        setFlag('uniformTopicLength', v)
+      )}
+      {@render toggleRow('Display All Notes', flag('displayAllNotes'), (v) =>
+        setFlag('displayAllNotes', v)
+      )}
+      {@render toggleRow('Auto-colour Floating Topic', flag('autoColorFloating'), (v) =>
+        setFlag('autoColorFloating', v)
+      )}
+
+      <div class="map-divider"></div>
+      <div class="groupname strong">Relationship</div>
+      {@render toggleRow('Line Colour Follow Topic', flag('relationLineFollowTopic'), (v) =>
+        setFlag('relationLineFollowTopic', v)
+      )}
     </div>
   {:else if activeTab === 'pitch'}
     <div class="tabbody">

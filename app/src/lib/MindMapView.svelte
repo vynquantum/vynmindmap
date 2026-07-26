@@ -33,6 +33,7 @@
     summaryPath,
     clampTopicMinHeight,
     clampTopicWidth,
+    NOTE_LINE_H,
     type Layout,
     type LaidOutNode
   } from './layout.js';
@@ -1498,9 +1499,15 @@
   function markerIcon(id: string): string {
     return MARKER_ICONS[id] ?? '●';
   }
+  /** Notes render under the title, so the title block sits above them rather
+   * than in the middle of the box. */
+  function titleCenterY(n: LaidOutNode): number {
+    return (n.h - n.noteLines.length * NOTE_LINE_H) / 2;
+  }
   function badges(t: Topic): string {
     let s = '';
-    if (t.note?.plain) s += '📝';
+    // With the note spelled out under the title the badge is just noise.
+    if (t.note?.plain && !sheet.settings?.displayAllNotes) s += '📝';
     if (t.hyperlink?.value) s += '🔗';
     if (t.image?.resource) s += '🖼';
     return s;
@@ -1510,7 +1517,8 @@
   // A user-dragged control point (rel.controlPoints[0], stored shift-free)
   // overrides the default perpendicular bow.
   const relationships = $derived.by(() => {
-    const out: { id: string; d: string; lx: number; ly: number; title?: string }[] = [];
+    const out: { id: string; d: string; lx: number; ly: number; title?: string; color: string }[] =
+      [];
     for (const rel of sheet.relationships ?? []) {
       const a = nodeById.get(rel.end1Id);
       const b = nodeById.get(rel.end2Id);
@@ -1539,7 +1547,10 @@
         d: `M ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`,
         lx: cx,
         ly: cy,
-        title: rel.title
+        title: rel.title,
+        // Follow the source topic so a cross-link reads as belonging to the
+        // branch it leaves, not as neutral chrome.
+        color: sheet.settings?.relationLineFollowTopic ? a.color : '#94a3b8'
       });
     }
     return out;
@@ -1712,7 +1723,7 @@
         <path
           d={r.d}
           fill="none"
-          stroke={selectedDeco?.id === r.id ? '#1d4ed8' : '#94a3b8'}
+          stroke={selectedDeco?.id === r.id ? '#1d4ed8' : r.color}
           stroke-width={selectedDeco?.id === r.id ? 3 : 2}
           stroke-dasharray="6 4"
           marker-end="url(#rel-arrow)"
@@ -1805,6 +1816,7 @@
           {/if}
 
           {#if n.id !== editingId}
+            {@const cy = titleCenterY(n)}
             <text
               dominant-baseline="central"
               text-anchor="middle"
@@ -1817,11 +1829,26 @@
               fill={textFill(n)}
             >
               {#each n.lines as line, li (li)}
-                <tspan x={n.w / 2} y={n.h / 2 + (li - (n.lines.length - 1) / 2) * n.lineH}
-                  >{line}</tspan
-                >
+                <tspan x={n.w / 2} y={cy + (li - (n.lines.length - 1) / 2) * n.lineH}>{line}</tspan>
               {/each}
             </text>
+            {#if n.noteLines.length}
+              <text
+                dominant-baseline="central"
+                text-anchor="middle"
+                font-family={sheet.settings?.globalFont ?? 'inherit'}
+                font-size="11"
+                fill={textFill(n)}
+                opacity="0.75"
+              >
+                {#each n.noteLines as line, ni (ni)}
+                  <tspan
+                    x={n.w / 2}
+                    y={cy + (n.lines.length * n.lineH) / 2 + (ni + 0.5) * NOTE_LINE_H}>{line}</tspan
+                  >
+                {/each}
+              </text>
+            {/if}
           {/if}
 
           {#if n.topic.image && imgUrl(n.topic.image.resource)}

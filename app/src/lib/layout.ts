@@ -24,6 +24,8 @@ export interface LaidOutNode {
   lines: string[];
   /** Vertical distance between rendered lines. */
   lineH: number;
+  /** Note text drawn under the title; empty unless 'Display All Notes'. */
+  noteLines: string[];
   floating?: boolean;
 }
 
@@ -81,9 +83,10 @@ export interface Layout {
 
 // Tunables -----------------------------------------------------------------
 const NODE_H = 34;
-const ROW_GAP = 14;
-const COL_GAP = 26;
-const LEVEL_GAP = 56;
+const SPACING = { row: 14, col: 26, level: 56 };
+let ROW_GAP = SPACING.row;
+let COL_GAP = SPACING.col;
+let LEVEL_GAP = SPACING.level;
 const CHAR_W = 7.6;
 const PAD_X = 26;
 const PAD_Y = 8;
@@ -95,6 +98,48 @@ const MARGIN = 56;
 const FLOAT_COLOR = '#7a8699';
 const SUMMARY_COLOR = '#64748b';
 
+/**
+ * Per-sheet measurement knobs, applied by `applySettings` before any placement
+ * runs. They live here rather than as parameters because `sizeOf` is called
+ * from every placement function and from the recursive helpers underneath them.
+ *
+ * ponytail: module-global, safe only because layoutSheet is synchronous and
+ * runs one sheet at a time. Laying out sheets concurrently (a worker, or async
+ * chunking for large maps) would have to pass these down as an options object.
+ */
+let uniformW = 0;
+let showNotes = false;
+
+/** Reset the knobs from a sheet's settings. Call once, before placement. */
+function applySettings(sheet: Sheet): void {
+  const density = sheet.settings?.compactMap === true ? 0.5 : 1;
+  ROW_GAP = Math.round(SPACING.row * density);
+  COL_GAP = Math.round(SPACING.col * density);
+  LEVEL_GAP = Math.round(SPACING.level * density);
+
+  showNotes = sheet.settings?.displayAllNotes === true;
+  // Measured with the knob off so the widest topic is its own natural width,
+  // not a previous sheet's uniform width fed back in.
+  uniformW = 0;
+  if (sheet.settings?.uniformTopicLength === true) {
+    let widest = 0;
+    for (const t of everyTopic(sheet)) widest = Math.max(widest, sizeOf(t).w);
+    uniformW = widest;
+  }
+}
+
+/** Every topic the sheet can place, root subtree plus floating subtrees. */
+function* everyTopic(sheet: Sheet): Generator<Topic> {
+  const stack: Topic[] = [sheet.rootTopic, ...(sheet.floatingTopics ?? [])];
+  while (stack.length) {
+    const t = stack.pop()!;
+    yield t;
+    // Collapsed children are unmeasured on purpose: they are not placed, so
+    // they must not widen the topics that are.
+    stack.push(...visibleChildren(t));
+  }
+}
+
 // Sizing / wrapping ----------------------------------------------------------
 
 export interface TopicSize {
@@ -102,23 +147,14 @@ export interface TopicSize {
   h: number;
   lines: string[];
   lineH: number;
+  /** Note text rendered under the title; empty unless 'Display All Notes'. */
+  noteLines: string[];
 }
 
-/**
- * Measure a topic box: wraps the title (explicit newlines + greedy word wrap)
- * to at most MAX_W, and grows the box height to fit all lines.
- */
-export function sizeOf(t: Topic): TopicSize {
-  const size = t.style?.font?.size ?? 13;
-  const cw = CHAR_W * (size / 13) * (t.style?.font?.weight === 'bold' ? 1.05 : 1);
-  // Automatic topics stop expanding at MAX_W. A user-specified width is a
-  // layout preference: it controls wrapping and is retained in the document.
-  const requestedWidth = t.style?.width;
-  const fixedWidth = Number.isFinite(requestedWidth) ? clampTopicWidth(requestedWidth!) : undefined;
-  const maxChars = Math.max(4, Math.floor(((fixedWidth ?? MAX_W) - PAD_X) / cw));
-
+/** Greedy word wrap, honoring explicit newlines and hard-breaking long words. */
+function wrap(text: string, maxChars: number): string[] {
   const lines: string[] = [];
-  for (const raw of (t.title ?? '').split('\n')) {
+  for (const raw of text.split('\n')) {
     if (raw.length <= maxChars) {
       lines.push(raw);
       continue;
@@ -143,14 +179,48 @@ export function sizeOf(t: Topic): TopicSize {
     }
     lines.push(cur);
   }
-  if (!lines.length) lines.push('');
+  return lines.length ? lines : [''];
+}
+
+/** Note lines are smaller than the title and capped, so one long note can't
+ * stretch a topic past the rest of the map. */
+export const NOTE_LINE_H = 15;
+const NOTE_MAX_LINES = 4;
+
+/**
+ * Measure a topic box: wraps the title (explicit newlines + greedy word wrap)
+ * to at most MAX_W, and grows the box height to fit all lines.
+ */
+export function sizeOf(t: Topic): TopicSize {
+  const size = t.style?.font?.size ?? 13;
+  const cw = CHAR_W * (size / 13) * (t.style?.font?.weight === 'bold' ? 1.05 : 1);
+  // Automatic topics stop expanding at MAX_W. A user-specified width is a
+  // layout preference: it controls wrapping and is retained in the document.
+  const requestedWidth = t.style?.width;
+  const fixedWidth = Number.isFinite(requestedWidth) ? clampTopicWidth(requestedWidth!) : undefined;
+  const maxChars = Math.max(4, Math.floor(((fixedWidth ?? MAX_W) - PAD_X) / cw));
+
+  const lines = wrap(t.title ?? '', maxChars);
 
   const longest = lines.reduce((m, l) => Math.max(m, l.length), 0);
   const lineH = Math.max(18, size + 5);
-  const w = fixedWidth ?? Math.max(MIN_W, Math.min(MAX_W, longest * cw + PAD_X));
+  const natural = Math.max(MIN_W, Math.min(MAX_W, longest * cw + PAD_X));
+  // Uniform length only ever widens: the shared width is the widest natural
+  // width on the sheet, so no title has to re-wrap to fit it.
+  const w = fixedWidth ?? Math.max(natural, uniformW);
+
+  const note = showNotes ? (t.note?.plain ?? '').trim() : '';
+  const noteLines = note
+    ? wrap(note, Math.max(4, Math.floor((w - PAD_X) / (CHAR_W * 0.85)))).slice(0, NOTE_MAX_LINES)
+    : [];
+
   const minHeight = Number.isFinite(t.style?.minHeight) ? t.style!.minHeight! : 0;
-  const h = Math.max(NODE_H, Math.round(minHeight), lines.length * lineH + PAD_Y * 2);
-  return { w, h, lines, lineH };
+  const h = Math.max(
+    NODE_H,
+    Math.round(minHeight),
+    lines.length * lineH + noteLines.length * NOTE_LINE_H + PAD_Y * 2
+  );
+  return { w, h, lines, lineH, noteLines };
 }
 
 /** Back-compat width-only measure. */
@@ -189,7 +259,8 @@ function mkNode(
     color,
     hasHiddenChildren: hidden(t),
     lines: s.lines,
-    lineH: s.lineH
+    lineH: s.lineH,
+    noteLines: s.noteLines
   };
 }
 
@@ -330,9 +401,9 @@ function vertical(sheet: Sheet, dir: 'down' | 'up'): LaidOutNode[] {
 }
 
 /** Place a floating topic's subtree, anchored at its stored position. */
-function placeFloating(topic: Topic, index: number, nodes: LaidOutNode[]): void {
+function placeFloating(topic: Topic, index: number, nodes: LaidOutNode[], color: string): void {
   const sub: LaidOutNode[] = [];
-  placeH(topic, 1, 'right', 1, 0, FLOAT_COLOR, { v: 0 }, sub);
+  placeH(topic, 1, 'right', 1, 0, color, { v: 0 }, sub);
   const root = sub.find((n) => n.id === topic.id)!;
   const px = topic.position?.x ?? 360;
   const py = topic.position?.y ?? -160 + index * 90;
@@ -775,6 +846,7 @@ function branchKind(sheet: Sheet, fallback: LaidOutEdge['kind']): LaidOutEdge['k
 }
 
 export function layoutSheet(sheet: Sheet): Layout {
+  applySettings(sheet);
   const s: StructureId = sheet.structure;
   let nodes: LaidOutNode[];
   let edges: LaidOutEdge[] = [];
@@ -814,7 +886,11 @@ export function layoutSheet(sheet: Sheet): Layout {
   // Floating topics carry their own canvas position and their own subtree, so
   // they belong on every chart type — no structure may silently drop them.
   const floating: LaidOutNode[] = [];
-  (sheet.floatingTopics ?? []).forEach((f, i) => placeFloating(f, i, floating));
+  const floatPalette = paletteForSheet(sheet);
+  const autoColorFloat = sheet.settings?.autoColorFloating === true;
+  (sheet.floatingTopics ?? []).forEach((f, i) =>
+    placeFloating(f, i, floating, autoColorFloat ? colorFor(i, floatPalette) : FLOAT_COLOR)
+  );
 
   nodes.push(...floating);
 

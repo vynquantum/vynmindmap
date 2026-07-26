@@ -300,6 +300,76 @@ describe('layoutBalanced', () => {
   });
 });
 
+describe('map display settings', () => {
+  /** Root with two children, one of them much wider than the other. */
+  function sample() {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    const narrow = addChild(sheet.rootTopic, 'Hi');
+    const wide = addChild(sheet.rootTopic, 'A considerably longer branch title');
+    return { sheet, narrow, wide };
+  }
+
+  it('compacts the gaps between topics and between levels', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    sheet.structure = 'map.right';
+    // Stacked siblings, each with a child, so both gaps are load-bearing.
+    for (const t of ['One', 'Two', 'Three']) addChild(addChild(sheet.rootTopic, t), 'leaf');
+
+    const spread = layoutSheet(sheet);
+    sheet.settings = { compactMap: true };
+    const tight = layoutSheet(sheet);
+
+    expect(tight.height).toBeLessThan(spread.height); // row gap
+    expect(tight.width).toBeLessThan(spread.width); // level gap
+    // Spacing only: the topics themselves are untouched.
+    expect(tight.nodes.map((n) => n.w)).toEqual(spread.nodes.map((n) => n.w));
+  });
+
+  it('widens every topic to the widest one, and only while enabled', () => {
+    const { sheet, narrow, wide } = sample();
+    const natural = new Map(layoutSheet(sheet).nodes.map((n) => [n.id, n.w]));
+    expect(natural.get(narrow.id)).toBeLessThan(natural.get(wide.id)!);
+
+    sheet.settings = { uniformTopicLength: true };
+    const widths = new Set(layoutSheet(sheet).nodes.map((n) => n.w));
+    expect(widths.size).toBe(1);
+    expect([...widths][0]).toBe(natural.get(wide.id));
+
+    // The knob is module state, so a later layout must not inherit it — nor
+    // feed the previous uniform width back in as a new natural width.
+    sheet.settings = {};
+    const after = new Map(layoutSheet(sheet).nodes.map((n) => [n.id, n.w]));
+    expect(after.get(narrow.id)).toBe(natural.get(narrow.id));
+  });
+
+  it('grows a topic to fit its note only when notes are displayed', () => {
+    const { sheet, narrow } = sample();
+    narrow.note = { plain: 'A note long enough to wrap onto more than one line in the box.' };
+    const plain = layoutSheet(sheet).nodes.find((n) => n.id === narrow.id)!;
+    expect(plain.noteLines).toEqual([]);
+
+    sheet.settings = { displayAllNotes: true };
+    const shown = layoutSheet(sheet).nodes.find((n) => n.id === narrow.id)!;
+    expect(shown.noteLines.length).toBeGreaterThan(1);
+    // Reserved room, so a note can never spill over the topic below it.
+    expect(shown.h).toBeGreaterThan(plain.h);
+  });
+
+  it('colors floating topics from the palette only when asked', () => {
+    const { sheet } = sample();
+    sheet.floatingTopics = [{ id: 'f1', title: 'One', children: [] } as Topic];
+    const gray = layoutSheet(sheet).nodes.find((n) => n.id === 'f1')!.color;
+
+    sheet.settings = { autoColorFloating: true };
+    const colored = layoutSheet(sheet).nodes.find((n) => n.id === 'f1')!.color;
+    expect(colored).not.toBe(gray);
+    // The same palette the first branch uses, so the two read as one scheme.
+    expect(colored).toBe(layoutSheet(sheet).nodes.find((n) => n.depth === 1)!.color);
+  });
+});
+
 describe('boxed first level', () => {
   it('only applies on top of the text-on-lines treatment', () => {
     const wb = createWorkbook('Root');
