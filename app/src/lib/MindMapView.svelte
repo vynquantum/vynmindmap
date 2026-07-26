@@ -103,7 +103,10 @@
   let dragOverId = $state<string | null>(null);
   let dropMode = $state<'child' | 'before' | 'after'>('child');
   let pressed = $state<{ id: string; sx: number; sy: number } | null>(null);
-  let lastPoint = { x: 0, y: 0 };
+  let lastPoint = $state({ x: 0, y: 0 });
+  /** Where inside the node the pointer grabbed it. The drag preview and the
+   * drop both subtract it, so the box keeps the spot you took hold of. */
+  let grab = $state({ x: 0, y: 0 });
 
   // Resize-to-wrap state: dragging the corner handle gives the topic an
   // explicit width (controls wrapping) and minimum height.
@@ -254,6 +257,7 @@
     // Background press → pan + clear selection.
     ctxMenu = null;
     if (e.button === 2) return; // right-click opens the context menu instead
+    e.preventDefault(); // panning is not a text selection either
     panning = true;
     clearSelection();
     relMode = false;
@@ -380,8 +384,8 @@
    */
   function dropPoint(node: LaidOutNode): { x: number; y: number } {
     const at = {
-      x: lastPoint.x - layout.shiftX - node.w / 2,
-      y: lastPoint.y - layout.shiftY - node.h / 2
+      x: lastPoint.x - layout.shiftX - grab.x,
+      y: lastPoint.y - layout.shiftY - grab.y
     };
     if (sheet.settings?.topicOverlap === false) {
       const moving = new Set([...walkTopic(node.topic)].map((t) => t.id));
@@ -391,6 +395,17 @@
       return escapeOverlap({ ...at, w: node.w, h: node.h }, obstacles);
     }
     return at;
+  }
+
+  /** Node origin, following the pointer while this is the node being dragged. */
+  function originOf(n: LaidOutNode): { x: number; y: number } {
+    return n.id === dragId ? { x: lastPoint.x - grab.x, y: lastPoint.y - grab.y } : n;
+  }
+
+  /** An edge hanging off the dragged node, which would otherwise be left
+   * stretching to where the node used to be. Edge ids are `parent->child`. */
+  function edgeDragged(id: string): boolean {
+    return !!dragId && (id.startsWith(`${dragId}->`) || id.endsWith(`->${dragId}`));
   }
 
   function onContainerPointerUp() {
@@ -503,8 +518,19 @@
       toggleInSelection(id);
       return; // multi-select doesn't start a drag
     }
+    // A press on the map is never a text selection; without this the browser
+    // starts one and highlights whatever the drag passes over.
+    e.preventDefault();
     selectOnly(id);
     pressed = { id, sx: e.clientX, sy: e.clientY };
+    const n = nodeById.get(id);
+    if (n && canvasEl) {
+      const p = canvasPoint(e, canvasEl);
+      grab = { x: p.x - n.x, y: p.y - n.y };
+    }
+    // Keep the gesture even if the pointer leaves the canvas, so a drop over
+    // the sidebar still lands instead of stranding the node mid-drag.
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
   }
 
   function onToggle(e: PointerEvent, t: Topic) {
@@ -1725,7 +1751,9 @@
       {/each}
 
       {#each layout.edges as e (e.id)}
-        <path d={edgePath(e)} fill="none" stroke={e.color} stroke-width={e.width ?? 2.5} />
+        {#if !edgeDragged(e.id)}
+          <path d={edgePath(e)} fill="none" stroke={e.color} stroke-width={e.width ?? 2.5} />
+        {/if}
       {/each}
 
       <!-- Relationships render below nodes so node clicks win near endpoints. -->
@@ -1791,8 +1819,9 @@
       {/each}
 
       {#each layout.nodes as n (n.id)}
+        {@const o = originOf(n)}
         <g
-          transform={`translate(${n.x} ${n.y})`}
+          transform={`translate(${o.x} ${o.y})`}
           class="node"
           role="button"
           tabindex={-1}
