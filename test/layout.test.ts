@@ -150,7 +150,7 @@ describe('layoutBalanced', () => {
     }
   });
 
-  it('uses continuous indigo underlines for the text-on-lines map', () => {
+  it('draws the text-on-lines map as curved joins plus flat underlines', () => {
     const wb = createWorkbook('Root');
     const sheet = wb.sheets[0]!;
     sheet.structure = 'map.underline';
@@ -159,14 +159,49 @@ describe('layoutBalanced', () => {
     addChild(label, 'A daily practice');
 
     const layout = layoutSheet(sheet);
-    // The first link is a curved join plus the first topic's underline; every
-    // deeper link continues the shared underline.
-    expect(layout.edges).toHaveLength(4);
-    expect(layout.edges.filter((e) => e.kind === 'bezier')).toHaveLength(1);
-    expect(layout.edges.filter((e) => e.kind === 'straight')).toHaveLength(1);
-    expect(layout.edges.filter((e) => e.kind === 'underline')).toHaveLength(2);
-    expect(layout.edges.every((e) => e.color === '#4f46d4')).toBe(true);
-    expect(edgePath(layout.edges.find((e) => e.kind === 'underline')!)).toMatch(/^M .* V .* H /);
+    // Every link is a curved join off the parent's line plus the child's own
+    // underline — no right-angle steps at any depth.
+    expect(layout.edges).toHaveLength(6);
+    expect(layout.edges.filter((e) => e.kind === 'bezier')).toHaveLength(3);
+    const lines = layout.edges.filter((e) => e.id.endsWith('-line'));
+    expect(lines).toHaveLength(3);
+    expect(lines.every((e) => e.kind === 'straight' && e.y1 === e.y2)).toBe(true);
+    expect(layout.edges.every((e) => edgePath(e).startsWith('M'))).toBe(true);
+
+    // The treatment reshapes connectors; it does not recolor them. Each branch
+    // keeps its palette color, and an explicit topic line color still wins.
+    const palette = new Set(layout.nodes.filter((n) => n.depth > 0).map((n) => n.color));
+    expect(layout.edges.every((e) => palette.has(e.color))).toBe(true);
+    label.style = { lineColor: '#ff0000' };
+    const intoLabel = layoutSheet(sheet).edges.filter((e) => e.id.includes(`->${label.id}`));
+    expect(intoLabel).toHaveLength(2);
+    expect(intoLabel.every((e) => e.color === '#ff0000')).toBe(true);
+  });
+
+  it('keeps the chart type when the text-on-lines treatment is applied', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    sheet.structure = 'map.balanced';
+    sheet.settings = { mapPresentation: 'underline' };
+    for (let i = 0; i < 4; i++) addChild(addChild(sheet.rootTopic, `B${i}`), `leaf ${i}`);
+
+    const layout = layoutSheet(sheet);
+    // Balanced stays balanced: the treatment only replaces the connectors.
+    const sides = new Set(layout.nodes.filter((n) => n.depth === 1).map((n) => n.side));
+    expect(sides).toEqual(new Set(['left', 'right']));
+
+    // Left-side underlines mirror: they run outward, away from the root.
+    const root = layout.nodes.find((n) => n.depth === 0)!;
+    const lines = layout.edges.filter((e) => e.id.endsWith('-line'));
+    expect(lines.length).toBeGreaterThan(0);
+    for (const e of lines) {
+      if (e.x1 < root.x) expect(e.x2).toBeLessThan(e.x1);
+      else expect(e.x2).toBeGreaterThan(e.x1);
+    }
+
+    // Chart types that draw their own geometry ignore the treatment.
+    sheet.structure = 'org.down';
+    expect(layoutSheet(sheet).edges.every((e) => !e.id.endsWith('-line'))).toBe(true);
   });
 
   it('keeps chart type, map presentation, and color controls independent', () => {
@@ -186,7 +221,7 @@ describe('layoutBalanced', () => {
     const layout = layoutSheet(sheet);
     expect(layout.nodes.find((n) => n.depth === 0)!.color).toBe('#075985');
     expect(layout.edges.every((e) => e.color === '#123456' && e.width === 4)).toBe(true);
-    expect(layout.edges.some((e) => e.kind === 'underline')).toBe(true);
+    expect(layout.edges.some((e) => e.id.endsWith('-line'))).toBe(true);
   });
 
   it('lays out the rich example without errors', () => {

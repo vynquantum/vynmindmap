@@ -7,12 +7,7 @@
  */
 
 import type { Sheet, StructureId, Topic } from '../../../src/index.js';
-import {
-  isTextOnLines,
-  paletteForSheet,
-  rootColorForSheet,
-  underlineColorForSheet
-} from './mapAppearance.js';
+import { isTextOnLines, paletteForSheet, rootColorForSheet } from './mapAppearance.js';
 
 export interface LaidOutNode {
   id: string;
@@ -358,12 +353,7 @@ function buildEdges(sheet: Sheet, nodes: LaidOutNode[], kind: LaidOutEdge['kind'
     for (const child of visibleChildren(n.topic)) {
       const cn = byId.get(child.id);
       if (!cn) continue;
-      // Underline maps use one restrained connector color, as the lines also
-      // serve as the visual treatment for the otherwise transparent nodes.
-      // An explicit topic line color still takes precedence.
-      const color =
-        cn.topic.style?.lineColor ??
-        (kind === 'underline' ? underlineColorForSheet(sheet) : cn.color);
+      const color = cn.topic.style?.lineColor ?? cn.color;
       const width = cn.topic.style?.lineWidth ?? sheet.settings?.branchLineWidth ?? 2.5;
       if (n.side === 'down' || n.side === 'up' || cn.side === 'down' || cn.side === 'up') {
         const down = cn.y >= n.y;
@@ -380,39 +370,34 @@ function buildEdges(sheet: Sheet, nodes: LaidOutNode[], kind: LaidOutEdge['kind'
           width
         });
       } else if (kind === 'underline') {
-        if (n.depth === 0) {
-          edges.push({
-            id: `${n.id}->${cn.id}-conn`,
-            x1: n.x + n.w,
-            y1: n.y + n.h / 2,
-            x2: cn.x,
-            y2: cn.y + cn.h,
-            color,
-            kind: 'bezier',
-            width
-          });
-          edges.push({
-            id: `${n.id}->${cn.id}-line`,
-            x1: cn.x,
-            y1: cn.y + cn.h,
-            x2: cn.x + cn.w,
-            y2: cn.y + cn.h,
-            color,
-            kind: 'straight',
-            width
-          });
-        } else {
-          edges.push({
-            id: `${n.id}->${cn.id}`,
-            x1: n.x + n.w,
-            y1: n.y + n.h,
-            x2: cn.x + cn.w,
-            y2: cn.y + cn.h,
-            color,
-            kind: 'underline',
-            width
-          });
-        }
+        // Underlines run outward from the root, so a left-side branch mirrors
+        // every anchor: the parent's outer end and the child's near/far ends.
+        const right = cn.x >= n.x;
+        const parentEnd = right ? n.x + n.w : n.x;
+        const childNear = right ? cn.x : cn.x + cn.w;
+        const childFar = right ? cn.x + cn.w : cn.x;
+        // Every link is a connector branching off the parent's line, then the
+        // child's own underline. The root is boxed, so it is met at its middle.
+        edges.push({
+          id: `${n.id}->${cn.id}-conn`,
+          x1: parentEnd,
+          y1: n.depth === 0 ? n.y + n.h / 2 : n.y + n.h,
+          x2: childNear,
+          y2: cn.y + cn.h,
+          color,
+          kind: styleKind(sheet, 'bezier'),
+          width
+        });
+        edges.push({
+          id: `${n.id}->${cn.id}-line`,
+          x1: childNear,
+          y1: cn.y + cn.h,
+          x2: childFar,
+          y2: cn.y + cn.h,
+          color,
+          kind: 'straight',
+          width
+        });
       } else {
         const right = cn.x >= n.x;
         edges.push({
@@ -761,14 +746,21 @@ function grid(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
   return { nodes, gridLines: lines };
 }
 
-/** Edge geometry for connector-based structures, from the sheet's branch
- * style; each structure family keeps its own default when unset. */
-function branchKind(sheet: Sheet, fallback: LaidOutEdge['kind']): LaidOutEdge['kind'] {
+/** Connector geometry from the sheet's branch style; each structure family
+ * keeps its own default when unset. */
+function styleKind(sheet: Sheet, fallback: LaidOutEdge['kind']): LaidOutEdge['kind'] {
   const style = sheet.settings?.branchStyle;
   if (style === 'straight') return 'straight';
   if (style === 'elbow') return 'elbow-h';
   if (style === 'curve') return 'bezier';
   return fallback;
+}
+
+/** Edge geometry for connector-based structures. The text-on-lines treatment
+ * reshapes the connectors into underlines; only the horizontal structures call
+ * this, which is exactly where that treatment applies. */
+function branchKind(sheet: Sheet, fallback: LaidOutEdge['kind']): LaidOutEdge['kind'] {
+  return isTextOnLines(sheet) ? 'underline' : styleKind(sheet, fallback);
 }
 
 export function layoutSheet(sheet: Sheet): Layout {
@@ -799,9 +791,6 @@ export function layoutSheet(sheet: Sheet): Layout {
     nodes = vertical(sheet, s === 'org.up' ? 'up' : 'down');
   } else if (s === 'timeline.v') {
     nodes = vertical(sheet, 'down');
-  } else if (isTextOnLines(sheet)) {
-    kind = 'underline';
-    nodes = horizontal(sheet, 'right');
   } else if (s === 'map.balanced') {
     kind = branchKind(sheet, 'bezier');
     nodes = horizontal(sheet, 'balanced');
@@ -920,9 +909,6 @@ export function edgePath(e: LaidOutEdge): string {
   if (e.kind === 'elbow-v') {
     const my = (e.y1 + e.y2) / 2;
     return `M ${e.x1} ${e.y1} V ${my} H ${e.x2} V ${e.y2}`;
-  }
-  if (e.kind === 'underline') {
-    return `M ${e.x1} ${e.y1} V ${e.y2} H ${e.x2}`;
   }
   const mx = (e.x1 + e.x2) / 2;
   return `M ${e.x1} ${e.y1} C ${mx} ${e.y1}, ${mx} ${e.y2}, ${e.x2} ${e.y2}`;

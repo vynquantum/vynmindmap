@@ -6,7 +6,7 @@
     TopicShape,
     StructureId
   } from '../../../src/index.js';
-  import { COLOR_THEMES } from './mapAppearance.js';
+  import { COLOR_THEMES, isTextOnLines, supportsTextOnLines } from './mapAppearance.js';
   import { clampTopicMinHeight, clampTopicWidth } from './layout.js';
   import {
     STRUCTURE_CATEGORIES,
@@ -399,12 +399,13 @@
   // Chart-type picker (thumbnail gallery below the card)
   let structurePickerOpen = $state(false);
   let collapsedCats = $state<Record<string, boolean>>({});
-  const underlineActive = $derived(
-    sheet.settings?.mapPresentation === 'underline' || sheet.structure === 'map.underline'
-  );
+  const underlineActive = $derived(isTextOnLines(sheet));
   function isItemActive(item: StructurePreview): boolean {
-    if (item.presentation === 'underline') return underlineActive;
-    if (sheet.structure !== item.id || (underlineActive && item.id === 'map.right')) return false;
+    if (sheet.structure !== item.id) return false;
+    // A card is a geometry plus a treatment, so both have to match. Geometries
+    // with no text-on-lines card of their own simply have no active card while
+    // the treatment is on; the card falls back to naming the geometry.
+    if ((item.presentation === 'underline') !== underlineActive) return false;
     if (!item.preset) return true;
     // Raw comparison: unset means the structure family's own default, which
     // differs per family (map curves, logic elbows), so unset ≠ any explicit.
@@ -422,16 +423,13 @@
       'Mind map · underline (legacy)'
   );
   function pickStructure(item: StructurePreview) {
-    if (item.presentation === 'underline') {
-      setMapPresentation('underline');
-    } else {
-      setStructure(item.id);
-      // A boxed card was chosen explicitly, so leave the underline treatment.
-      if (sheet.settings?.mapPresentation === 'underline') setMapPresentation('boxed');
-      if (item.preset) {
-        setBranchStyle(item.preset.branchStyle ?? '');
-        setDefaultShape(item.preset.defaultShape ?? '');
-      }
+    setStructure(item.id);
+    if (item.presentation === 'underline') setMapPresentation('underline');
+    // A boxed card was chosen explicitly, so leave the underline treatment.
+    else if (sheet.settings?.mapPresentation === 'underline') setMapPresentation('boxed');
+    if (item.preset) {
+      setBranchStyle(item.preset.branchStyle ?? '');
+      setDefaultShape(item.preset.defaultShape ?? '');
     }
     structurePickerOpen = false;
   }
@@ -649,18 +647,8 @@
   }
   function setMapPresentation(v: MapPresentation) {
     (sheet.settings ??= {}).mapPresentation = v;
-    // The text-on-lines treatment uses a rightward mind-map layout. Selecting
-    // it makes that compatible chart type explicit instead of hiding a layout
-    // change inside the style implementation.
-    if (
-      v === 'underline' &&
-      sheet.structure !== 'map.right' &&
-      sheet.structure !== 'map.underline'
-    ) {
-      sheet.structure = 'map.right';
-    }
-    // Turning the treatment off needs the same migration for legacy documents:
-    // in map.underline the geometry itself is the treatment.
+    // Turning the treatment off needs a migration for legacy documents: in
+    // map.underline the geometry itself is the treatment.
     if (v === 'boxed' && sheet.structure === 'map.underline') {
       sheet.structure = 'map.right';
     }
@@ -701,11 +689,9 @@
   }
   function setStructure(v: string) {
     sheet.structure = v as StructureId;
-    if (
-      v !== 'map.right' &&
-      v !== 'map.underline' &&
-      sheet.settings?.mapPresentation === 'underline'
-    ) {
+    // Chart types that draw their own geometry can't show the treatment, so
+    // don't leave the setting behind where it would silently do nothing.
+    if (!supportsTextOnLines(sheet.structure) && sheet.settings?.mapPresentation === 'underline') {
       sheet.settings.mapPresentation = 'boxed';
     }
     markDirty();
@@ -969,6 +955,7 @@
           role="switch"
           aria-checked={underlineActive}
           aria-label="Text on lines"
+          disabled={!supportsTextOnLines(sheet.structure)}
           onclick={() => setMapPresentation(underlineActive ? 'boxed' : 'underline')}
         ></button>
       </div>

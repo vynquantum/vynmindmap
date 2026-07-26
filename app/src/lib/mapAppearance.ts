@@ -1,6 +1,6 @@
 /** Shared map-level appearance defaults. Layout consumes the same settings the
  * inspector edits, so chart structure stays independent from visual treatment. */
-import type { Sheet } from '../../../src/index.js';
+import type { Sheet, StructureId } from '../../../src/index.js';
 
 export const COLOR_THEMES = [
   {
@@ -54,10 +54,24 @@ export function colorThemeFor(sheet: Sheet) {
   return COLOR_THEMES.find((theme) => theme.id === sheet.theme) ?? COLOR_THEMES[0];
 }
 
+/** Chart types the text-on-lines treatment can replace connectors in: the
+ * horizontally laid-out families, which draw one connector per parent-child
+ * link. Vertical and diagram layouts (org, timeline.v, fishbone, brace,
+ * matrix, tree table, grid) draw their own geometry and ignore it. */
+export function supportsTextOnLines(structure: StructureId): boolean {
+  return (
+    structure.startsWith('map.') ||
+    structure.startsWith('logic.') ||
+    structure.startsWith('tree.') ||
+    structure === 'timeline.h'
+  );
+}
+
 export function isTextOnLines(sheet: Sheet): boolean {
-  // map.underline remains readable for existing documents. New documents use
-  // map.right (or another chart type) plus this independent presentation.
-  return sheet.settings?.mapPresentation === 'underline' || sheet.structure === 'map.underline';
+  // map.underline remains readable for existing documents. New documents keep
+  // their own chart type and add this independent presentation on top.
+  if (sheet.structure === 'map.underline') return true;
+  return sheet.settings?.mapPresentation === 'underline' && supportsTextOnLines(sheet.structure);
 }
 
 export function paletteForSheet(sheet: Sheet): readonly string[] {
@@ -70,8 +84,4 @@ export function paletteForSheet(sheet: Sheet): readonly string[] {
 
 export function rootColorForSheet(sheet: Sheet): string {
   return colorThemeFor(sheet).root;
-}
-
-export function underlineColorForSheet(sheet: Sheet): string {
-  return sheet.settings?.branchColor ?? '#4f46d4';
 }
