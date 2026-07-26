@@ -156,6 +156,77 @@ function applyFreePositions(sheet: Sheet, nodes: LaidOutNode[]): void {
   }
 }
 
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Gap kept between a moved box and whatever it was overlapping. */
+const CLEAR_PAD = 8;
+
+/**
+ * Move `box` off anything it overlaps and return its new top-left. Used both
+ * when layout keeps floating subtrees clear of the map and when a drop is not
+ * allowed to bury an existing topic.
+ *
+ * ponytail: O(obstacles²) rescan, which is fine for one dropped box or a
+ * handful of floating subtrees. A map that needed to separate everything at
+ * once would want a spatial index instead.
+ */
+export function escapeOverlap(box: Rect, obstacles: readonly Rect[]): { x: number; y: number } {
+  let { x, y } = box;
+  const hit = () =>
+    obstacles.find(
+      (o) =>
+        x < o.x + o.w + CLEAR_PAD &&
+        o.x - CLEAR_PAD < x + box.w &&
+        y < o.y + o.h + CLEAR_PAD &&
+        o.y - CLEAR_PAD < y + box.h
+    );
+  const first = hit();
+  if (!first) return { x, y };
+
+  // Four ways out of the first obstacle; the shortest one fixes the direction.
+  // Every later push then goes the same way, so a box wedged in a row of topics
+  // walks clear of the row instead of bouncing between two of its neighbors.
+  const ways = [
+    ['x', first.x - CLEAR_PAD - (x + box.w)],
+    ['x', first.x + first.w + CLEAR_PAD - x],
+    ['y', first.y - CLEAR_PAD - (y + box.h)],
+    ['y', first.y + first.h + CLEAR_PAD - y]
+  ] as const;
+  const [axis, delta] = ways.reduce((a, b) => (Math.abs(b[1]) < Math.abs(a[1]) ? b : a));
+  const forward = delta > 0;
+
+  // Each push clears at least one obstacle for good, so the list bounds the loop.
+  for (let pass = 0; pass <= obstacles.length; pass++) {
+    const o = hit();
+    if (!o) break;
+    if (axis === 'x') x = forward ? o.x + o.w + CLEAR_PAD : o.x - CLEAR_PAD - box.w;
+    else y = forward ? o.y + o.h + CLEAR_PAD : o.y - CLEAR_PAD - box.h;
+  }
+  return { x, y };
+}
+
+/** Slide a whole placed subtree clear of `obstacles`, keeping its shape. */
+function nudgeClear(group: LaidOutNode[], obstacles: readonly Rect[]): void {
+  const bb = bboxOf(group);
+  if (!bb) return;
+  const to = escapeOverlap(
+    { x: bb.minX, y: bb.minY, w: bb.maxX - bb.minX, h: bb.maxY - bb.minY },
+    obstacles
+  );
+  const dx = to.x - bb.minX;
+  const dy = to.y - bb.minY;
+  if (dx === 0 && dy === 0) return;
+  for (const n of group) {
+    n.x += dx;
+    n.y += dy;
+  }
+}
+
 /** A topic and every visible descendant, the topic first. */
 function* subtreeOf(t: Topic): Generator<Topic> {
   yield t;
@@ -922,9 +993,14 @@ export function layoutSheet(sheet: Sheet): Layout {
   const floating: LaidOutNode[] = [];
   const floatPalette = paletteForSheet(sheet);
   const autoColorFloat = sheet.settings?.autoColorFloating === true;
-  (sheet.floatingTopics ?? []).forEach((f, i) =>
-    placeFloating(f, i, floating, autoColorFloat ? colorFor(i, floatPalette) : FLOAT_COLOR)
-  );
+  const flexibleFloat = sheet.settings?.flexibleFloatingTopic === true;
+  (sheet.floatingTopics ?? []).forEach((f, i) => {
+    const start = floating.length;
+    placeFloating(f, i, floating, autoColorFloat ? colorFor(i, floatPalette) : FLOAT_COLOR);
+    // Each floating subtree dodges the map and the ones already placed, so a
+    // growing map pushes them aside instead of growing over them.
+    if (flexibleFloat) nudgeClear(floating.slice(start), [...nodes, ...floating.slice(0, start)]);
+  });
 
   nodes.push(...floating);
 

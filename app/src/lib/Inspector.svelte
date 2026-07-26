@@ -1022,6 +1022,16 @@
         Dragging a branch to empty space moves it there and keeps its connector, instead of
         detaching it into a floating topic.
       </p>
+      {@render toggleRow('Flexible Floating Topic', flag('flexibleFloatingTopic'), (v) =>
+        setFlag('flexibleFloatingTopic', v)
+      )}
+      <p class="hint">Floating topics shift aside when the map grows into them.</p>
+      {@render toggleRow('Topic Overlap', sheet.settings?.topicOverlap !== false, (v) =>
+        setFlag('topicOverlap', v)
+      )}
+      <p class="hint">
+        Off: a topic dropped on top of another snaps to the nearest free space instead.
+      </p>
     </div>
   {:else if activeTab === 'pitch'}
     <div class="tabbody">

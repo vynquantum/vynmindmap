@@ -5,7 +5,13 @@ import { fileURLToPath } from 'node:url';
 
 import { addChild, createWorkbook, readVmm } from '../src/index.js';
 import type { Topic } from '../src/index.js';
-import { layoutBalanced, layoutSheet, edgePath, sizeOf } from '../app/src/lib/layout.js';
+import {
+  layoutBalanced,
+  layoutSheet,
+  edgePath,
+  escapeOverlap,
+  sizeOf
+} from '../app/src/lib/layout.js';
 import { isBoxedLevelOne } from '../app/src/lib/mapAppearance.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -431,5 +437,65 @@ describe('boxed first level', () => {
     // Floating topics read as first-level branches, so they pick up the same
     // box rather than being singled out as bare text.
     expect(byId.get('park')).toBe(1);
+  });
+});
+
+/** Whether two placed rectangles share any area. */
+function overlaps(a: { x: number; y: number; w: number; h: number }, b: typeof a): boolean {
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+}
+
+describe('topic overlap', () => {
+  const obstacle = { x: 0, y: 0, w: 100, h: 40 };
+
+  it('leaves a box that already clears everything where it is', () => {
+    expect(escapeOverlap({ x: 500, y: 500, w: 80, h: 30 }, [obstacle])).toEqual({ x: 500, y: 500 });
+  });
+
+  it('escapes along the axis that needs the least movement', () => {
+    // Deep inside horizontally, barely inside vertically: down is the short way.
+    const moved = escapeOverlap({ x: 20, y: 35, w: 100, h: 40 }, [obstacle]);
+    expect(moved.x).toBe(20);
+    expect(moved.y).toBeGreaterThanOrEqual(obstacle.y + obstacle.h);
+  });
+
+  it('walks clear of a stacked row instead of bouncing between two of them', () => {
+    const box = { x: 10, y: 10, w: 60, h: 30 };
+    const row = [obstacle, { x: 0, y: 48, w: 100, h: 40 }, { x: 0, y: 96, w: 100, h: 40 }];
+    const moved = escapeOverlap(box, row);
+    expect(row.some((o) => overlaps({ ...moved, w: box.w, h: box.h }, o))).toBe(false);
+  });
+});
+
+describe('flexible floating topic', () => {
+  it('shifts a floating topic off the main map', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    addChild(sheet.rootTopic, 'Branch');
+    const float: Topic = {
+      id: 'park',
+      title: 'Parking lot',
+      children: [],
+      position: { x: 0, y: 0 }
+    };
+    sheet.floatingTopics = [float];
+
+    // Aim the floating topic at the root: positions are shift-free, so lining
+    // up the two local origins stacks them whatever the map's final offset is.
+    const probe = layoutSheet(sheet);
+    const pRoot = probe.nodes.find((n) => n.id === sheet.rootTopic.id)!;
+    const pFloat = probe.nodes.find((n) => n.id === 'park')!;
+    float.position = { x: pRoot.x - pFloat.x, y: pRoot.y - pFloat.y };
+
+    const off = layoutSheet(sheet);
+    const rect = (l: typeof off, id: string) => {
+      const n = l.nodes.find((m) => m.id === id)!;
+      return { x: n.x, y: n.y, w: n.w, h: n.h };
+    };
+    expect(overlaps(rect(off, sheet.rootTopic.id), rect(off, 'park'))).toBe(true);
+
+    sheet.settings = { flexibleFloatingTopic: true };
+    const on = layoutSheet(sheet);
+    expect(overlaps(rect(on, sheet.rootTopic.id), rect(on, 'park'))).toBe(false);
   });
 });

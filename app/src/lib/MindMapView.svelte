@@ -25,11 +25,13 @@
     removeBoundary,
     removeRelationship,
     removeSummary,
-    walkSheetTopics
+    walkSheetTopics,
+    walkTopic
   } from '../../../src/index.js';
   import {
     layoutSheet,
     edgePath,
+    escapeOverlap,
     summaryPath,
     clampTopicMinHeight,
     clampTopicWidth,
@@ -371,6 +373,26 @@
     }
   }
 
+  /**
+   * Where a dragged node lands, in the shift-free coordinates `position` uses.
+   * With Topic Overlap off the landing spot is pushed to the nearest free
+   * space, so a drop never buries a topic that is already placed.
+   */
+  function dropPoint(node: LaidOutNode): { x: number; y: number } {
+    const at = {
+      x: lastPoint.x - layout.shiftX - node.w / 2,
+      y: lastPoint.y - layout.shiftY - node.h / 2
+    };
+    if (sheet.settings?.topicOverlap === false) {
+      const moving = new Set([...walkTopic(node.topic)].map((t) => t.id));
+      const obstacles = layout.nodes
+        .filter((n) => !moving.has(n.id))
+        .map((n) => ({ x: n.x - layout.shiftX, y: n.y - layout.shiftY, w: n.w, h: n.h }));
+      return escapeOverlap({ ...at, w: node.w, h: node.h }, obstacles);
+    }
+    return at;
+  }
+
   function onContainerPointerUp() {
     if (resizing) {
       notify();
@@ -389,10 +411,7 @@
         const node = nodeById.get(dragId);
         const f = (sheet.floatingTopics ?? []).find((t) => t.id === dragId);
         if (f && node) {
-          f.position = {
-            x: lastPoint.x - layout.shiftX - node.w / 2,
-            y: lastPoint.y - layout.shiftY - node.h / 2
-          };
+          f.position = dropPoint(node);
           notify();
         }
         dragId = null;
@@ -413,10 +432,7 @@
             lastPoint.y > node.y + node.h + 24
           : false;
         if (hasParent && farEnough && node) {
-          const at = {
-            x: lastPoint.x - layout.shiftX - node.w / 2,
-            y: lastPoint.y - layout.shiftY - node.h / 2
-          };
+          const at = dropPoint(node);
           if (sheet.settings?.freeBranchPosition) {
             // Same gesture, non-destructive: the branch keeps its parent and
             // its connector, and only its anchor moves.

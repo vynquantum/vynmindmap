@@ -226,6 +226,12 @@ export interface SheetSettings {
   /** Let an attached branch keep an explicit canvas position: dragging one to
    * empty space moves it there instead of detaching it from its parent. */
   freeBranchPosition?: boolean;
+  /** Shift floating topics clear of the main map instead of letting it grow
+   * over them. */
+  flexibleFloatingTopic?: boolean;
+  /** Whether topics may be dropped on top of each other. Defaults to true;
+   * set false to snap a drop to the nearest free space instead. */
+  topicOverlap?: boolean;
   /** Branch line geometry for connector-based structures; each structure
    * family keeps its own default when unset. Vertical charts (org, vertical
    * timeline) support 'straight' and otherwise stay elbowed. */
