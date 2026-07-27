@@ -234,10 +234,20 @@ closes. The canvas pans to each match.
 
 ## Presenting
 
-Click the presenter button in the toolbar. **PageDown** and **PageUp** walk
-through topics one at a time, zooming to each. There's a presenter view with a
-clock, a timer, and progress. **F8** (zen mode) is useful alongside it, since
-it strips the toolbar.
+Click the presenter button in the toolbar. Zen mode turns on by itself, so the
+toolbar and panels get out of the way.
+
+VynMM presents **the map itself**, not a generated slide deck: **PageDown** and
+**PageUp** walk topics one at a time, zooming to each, expanding collapsed
+branches on the way. The audience sees the structure and how each point hangs
+off it, which is the argument a mind map is making. A second window gives you
+the presenter view — the current topic's note, what's next, progress, a timer,
+and a clock.
+
+The walk order is depth-first through the tree, then any floating topics, so
+it follows the map top to bottom. You can't reorder it or skip branches; every
+topic gets its turn. If you need something to hand out afterwards, export to
+PDF or PNG rather than presenting.
 
 ## Saving, opening, exporting
 
@@ -318,7 +328,5 @@ Honest list of what doesn't work yet, tracked in
   horizontal_ is identical to _Logic chart · right_. They render every topic
   correctly — they just aren't distinct chart types yet. _Timeline · capsule_
   is unaffected.
-- **The Pitch tab is a placeholder.** Use the presenter button in the toolbar
-  for presentation; the Pitch tab's settings aren't implemented.
 
 The other 28 of the 31 gallery layouts render every topic.

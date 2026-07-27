@@ -384,15 +384,15 @@
 
   // --- top-level tabs (persisted) --------------------------------------------
   const TAB_KEY = 'vynmm.inspector.tab';
-  type TabId = 'style' | 'pitch' | 'map';
+  type TabId = 'style' | 'map';
   const TABS: { id: TabId; label: string }[] = [
     { id: 'style', label: 'Style' },
-    { id: 'pitch', label: 'Pitch' },
     { id: 'map', label: 'Map' }
   ];
   function loadTab(): TabId {
     const raw = localStorage.getItem(TAB_KEY);
-    return raw === 'style' || raw === 'pitch' || raw === 'map' ? raw : 'map';
+    // A stored 'pitch' from the removed tab falls through to the default.
+    return raw === 'style' || raw === 'map' ? raw : 'map';
   }
   let activeTab = $state<TabId>(loadTab());
   $effect(() => {
@@ -1050,13 +1050,6 @@
         Off: a topic dropped on top of another snaps to the nearest free space instead.
       </p>
     </div>
-  {:else if activeTab === 'pitch'}
-    <div class="tabbody">
-      <p class="hint">
-        Pitch mode settings are coming soon. Use the presentation button in the toolbar to present
-        this map.
-      </p>
-    </div>
   {:else if topic}
     <section>
       {@render sectionHeader('layout', 'Size & wrapping')}
@@ -1383,7 +1376,7 @@
     font-size: 13px;
   }
 
-  /* Top-level Style / Pitch / Map tabs */
+  /* Top-level Style / Map tabs */
   .tabbar {
     position: sticky;
     top: -10px;
