@@ -10,7 +10,8 @@ import {
   layoutSheet,
   edgePath,
   escapeOverlap,
-  sizeOf
+  sizeOf,
+  titleAnchor
 } from '../app/src/lib/layout.js';
 import { isBoxedLevelOne } from '../app/src/lib/mapAppearance.js';
 
@@ -497,5 +498,26 @@ describe('flexible floating topic', () => {
     sheet.settings = { flexibleFloatingTopic: true };
     const on = layoutSheet(sheet);
     expect(overlaps(rect(on, sheet.rootTopic.id), rect(on, 'park'))).toBe(false);
+  });
+});
+
+describe('title alignment', () => {
+  it('anchors inside the box, symmetrically, and centres by default', () => {
+    const w = 200;
+    const left = titleAnchor('left', w);
+    const right = titleAnchor('right', w);
+    const centre = titleAnchor('center', w);
+
+    expect(left).toEqual({ anchor: 'start', x: 13 });
+    expect(right).toEqual({ anchor: 'end', x: w - 13 });
+    expect(centre).toEqual({ anchor: 'middle', x: w / 2 });
+    // An unset align is centred, so existing maps render exactly as before.
+    expect(titleAnchor(undefined, w)).toEqual(centre);
+
+    // Both insets have to match the padding sizeOf reserved, or a fixed-width
+    // topic wraps its text at one width and then paints it at another.
+    expect(left.x).toBe(w - right.x);
+    const t: Topic = { id: 'a', title: 'x'.repeat(40), style: { width: w } };
+    expect(sizeOf(t).w).toBe(w);
   });
 });

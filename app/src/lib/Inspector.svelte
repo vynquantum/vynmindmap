@@ -609,6 +609,11 @@
     font.style = font.style === 'italic' ? 'normal' : 'italic';
     markDirty();
   }
+  function setAlign(a: 'left' | 'center' | 'right') {
+    if (!topic) return;
+    fontOf(topic).align = a;
+    markDirty();
+  }
   function setDecoration(d: 'none' | 'underline' | 'line-through') {
     if (!topic) return;
     const font = fontOf(topic);
@@ -769,6 +774,28 @@
       ></button>
     {/each}
   </div>
+{/snippet}
+
+{#snippet alignBtn(id: 'left' | 'center' | 'right', shortX: number)}
+  <button
+    class="ff"
+    class:on={(font?.align ?? 'center') === id}
+    title={`Align ${id}`}
+    aria-label={`Align ${id}`}
+    onclick={() => setAlign(id)}
+  >
+    <!-- Four ragged lines: the short ones move to show which edge is flush. -->
+    <svg viewBox="0 0 14 12" aria-hidden="true">
+      {#each [0, 1, 2, 3] as i (i)}
+        <line
+          x1={i % 2 ? shortX : 1}
+          x2={i % 2 ? shortX + 7 : 13}
+          y1={1.5 + i * 3}
+          y2={1.5 + i * 3}
+        />
+      {/each}
+    </svg>
+  </button>
 {/snippet}
 
 {#snippet toggleRow(label: string, on: boolean, set: (v: boolean) => void, disabled = false)}
@@ -1220,6 +1247,12 @@
                 onclick={() => setDecoration('line-through')}>S</button
               >
             </div>
+          </div>
+          <div class="fieldname">Alignment</div>
+          <div class="fontbtns">
+            {@render alignBtn('left', 1)}
+            {@render alignBtn('center', 3.5)}
+            {@render alignBtn('right', 6)}
           </div>
         </div>
       {/if}
@@ -1876,6 +1909,13 @@
     height: 28px;
     padding: 0;
     border-radius: 7px;
+  }
+  .ff svg {
+    width: 14px;
+    height: 12px;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
   }
   .ff.bold {
     font-weight: 700;

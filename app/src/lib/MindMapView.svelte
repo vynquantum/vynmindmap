@@ -41,6 +41,7 @@
     clampTopicMinHeight,
     clampTopicWidth,
     NOTE_LINE_H,
+    titleAnchor,
     type Layout,
     type LaidOutNode,
     type Rect
@@ -1727,7 +1728,14 @@
     if (!editingId) return null;
     const n = nodeById.get(editingId);
     if (!n) return null;
-    return { left: n.x * scale + tx, top: n.y * scale + ty, w: n.w * scale, h: n.h * scale };
+    return {
+      left: n.x * scale + tx,
+      top: n.y * scale + ty,
+      w: n.w * scale,
+      h: n.h * scale,
+      // Match the topic's alignment so the text doesn't jump on double-click.
+      align: n.topic.style?.font?.align ?? 'center'
+    };
   });
 
   const ctxTopic = $derived(ctxMenu?.nodeId ? (findTopic(sheet, ctxMenu.nodeId) ?? null) : null);
@@ -1958,9 +1966,10 @@
 
           {#if n.id !== editingId}
             {@const cy = titleCenterY(n)}
+            {@const ta = titleAnchor(n.topic.style?.font?.align, n.w)}
             <text
               dominant-baseline="central"
-              text-anchor="middle"
+              text-anchor={ta.anchor}
               font-family={n.topic.style?.font?.family ?? sheet.settings?.globalFont ?? 'inherit'}
               font-size={n.topic.style?.font?.size ?? (n.depth === 0 ? 15 : 13)}
               font-weight={n.topic.style?.font?.weight ??
@@ -1970,22 +1979,21 @@
               fill={textFill(n)}
             >
               {#each n.lines as line, li (li)}
-                <tspan x={n.w / 2} y={cy + (li - (n.lines.length - 1) / 2) * n.lineH}>{line}</tspan>
+                <tspan x={ta.x} y={cy + (li - (n.lines.length - 1) / 2) * n.lineH}>{line}</tspan>
               {/each}
             </text>
             {#if n.noteLines.length}
               <text
                 dominant-baseline="central"
-                text-anchor="middle"
+                text-anchor={ta.anchor}
                 font-family={sheet.settings?.globalFont ?? 'inherit'}
                 font-size="11"
                 fill={textFill(n)}
                 opacity="0.75"
               >
                 {#each n.noteLines as line, ni (ni)}
-                  <tspan
-                    x={n.w / 2}
-                    y={cy + (n.lines.length * n.lineH) / 2 + (ni + 0.5) * NOTE_LINE_H}>{line}</tspan
+                  <tspan x={ta.x} y={cy + (n.lines.length * n.lineH) / 2 + (ni + 0.5) * NOTE_LINE_H}
+                    >{line}</tspan
                   >
                 {/each}
               </text>
@@ -2128,7 +2136,7 @@
       bind:this={editInput}
       bind:value={editValue}
       rows="1"
-      style={`left:${editBox.left}px; top:${editBox.top}px; width:${Math.max(90, editBox.w)}px; height:${Math.max(30, editBox.h)}px; font-size:${13 * scale}px;`}
+      style={`left:${editBox.left}px; top:${editBox.top}px; width:${Math.max(90, editBox.w)}px; height:${Math.max(30, editBox.h)}px; font-size:${13 * scale}px; text-align:${editBox.align};`}
       onkeydown={onEditKey}
       onblur={commitEdit}
       onpointerdown={(e) => e.stopPropagation()}></textarea>

@@ -6,7 +6,7 @@
  * topics and the decorations (boundaries / summaries) that wrap topic groups.
  */
 
-import type { Sheet, StructureId, Topic } from '../../../src/index.js';
+import type { FontStyle, Sheet, StructureId, Topic } from '../../../src/index.js';
 import { isTextOnLines, paletteForSheet, rootColorForSheet } from './mapAppearance.js';
 
 export interface LaidOutNode {
@@ -326,6 +326,20 @@ export function sizeOf(t: Topic): TopicSize {
     lines.length * lineH + noteLines.length * NOTE_LINE_H + PAD_Y * 2
   );
   return { w, h, lines, lineH, noteLines };
+}
+
+/**
+ * Where a topic's title sits inside its box. SVG anchors text *at* the given x
+ * rather than within a box, so left and right align have to inset by the same
+ * padding `sizeOf` reserved when it measured the box.
+ */
+export function titleAnchor(
+  align: FontStyle['align'],
+  w: number
+): { anchor: 'start' | 'middle' | 'end'; x: number } {
+  if (align === 'left') return { anchor: 'start', x: PAD_X / 2 };
+  if (align === 'right') return { anchor: 'end', x: w - PAD_X / 2 };
+  return { anchor: 'middle', x: w / 2 };
 }
 
 /** Back-compat width-only measure. */

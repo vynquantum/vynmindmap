@@ -150,7 +150,10 @@ Open the style panel (toolbar, or the button on a selected topic) and use the
 
 - **Size & wrapping** — fixed width, wrap behaviour
 - **Appearance** — fill colour, border colour, shape
-- **Font** — family, size, weight, colour
+- **Font** — family, size, weight, colour, bold / italic / underline /
+  strikethrough, and **Alignment** (left, centre, right). Alignment applies to
+  the title and any note shown under it; topics are centred unless you say
+  otherwise.
 - **Markers** — **Priority** 1–9 as coloured numbered chips, plus a **Progress
   & symbols** row (task start / 25% / 50% / 75% / done, flags, stars, heart,
   idea, question, warning, info, cross, check, rocket, fire, bomb…). Click to

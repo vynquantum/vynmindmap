@@ -66,6 +66,8 @@ export interface FontStyle {
   style?: 'normal' | 'italic';
   color?: string;
   decoration?: 'none' | 'underline' | 'line-through';
+  /** Horizontal alignment of the title inside the topic box. Omit for centred. */
+  align?: 'left' | 'center' | 'right';
 }
 
 export interface TopicStyle {
