@@ -16,6 +16,7 @@
  */
 
 import { createSheet, createTopic } from './model.js';
+import { isStructureId } from './types.js';
 import type { Sheet, StructureId, Topic, Workbook } from './types.js';
 
 const SHEET_SEPARATOR = '<!-- vmm:sheet -->';
@@ -93,7 +94,9 @@ function parseFrontmatter(md: string): { body: string; fm: Frontmatter } {
     const key = kv[1]!;
     const value = kv[2]!.replace(/^["']|["']$/g, '').trim();
     if (key === 'title') fm.title = value;
-    else if (key === 'structure') fm.structure = value as StructureId;
+    // An unknown structure is ignored, not fatal: the parser is lenient, and the
+    // caller falls back to the documented default rather than losing the import.
+    else if (key === 'structure' && isStructureId(value)) fm.structure = value;
     else if (key === 'theme') fm.theme = value;
   }
   return { body: text.slice(m[0].length), fm };

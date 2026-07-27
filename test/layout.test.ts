@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { addChild, createWorkbook, readVmm } from '../src/index.js';
+import { addChild, createWorkbook, readVmm, STRUCTURE_IDS } from '../src/index.js';
 import type { Topic } from '../src/index.js';
 import {
   layoutBalanced,
@@ -295,6 +295,31 @@ describe('layoutBalanced', () => {
         layout.edges.some((e) => e.id.includes('float-1') && e.id.includes('float-2')),
         structure
       ).toBe(true);
+    }
+  });
+
+  it('places every topic of the tree, in every structure', () => {
+    const ids = (t: Topic): string[] => [t.id, ...(t.children ?? []).flatMap(ids)];
+
+    for (const structure of STRUCTURE_IDS) {
+      const wb = createWorkbook('Root');
+      const sheet = wb.sheets[0]!;
+      sheet.structure = structure;
+      const a = addChild(sheet.rootTopic, 'A');
+      const b = addChild(sheet.rootTopic, 'B');
+      const a1 = addChild(a, 'A1');
+      addChild(a, 'A2');
+      addChild(b, 'B1');
+      // Depth 3 — a layout that walks a fixed number of levels drops this one.
+      const deep = addChild(a1, 'A1x');
+
+      const placed = new Set(layoutSheet(sheet).nodes.map((n) => n.id));
+      const missing = ids(sheet.rootTopic).filter((id) => !placed.has(id));
+
+      // BACKLOG.md §1: fishbone iterates exactly two levels (bones, then causes),
+      // so depth 3 is placed nowhere. Drop this branch when sub-bones land.
+      if (structure.startsWith('fishbone.')) expect(missing, structure).toEqual([deep.id]);
+      else expect(missing, structure).toEqual([]);
     }
   });
 

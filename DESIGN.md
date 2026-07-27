@@ -221,7 +221,11 @@ either dropped on export or added in-app after import.
 - `fishbone.right`, `fishbone.left` — fishbone / Ishikawa
 - `matrix` — matrix / spreadsheet-like
 - `tree-table` — tree table
+- `grid` — grid / sticky-note wall
 - `brace.right`, `brace.left` — brace map
+
+The full runtime list is `STRUCTURE_IDS` in `src/types.ts` (`map.underline` is
+legacy — reachable in old files, not offered in the picker).
 
 ### 5.2 Topic elements
 

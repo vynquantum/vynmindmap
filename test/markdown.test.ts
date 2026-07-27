@@ -65,6 +65,12 @@ theme: dark
     expect(sheet.theme).toBe('dark');
   });
 
+  it('ignores an unknown structure instead of writing it into the sheet', () => {
+    const sheet = markdownToSheet(`---\nstructure: org.sideways\ntheme: dark\n---\n# Plan\n`);
+    expect(sheet.structure).toBe('map.balanced');
+    expect(sheet.theme).toBe('dark');
+  });
+
   it('is lenient when there is no H1', () => {
     const sheet = markdownToSheet(`- lonely\n- items\n`);
     expect(sheet.rootTopic.title).toBe('Untitled');

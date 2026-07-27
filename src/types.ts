@@ -29,26 +29,34 @@ export interface Manifest {
 // Structures (per-sheet layout) — DESIGN.md §5.1
 // ---------------------------------------------------------------------------
 
-export type StructureId =
-  | 'map.balanced'
-  | 'map.left'
-  | 'map.right'
-  | 'map.underline'
-  | 'logic.right'
-  | 'logic.left'
-  | 'org.down'
-  | 'org.up'
-  | 'tree.right'
-  | 'tree.left'
-  | 'timeline.h'
-  | 'timeline.v'
-  | 'fishbone.right'
-  | 'fishbone.left'
-  | 'matrix'
-  | 'tree-table'
-  | 'grid'
-  | 'brace.right'
-  | 'brace.left';
+/** Every valid `structure` id. Runtime list so untrusted input (Markdown
+ * frontmatter, `content.json`) can be checked against it, not just cast. */
+export const STRUCTURE_IDS = [
+  'map.balanced',
+  'map.left',
+  'map.right',
+  'map.underline',
+  'logic.right',
+  'logic.left',
+  'org.down',
+  'org.up',
+  'tree.right',
+  'tree.left',
+  'timeline.h',
+  'timeline.v',
+  'fishbone.right',
+  'fishbone.left',
+  'matrix',
+  'tree-table',
+  'grid',
+  'brace.right',
+  'brace.left'
+] as const;
+
+export type StructureId = (typeof STRUCTURE_IDS)[number];
+
+export const isStructureId = (v: unknown): v is StructureId =>
+  (STRUCTURE_IDS as readonly unknown[]).includes(v);
 
 /** Visual treatment applied independently from the chart's geometry. */
 export type MapPresentation = 'boxed' | 'underline';

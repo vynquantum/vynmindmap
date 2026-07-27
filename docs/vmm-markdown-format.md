@@ -49,7 +49,10 @@ Set `structure:` in the frontmatter to one of:
 
 `map.balanced`, `map.left`, `map.right`, `logic.right`, `logic.left`, `org.down`,
 `org.up`, `tree.right`, `tree.left`, `timeline.h`, `timeline.v`, `fishbone.right`,
-`fishbone.left`, `matrix`, `tree-table`, `brace.right`, `brace.left`.
+`fishbone.left`, `matrix`, `tree-table`, `grid`, `brace.right`, `brace.left`.
+
+Anything else is ignored and the sheet falls back to `map.balanced`, so a typo
+costs you the layout, not the import.
 
 (Only the topic tree is shared across structures; the structure just changes how
 VynMM lays it out.)
