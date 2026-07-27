@@ -2,7 +2,11 @@
   import type { Topic as ClipTopic } from '../../../src/index.js';
   // Session-wide clipboard for topic subtrees: survives sheet switches and
   // lets users copy across sheets in the same workbook.
-  let clipboard = $state<ClipTopic[]>([]);
+  //
+  // Raw, not deep state: these are already snapshots, nothing mutates them in
+  // place, and `cloneTopicWithNewIds` clones with `structuredClone`, which
+  // throws on a proxy. Deep state would hand it one and break every paste.
+  let clipboard = $state.raw<ClipTopic[]>([]);
 </script>
 
 <script lang="ts">
@@ -1727,6 +1731,17 @@
   });
 
   const ctxTopic = $derived(ctxMenu?.nodeId ? (findTopic(sheet, ctxMenu.nodeId) ?? null) : null);
+
+  /**
+   * Run a context-menu action on the topic the menu was opened over, then close
+   * the menu. Read the id first: closing invalidates anything derived from
+   * `ctxMenu`, so a handler that closes and *then* reads it gets nothing.
+   */
+  function runOnCtxTopic(fn: (id: string) => void) {
+    const id = ctxMenu?.nodeId;
+    ctxMenu = null;
+    if (id) fn(id);
+  }
 </script>
 
 <div
@@ -2127,38 +2142,35 @@
       style={`left:${ctxMenu.x}px; top:${ctxMenu.y}px;`}
       onpointerdown={(e) => e.stopPropagation()}
     >
-      {#if ctxMenu.nodeId}
-        {@const id = ctxMenu.nodeId}
+      <!-- Optional chaining: closing the menu sets ctxMenu to null, and this
+           block is re-evaluated once before the outer {#if} tears it down. -->
+      {#if ctxMenu?.nodeId}
         <button
           role="menuitem"
-          onclick={() => {
-            ctxMenu = null;
-            selectOnly(id);
-            addChildToSelected();
-          }}>Add child <kbd>Tab</kbd></button
+          onclick={() =>
+            runOnCtxTopic((id) => {
+              selectOnly(id);
+              addChildToSelected();
+            })}>Add child <kbd>Tab</kbd></button
         >
         <button
           role="menuitem"
-          onclick={() => {
-            ctxMenu = null;
-            selectOnly(id);
-            addSiblingToSelected();
-          }}>Add sibling <kbd>Enter</kbd></button
+          onclick={() =>
+            runOnCtxTopic((id) => {
+              selectOnly(id);
+              addSiblingToSelected();
+            })}>Add sibling <kbd>Enter</kbd></button
+        >
+        <button role="menuitem" onclick={() => runOnCtxTopic(beginEdit)}
+          >Rename <kbd>F2</kbd></button
         >
         <button
           role="menuitem"
-          onclick={() => {
-            ctxMenu = null;
-            beginEdit(id);
-          }}>Rename <kbd>F2</kbd></button
-        >
-        <button
-          role="menuitem"
-          onclick={() => {
-            ctxMenu = null;
-            selectOnly(id);
-            startRelate();
-          }}>Relate →</button
+          onclick={() =>
+            runOnCtxTopic((id) => {
+              selectOnly(id);
+              startRelate();
+            })}>Relate →</button
         >
         <hr />
         <button
@@ -2178,10 +2190,7 @@
         <button
           role="menuitem"
           disabled={!clipboard.length}
-          onclick={() => {
-            ctxMenu = null;
-            pasteClipboard(id);
-          }}>Paste as child <kbd>Ctrl+V</kbd></button
+          onclick={() => runOnCtxTopic(pasteClipboard)}>Paste as child <kbd>Ctrl+V</kbd></button
         >
         <button
           role="menuitem"
@@ -2194,11 +2203,11 @@
         {#if ctxTopic && hasChildren(ctxTopic)}
           <button
             role="menuitem"
-            onclick={() => {
-              ctxMenu = null;
-              selectOnly(id);
-              collapseSelected();
-            }}
+            onclick={() =>
+              runOnCtxTopic((id) => {
+                selectOnly(id);
+                collapseSelected();
+              })}
           >
             {ctxTopic.collapsed ? 'Expand' : 'Collapse'} <kbd>Space</kbd>
           </button>
@@ -2206,11 +2215,11 @@
         <button
           role="menuitem"
           class="danger"
-          onclick={() => {
-            ctxMenu = null;
-            selectOnly(id);
-            deleteSelected();
-          }}>Delete <kbd>Del</kbd></button
+          onclick={() =>
+            runOnCtxTopic((id) => {
+              selectOnly(id);
+              deleteSelected();
+            })}>Delete <kbd>Del</kbd></button
         >
       {:else}
         <button
