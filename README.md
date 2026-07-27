@@ -4,7 +4,8 @@ A cross-platform mind-mapping app (Windows / Linux / Mac) and an XMind-class
 feature clone. Mind maps are stored locally as `.vmm` files. Humans edit them in a
 visual canvas; LLMs read/write them through a Markdown lane and an MCP/CLI.
 
-See [DESIGN.md](DESIGN.md) for the full design.
+New here? Start with the [**user guide**](docs/user-guide.md) — every feature and
+how to reach it. See [DESIGN.md](DESIGN.md) for the full design.
 
 ## Download & install
 

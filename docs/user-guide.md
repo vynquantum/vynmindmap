@@ -1,0 +1,324 @@
+# VynMindMap user guide
+
+Everything the app can do, and how to reach it. If you only read one section,
+read [Your first map](#your-first-map) and the
+[keyboard shortcuts](#keyboard-shortcuts).
+
+- [Your first map](#your-first-map)
+- [Getting around the canvas](#getting-around-the-canvas)
+- [Building the tree](#building-the-tree)
+- [Moving branches: attach, detach, reparent](#moving-branches-attach-detach-reparent)
+- [Copy, cut, paste, duplicate](#copy-cut-paste-duplicate)
+- [Collapsing and expanding](#collapsing-and-expanding)
+- [Floating topics](#floating-topics)
+- [Relationships, boundaries, summaries](#relationships-boundaries-summaries)
+- [Styling a topic](#styling-a-topic)
+- [Notes, links, labels, images, markers](#notes-links-labels-images-markers)
+- [Changing the chart type](#changing-the-chart-type)
+- [Map-wide layout options](#map-wide-layout-options)
+- [Sheets](#sheets)
+- [The outline panel](#the-outline-panel)
+- [Finding topics](#finding-topics)
+- [Presenting](#presenting)
+- [Saving, opening, exporting](#saving-opening-exporting)
+- [Keyboard shortcuts](#keyboard-shortcuts)
+- [Known limitations](#known-limitations)
+
+---
+
+## Your first map
+
+1. Launch the app. You get a new map with a single root topic.
+2. Click the root to select it. Press **Tab** to add a child; the new topic
+   opens for editing straight away — just type.
+3. Press **Enter** to add a sibling next to whatever is selected.
+4. Press **Esc** or click anywhere else on the canvas to finish typing. Both
+   commit what you typed; nothing is lost.
+5. **Ctrl+S** saves to a `.vmm` file.
+
+That loop — Tab for deeper, Enter for wider, type, Esc — is the whole editor.
+Everything below is refinement.
+
+## Getting around the canvas
+
+| You want to           | Do this                                                                                       |
+| --------------------- | --------------------------------------------------------------------------------------------- |
+| Pan                   | Drag empty canvas, or scroll with the mouse wheel                                             |
+| Zoom in / out         | **Ctrl+=** / **Ctrl+-**, or the ± buttons bottom-left                                         |
+| Back to 100%          | **Ctrl+0**, or click the percentage in the zoom bar                                           |
+| Fit the map on screen | Right-click empty canvas → **Fit map to view** (scales up as well as down, to a 150% ceiling) |
+| Jump somewhere far    | Drag inside the minimap (bottom-right)                                                        |
+| Hide all the chrome   | **F8** toggles full-window (zen) mode                                                         |
+
+Keyboard selection auto-pans: arrow-key your way off-screen and the canvas
+follows you.
+
+## Building the tree
+
+Select a topic first — everything here acts on the selection.
+
+- **Tab** (or **Insert**) — add a child
+- **Enter** — add a sibling
+- **F2** or double-click — rename; **Shift+Enter** inside the editor inserts a
+  line break, so titles can be multi-line
+- **Delete** / **Backspace** — delete the topic and everything under it
+- **Arrow keys** — move the selection through the tree
+- **Shift-click** — add another topic to the selection
+- **Esc** — clear the selection
+
+Long titles word-wrap by themselves. Right-clicking a topic gives you the same
+actions in a menu: Add child, Add sibling, Rename, Relate, Copy, Cut, Paste as
+child, Duplicate, Collapse/Expand, Delete.
+
+## Moving branches: attach, detach, reparent
+
+Drag the topic itself.
+
+- **Drop it on another topic** — it becomes that topic's child. The target
+  highlights while you hover it, so you can see where it will land.
+- **Drop it on empty canvas** — it detaches from its parent and becomes a
+  floating topic, anchored where you dropped it.
+- **Drop a floating topic on a real one** — it attaches as a child.
+
+The whole subtree travels with the topic you drag. Press **Esc** mid-drag to
+call the whole thing off.
+
+If you turn on **Free Branch Position** (Inspector → Map), dropping on empty
+canvas repositions the branch instead of detaching it — useful when you want to
+hand-place branches without breaking the tree.
+
+## Copy, cut, paste, duplicate
+
+- **Ctrl+C** copies the selected topic _and its subtree_
+- **Ctrl+X** cuts it out
+- **Ctrl+V** pastes it as a child of whatever is selected
+- **Ctrl+D** duplicates in place
+
+The clipboard survives sheet switches, so you can copy on one sheet and paste
+on another. To drop a copy somewhere specific, right-click empty canvas and
+choose **Paste here** — it lands as a floating topic at the cursor.
+
+Pasted topics get fresh ids, so nothing collides with the original.
+
+## Collapsing and expanding
+
+| Key       | Effect                                                       |
+| --------- | ------------------------------------------------------------ |
+| **Space** | Collapse/expand the selected topic one level                 |
+| **-**     | Collapse the selected topic                                  |
+| **=**     | Expand the selected topic                                    |
+| **/**     | Collapse the entire subtree under the selection, recursively |
+| **\***    | Expand the entire subtree, recursively                       |
+
+With nothing selected, **/** and **\*** collapse or expand the whole map.
+Topics with hidden children show a toggle you can click instead.
+
+## Floating topics
+
+A floating topic sits on the canvas with no parent — a parking lot, a caption,
+an idea you haven't placed yet.
+
+- **Double-click empty canvas**, or right-click → **New floating topic**
+- It opens for editing immediately; type, then click away or press Esc
+- Give it children with Tab, exactly like a rooted topic
+- Drag it onto a real topic when you're ready to fold it into the tree
+
+## Relationships, boundaries, summaries
+
+**Relationship** — a dashed arrow between any two topics, regardless of where
+they sit in the tree. Select a topic, click **Relate →** in the action bar (or
+right-click → Relate), then click the target. Double-click the arrow to give it
+a label; click it once to select it, then Delete to remove it.
+
+**Boundary** — a dashed outline drawn around a group of sibling topics.
+**Shift-click** (or Ctrl/Cmd-click) to select two or more _contiguous
+siblings_ — the action bar appears and says "2 topics" — then click **Add
+boundary**. Click the outline later to select it; the action bar then offers
+**Delete**.
+
+> Boundaries and summaries only work on siblings that sit next to each other
+> under the same parent. If you select two topics with different parents, the
+> action bar stays empty — that's the guard, not a bug.
+
+**Summary** — a brace spanning a group plus a new topic that summarises it.
+Same selection, click **Add summary**; a new "Summary" topic appears.
+
+## Styling a topic
+
+Open the style panel (toolbar, or the button on a selected topic) and use the
+**Style** tab:
+
+- **Size & wrapping** — fixed width, wrap behaviour
+- **Appearance** — fill colour, border colour, shape
+- **Font** — family, size, weight, colour
+- **Markers** — **Priority** 1–9 as coloured numbered chips, plus a **Progress
+  & symbols** row (task start / 25% / 50% / 75% / done, flags, stars, heart,
+  idea, question, warning, info, cross, check, rocket, fire, bomb…). Click to
+  toggle one on, click again to remove it.
+- **Insert emoji** — drop an emoji straight into the title
+- **Note · link · labels · image** — see below
+
+Styles are per topic. Nothing you set here changes the map's geometry — that's
+the Map tab.
+
+## Notes, links, labels, images, markers
+
+All in the Style tab's last section:
+
+- **Note** — long-form text attached to a topic; shows a small badge on the
+  node. Turn on _Display All Notes_ (Map tab) to render them inline.
+- **Link** — one of four kinds: a **web** URL, a local **file** path, another
+  **topic** in the map, or an **email** address.
+- **Labels** — short tags rendered under the title.
+- **Image** — an image embedded in the node.
+- **Markers** — icon chips shown before the title; priority markers render as
+  coloured numbered chips.
+
+## Changing the chart type
+
+The **Map** tab holds the structure gallery: 31 layouts across 10 families.
+
+| Family      | Variants                                                             |
+| ----------- | -------------------------------------------------------------------- |
+| Mind Map    | balanced, right, left, text-on-lines, capsule, straight lines, elbow |
+| Logic Chart | right, left, curved, capsule                                         |
+| Org Chart   | down, up, straight, capsule                                          |
+| Tree Chart  | right, left, curved                                                  |
+| Timeline    | horizontal, vertical, capsule                                        |
+| Fishbone    | right, left, capsule                                                 |
+| Brace Map   | right, left, capsule                                                 |
+| Tree Table  | —                                                                    |
+| Matrix      | —                                                                    |
+| Grid        | plain, rounded cards                                                 |
+
+Click a card and the map re-lays out immediately. Your content doesn't change,
+only the geometry — switch freely and switch back.
+
+## Map-wide layout options
+
+Also on the **Map** tab, as toggles:
+
+- **Compact Map** — tighter spacing
+- **Uniform Topic Length** — every node the same width
+- **Display All Notes** — render notes inline instead of as badges
+- **Auto-colour Floating Topic** — give new floating topics their own colours
+- **Line Colour Follow Topic** — branch lines take the topic's colour
+- **Free Branch Position** — drop on empty canvas repositions instead of
+  detaching (see [Moving branches](#moving-branches-attach-detach-reparent))
+- **Flexible Floating Topic** — looser placement rules for floating topics
+- **Topic Overlap** — allow nodes to overlap rather than pushing each other apart
+
+## Sheets
+
+One `.vmm` file can hold several maps, as sheets, shown as tabs below the
+canvas.
+
+- **+** adds a sheet
+- Click a tab to switch
+- **Double-click** a tab to rename it
+- **×** on the tab closes it
+
+The clipboard is shared across sheets, so copy on one and paste on another.
+
+## The outline panel
+
+Toggle it from the toolbar. It shows the map as an indented text outline — good
+for reading a big map quickly, and for checking structure without the visual
+noise. Selecting in the outline selects on the canvas.
+
+## Finding topics
+
+**Ctrl+F** opens the find bar. Type; matches are counted and highlighted.
+**Enter** goes to the next match, **Shift+Enter** to the previous, **Esc**
+closes. The canvas pans to each match.
+
+## Presenting
+
+Click the presenter button in the toolbar. **PageDown** and **PageUp** walk
+through topics one at a time, zooming to each. There's a presenter view with a
+clock, a timer, and progress. **F8** (zen mode) is useful alongside it, since
+it strips the toolbar.
+
+## Saving, opening, exporting
+
+| Action      | Shortcut                                      |
+| ----------- | --------------------------------------------- |
+| New map     | **Ctrl+N**                                    |
+| Open        | **Ctrl+O**                                    |
+| Save        | **Ctrl+S**                                    |
+| Save As     | **Ctrl+Shift+S**                              |
+| Close map   | **Ctrl+W**                                    |
+| Undo / Redo | **Ctrl+Z** / **Ctrl+Y** (or **Ctrl+Shift+Z**) |
+
+Maps save as `.vmm` files on your own disk — no account, no cloud.
+**Autosave** can be toggled in the toolbar. If you try to close with unsaved
+changes, you get a warning.
+
+**Import**: Markdown, via the toolbar. **Export**: the Export menu offers
+Markdown (`.md`), Image (`.png`), and Document (`.pdf`).
+
+The Markdown lane is also how AI tools read and write these maps — see
+[vmm-markdown-format.md](vmm-markdown-format.md).
+
+## Keyboard shortcuts
+
+### File and app
+
+| Key                    | Action              |
+| ---------------------- | ------------------- |
+| Ctrl+N                 | New map             |
+| Ctrl+O                 | Open                |
+| Ctrl+S / Ctrl+Shift+S  | Save / Save As      |
+| Ctrl+W                 | Close map           |
+| Ctrl+Z                 | Undo                |
+| Ctrl+Y or Ctrl+Shift+Z | Redo                |
+| F8                     | Full-window (zen)   |
+| PageDown / PageUp      | Present next / prev |
+
+### Editing
+
+| Key                      | Action                                          |
+| ------------------------ | ----------------------------------------------- |
+| Tab / Insert             | Add child                                       |
+| Enter                    | Add sibling                                     |
+| F2                       | Rename (double-click also works)                |
+| Shift+Enter              | Line break, while renaming                      |
+| Esc                      | Commit the edit / cancel drag / clear selection |
+| Delete or Backspace      | Delete topic and subtree                        |
+| Ctrl+C / Ctrl+X / Ctrl+V | Copy / Cut / Paste as child                     |
+| Ctrl+D                   | Duplicate                                       |
+
+### View
+
+| Key                 | Action                          |
+| ------------------- | ------------------------------- |
+| Arrow keys          | Move selection                  |
+| Shift-click a topic | Add it to the selection         |
+| Space               | Collapse/expand one level       |
+| `-` / `=`           | Collapse / expand selected      |
+| `/` / `*`           | Collapse / expand whole subtree |
+| Ctrl+F              | Find                            |
+| Ctrl+= / Ctrl+-     | Zoom in / out                   |
+| Ctrl+0              | Zoom to 100%                    |
+
+> On macOS use **Cmd** wherever this table says Ctrl.
+
+## Known limitations
+
+Honest list of what doesn't work yet, tracked in
+[BACKLOG.md](../BACKLOG.md):
+
+- **Fishbone layouts drop topics below depth 3.** On the bundled
+  `examples/rich.vmm`, all three fishbone variants render 11 of 13 topics —
+  `API` and `Database`, the grandchildren under `Backend`, disappear from the
+  canvas. They're still in the file and still listed in the outline panel;
+  switch to another structure to see them again.
+- **The two timeline variants aren't really timelines.** _Timeline · vertical_
+  lays out pixel-for-pixel identically to _Org chart · down_, and _Timeline ·
+  horizontal_ is identical to _Logic chart · right_. They render every topic
+  correctly — they just aren't distinct chart types yet. _Timeline · capsule_
+  is unaffected.
+- **The Pitch tab is a placeholder.** Use the presenter button in the toolbar
+  for presentation; the Pitch tab's settings aren't implemented.
+
+The other 28 of the 31 gallery layouts render every topic.

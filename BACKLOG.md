@@ -1,6 +1,6 @@
 # Backlog
 
-Open work on the Map tab, in rough priority order. Nothing here is started.
+Open work on the Map tab, in rough priority order.
 
 ## 1. Fishbone drops everything below depth 3
 
@@ -25,8 +25,12 @@ So two gallery cards promise a timeline and draw a chart already available under
 another name: no axis, no date ordering, no milestone markers. Either give them
 real timeline geometry, or drop the cards so the gallery stops overpromising.
 
-## 3. Fit-to-screen never zooms in
+## 3. Fit-to-screen never zooms in — no longer reproduces
 
-The `⛶` control centers the map but does not scale it up to fill the viewport,
-so a small map sits tiny in the middle of a large canvas. Minor, but it is the
-first thing you reach for after switching chart type.
+`fit()` scales by `Math.min(vw / layout.width, vh / layout.height, 1.5)`, so it
+does enlarge a small map, up to a 150% ceiling. Measured on the 3-topic "Team"
+sheet of `examples/rich.vmm`: zoomed out to 60%, then `⛶` → 150%. On the
+13-topic "Plan" sheet it settles at 85% from either direction. Both the `⛶`
+button and the canvas menu's "Fit map to view" call the same `fitView`.
+
+Closing this unless someone can name a map where it still sits tiny.
