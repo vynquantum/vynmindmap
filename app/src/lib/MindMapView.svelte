@@ -47,6 +47,7 @@
     type Rect
   } from './layout.js';
   import { isBoxedLevelOne, isTextOnLines } from './mapAppearance.js';
+  import { attachImage, mimeForPath } from './images.js';
 
   let {
     sheet,
@@ -233,7 +234,7 @@
     }
   }
 
-  function handleDrop(e: DragEvent) {
+  async function handleDrop(e: DragEvent) {
     e.preventDefault();
     if (!e.dataTransfer?.files.length) return;
     const file = e.dataTransfer.files[0];
@@ -243,12 +244,8 @@
     const node = nodeAt(p.x, p.y);
     if (!node) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      node.topic.image = { resource: reader.result as string };
-      markDirty();
-    };
-    reader.readAsDataURL(file);
+    await attachImage(file, node.topic, resources);
+    markDirty();
   }
 
   // --- pan & zoom -----------------------------------------------------------
@@ -1493,16 +1490,7 @@
     if (!bytes) return null;
     let bin = '';
     for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!);
-    const mime = path.endsWith('.png')
-      ? 'image/png'
-      : /\.jpe?g$/.test(path)
-        ? 'image/jpeg'
-        : path.endsWith('.gif')
-          ? 'image/gif'
-          : path.endsWith('.svg')
-            ? 'image/svg+xml'
-            : 'application/octet-stream';
-    const url = `data:${mime};base64,${btoa(bin)}`;
+    const url = `data:${mimeForPath(path)};base64,${btoa(bin)}`;
     imgCache.set(path, url);
     return url;
   }

@@ -1388,6 +1388,7 @@
           <Inspector
             {sheet}
             topic={selectedTopic}
+            {resources}
             {markDirty}
             onClose={() => (showInspector = false)}
           />

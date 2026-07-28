@@ -14,6 +14,7 @@
     supportsTextOnLines
   } from './mapAppearance.js';
   import { clampTopicMinHeight, clampTopicWidth } from './layout.js';
+  import { attachImage } from './images.js';
   import {
     STRUCTURE_CATEGORIES,
     STRUCTURE_ITEMS,
@@ -24,9 +25,16 @@
   let {
     sheet,
     topic,
+    resources = {},
     markDirty,
     onClose
-  }: { sheet: Sheet; topic: Topic | null; markDirty: () => void; onClose?: () => void } = $props();
+  }: {
+    sheet: Sheet;
+    topic: Topic | null;
+    resources?: Record<string, Uint8Array>;
+    markDirty: () => void;
+    onClose?: () => void;
+  } = $props();
 
   const STRUCTURES: { id: StructureId; label: string }[] = [
     { id: 'map.balanced', label: 'Mind map · balanced' },
@@ -738,20 +746,13 @@
     markDirty();
   }
 
-  function handleImageUpload(e: Event) {
-    if (!topic) return;
+  async function handleImageUpload(e: Event) {
     const input = e.target as HTMLInputElement;
-    if (!input.files || input.files.length === 0) return;
-    const file = input.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        topic.image = { resource: reader.result as string };
-        markDirty();
-      };
-      reader.readAsDataURL(file);
-    }
+    const file = input.files?.[0];
     input.value = ''; // reset
+    if (!topic || !file) return;
+    await attachImage(file, topic, resources);
+    markDirty();
   }
 
   function removeImage() {
