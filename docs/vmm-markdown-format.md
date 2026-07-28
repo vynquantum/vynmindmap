@@ -40,7 +40,8 @@ Rules:
 3. **`## H2`** lines are the **level-1 branches**.
 4. **`-` list items** under a branch are its children; nested lists nest deeper.
 5. Indent nested list items by **2 spaces** per level.
-6. The parser is lenient — it also accepts deeper headings (`###`…) or lists at any
+6. **Paragraphs**: Any regular unformatted text following a heading or list item will be appended to that topic's `note`.
+7. The parser is lenient — it also accepts deeper headings (`###`…) or lists at any
    level, and tolerates `*` bullets.
 
 ## Structures
@@ -64,6 +65,9 @@ Attach a trailing HTML comment to any heading or list item to add metadata:
 ```markdown
 ## Build <!-- vmm: {"markers":["priority-1"],"note":"Start Monday","collapsed":true} -->
 
+Some additional notes can also just be typed as plain text below the heading!
+It will be appended to the topic's note.
+
 - API <!-- vmm: {"link":"https://api.example.com"} -->
 ```
 
@@ -80,6 +84,8 @@ Separate sheets with a `<!-- vmm:sheet -->` line. Each section is a full documen
 ## Converting
 
 **CLI:**
+
+If you have the package installed globally, you can use `vynmm`. If you are working in the repository locally, you can use `npx tsx src/cli.ts` or `npm run vynmm`.
 
 ```bash
 vynmm import plan.md -o plan.vmm    # Markdown → .vmm
