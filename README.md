@@ -173,26 +173,64 @@ native webview loads from disk. Vite's dev server is a development-only tool.
 
 ## Run it
 
+You need **Node.js 20+** and **git**. Everything else — Rust, the C/C++ toolchain,
+the OS libraries — the setup script installs for you on first run.
+
 **Option A — one command (installs everything, then launches):**
 
 ```bash
 # Linux / macOS
 ./scripts/setup.sh            # native app   (installs Rust + OS libs on first run)
 ./scripts/setup.sh --browser  # web preview  (no Rust needed)
+./scripts/setup.sh --build    # package installers instead of launching
 
 # Windows (PowerShell)
 .\scripts\setup.ps1            # native app
 .\scripts\setup.ps1 -Browser   # web preview
+.\scripts\setup.ps1 -Build     # package installers instead of launching
 ```
+
+If PowerShell refuses to run the script ("running scripts is disabled on this
+system" — common when you downloaded the repo as a ZIP), use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
+```
+
+The scripts use `sudo` (Linux) or `winget` (Windows) to install prerequisites, so
+they'll prompt. Everything they install is listed in
+[Prerequisites](#prerequisites) if you'd rather do it yourself.
 
 **Option B — manual:**
 
 ```bash
-npm install
+npm ci             # exact dependency versions from the committed lockfile
 npm run dev        # web preview at http://localhost:5183 (no Rust)
 npm run app:dev    # native Tauri app (needs Rust toolchain)
 npm run app:build  # package installers → src-tauri/target/release/bundle/
 ```
+
+The first native build compiles the whole Rust dependency tree and takes several
+minutes; later builds are seconds. It needs **network access** — Tauri downloads
+its bundler tools (NSIS/WiX on Windows, linuxdeploy for the Linux AppImage) the
+first time you package.
+
+### Prerequisites
+
+If you'd rather install them yourself instead of letting the setup script do it:
+
+| OS          | What's needed                                                                                                                                                                                                  |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **All**     | [Node.js 20+](https://nodejs.org), and [Rust](https://rustup.rs) for the native app                                                                                                                            |
+| **Windows** | [VS C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ("Desktop development with C++") · WebView2 (preinstalled on Win 11)                                                          |
+| **macOS**   | Xcode Command Line Tools — `xcode-select --install`                                                                                                                                                            |
+| **Linux**   | `libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev pkg-config` (Debian/Ubuntu names; needs a distro with WebKitGTK 4.1, e.g. Ubuntu 22.04+) |
+
+Full list and other distros: [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
+
+**Where the installers land** after `npm run app:build`, under
+`src-tauri/target/release/bundle/`: `nsis/` + `msi/` on Windows, `dmg/` +
+`macos/` on macOS, `deb/` + `rpm/` + `appimage/` on Linux.
 
 Once open, click an **example** button (rich / minimal / structures) or **Open
 .vmm…** to load a file, then scroll to zoom and drag to pan.

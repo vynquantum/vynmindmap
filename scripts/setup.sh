@@ -46,6 +46,10 @@ if ! have node; then
   fi
 fi
 info "Node $(node --version)"
+# Vite 6 / Tauri 2 need Node 20+; an older one fails much later with a cryptic error.
+if [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 20 ]; then
+  echo "Node $(node --version) is too old — VynMM needs Node 20+. See https://nodejs.org"; exit 1
+fi
 
 # --- 2. OS libraries (only needed for the native Tauri app) ---------------
 if [ "$MODE" != "browser" ]; then
@@ -72,11 +76,17 @@ if [ "$MODE" != "browser" ]; then
     if ! xcode-select -p >/dev/null 2>&1; then
       info "Installing Xcode Command Line Tools..."
       xcode-select --install || true
-      warn "Finish the Xcode CLT install if a dialog appeared, then re-run."
+      # The install runs in its own GUI installer, so stop here rather than
+      # letting the Rust build fail later with a missing-linker error.
+      warn "Finish the Xcode CLT install in the dialog that opened, then re-run this script."
+      exit 1
     fi
   fi
 
   # --- 3. Rust ------------------------------------------------------------
+  # rustup from an earlier run isn't on PATH in a fresh shell; sourcing first
+  # keeps us from trying to install it again (rustup-init refuses and aborts).
+  if [ -f "$HOME/.cargo/env" ]; then . "$HOME/.cargo/env"; fi
   if ! have cargo; then
     info "Installing Rust via rustup..."
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -88,7 +98,8 @@ fi
 
 # --- 4. npm dependencies --------------------------------------------------
 info "Installing npm dependencies..."
-npm install
+# ci installs exactly the committed lockfile; fall back for a modified package.json.
+npm ci || npm install
 
 # --- 5. Icons -------------------------------------------------------------
 if [ ! -f src-tauri/icons/icon.ico ]; then

@@ -40,6 +40,10 @@ if (-not (Have node)) {
   }
 }
 Info "Node $(node --version)"
+# Vite 6 / Tauri 2 need Node 20+; an older one fails much later with a cryptic error.
+if ([int](node -p 'process.versions.node.split(".")[0]') -lt 20) {
+  throw "Node $(node --version) is too old - VynMM needs Node 20+. See https://nodejs.org"
+}
 
 if ($mode -ne "browser") {
   # --- 2. MSVC C++ build tools (required to compile Rust on Windows) ------
@@ -52,9 +56,11 @@ if ($mode -ne "browser") {
         --override "--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" `
         --accept-source-agreements --accept-package-agreements
     } else {
-      Warn "MSVC C++ Build Tools not found and winget unavailable."
-      Warn "Install 'Desktop development with C++' from:"
-      Warn "  https://visualstudio.microsoft.com/visual-cpp-build-tools/"
+      # Without a C++ linker the Rust build fails minutes later on a link error,
+      # so stop now with the fix rather than letting it get that far.
+      throw "MSVC C++ Build Tools not found and winget is unavailable. Install " +
+        "'Desktop development with C++' from " +
+        "https://visualstudio.microsoft.com/visual-cpp-build-tools/ and re-run."
     }
   }
 
@@ -67,13 +73,18 @@ if ($mode -ne "browser") {
   }
 
   # --- 4. Rust ------------------------------------------------------------
+  # rustup from an earlier run isn't on PATH in a fresh shell; look there first
+  # so we don't try to install it again on top of itself.
+  $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
+  if (Test-Path (Join-Path $cargoBin "cargo.exe")) { $env:Path = "$cargoBin;$env:Path" }
   if (-not (Have cargo)) {
     Info "Installing Rust via rustup..."
     if ($hasWinget) {
       winget install -e --id Rustlang.Rustup --accept-source-agreements --accept-package-agreements
     } else {
       $tmp = Join-Path $env:TEMP "rustup-init.exe"
-      Invoke-WebRequest -Uri "https://win.rustup.rs/x86_64" -OutFile $tmp
+      $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "aarch64" } else { "x86_64" }
+      Invoke-WebRequest -Uri "https://win.rustup.rs/$arch" -OutFile $tmp
       & $tmp -y
     }
     $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
@@ -84,7 +95,9 @@ if ($mode -ne "browser") {
 
 # --- 5. npm dependencies --------------------------------------------------
 Info "Installing npm dependencies..."
-npm install
+# ci installs exactly the committed lockfile; fall back for a modified package.json.
+npm ci
+if ($LASTEXITCODE -ne 0) { npm install }
 
 # --- 6. Icons -------------------------------------------------------------
 if (-not (Test-Path "src-tauri\icons\icon.ico")) {
