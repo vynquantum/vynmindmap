@@ -87,7 +87,21 @@ theme: dark
     expect(task.note?.plain).toBe('do it');
     expect(task.collapsed).toBe(true);
   });
+
+  it('falls back to plaintext title if trailing comment is invalid JSON', () => {
+    const md = `# Root\n## Task <!-- vmm: {bad json} -->\n`;
+    const sheet = markdownToSheet(md);
+    expect(sheet.rootTopic.children![0]!.title).toBe('Task <!-- vmm: {bad json} -->');
+  });
+
+  it('appends non-structural text as notes, preserving existing notes', () => {
+    const md = `# Root\n## Topic <!-- vmm: {"note":"initial note"} -->\nSome extra text\nAnd more text`;
+    const sheet = markdownToSheet(md);
+    const topic = sheet.rootTopic.children![0]!;
+    expect(topic.note?.plain).toBe('initial note\nSome extra text\nAnd more text');
+  });
 });
+
 
 describe('round-trip: sheet → markdown → sheet', () => {
   it('preserves the topic hierarchy', () => {

@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   addBoundary,
   addChild,
+  addSheet,
   cloneTopicWithNewIds,
   walkTopic,
   addRelationship,
@@ -12,12 +13,14 @@ import {
   deleteTopic,
   detachTopic,
   findDuplicateIds,
+  ensureIds,
   findTopic,
   ModelError,
   moveTopic,
   removeBoundary,
   removeRelationship,
   removeSummary,
+  setStructure,
   toggleCollapse,
   walkSheetTopics,
   type Sheet
@@ -57,6 +60,36 @@ describe('tree mutations', () => {
     const a = sheet.rootTopic.children![0]!;
     expect(toggleCollapse(a)).toBe(true);
     expect(toggleCollapse(a)).toBe(false);
+  });
+});
+
+describe('tree queries & construction', () => {
+  it('returns undefined when findTopic cannot find the id', () => {
+    const { sheet } = fixture();
+    expect(findTopic(sheet, 'non-existent')).toBeUndefined();
+  });
+
+  it('addSheet creates and appends a new sheet', () => {
+    const wb = createWorkbook('Root');
+    const sheet2 = addSheet(wb, 'Sheet 2', 'org.down');
+    expect(wb.sheets).toHaveLength(2);
+    expect(sheet2.title).toBe('Sheet 2');
+    expect(sheet2.structure).toBe('org.down');
+  });
+
+  it('ensureIds assigns fresh ids to topics missing them', () => {
+    const wb = createWorkbook('Root');
+    const a = addChild(wb.sheets[0]!.rootTopic, 'A');
+    delete (a as any).id;
+    expect(a.id).toBeUndefined();
+    ensureIds(wb);
+    expect(typeof a.id).toBe('string');
+  });
+
+  it('setStructure updates the structure', () => {
+    const { sheet } = fixture();
+    setStructure(sheet, 'org.down');
+    expect(sheet.structure).toBe('org.down');
   });
 });
 
@@ -125,6 +158,15 @@ describe('connectors & groupings', () => {
     const a = root.children![0]!;
     // A and C are not contiguous (B is between them).
     expect(() => addBoundary(sheet, root.id, [a.id, c.id])).toThrow(/contiguous/);
+  });
+
+  it('rejects a boundary/summary if a child is not a direct child of the parent', () => {
+    const { sheet } = fixture();
+    const root = sheet.rootTopic;
+    const a = root.children![0]!;
+    const a1 = a.children![0]!;
+    // a1 is a grandchild of root, not a direct child
+    expect(() => addBoundary(sheet, root.id, [a.id, a1.id])).toThrow(/direct children/);
   });
 
   it('removes relationships, boundaries, and summaries by id', () => {

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { addChild, createWorkbook, readVmm, writeVmm, type Workbook } from '../src/index.js';
+import { addChild, createWorkbook, readVmm, writeVmm, newDocument, VmmFormatError, type Workbook } from '../src/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const examples = join(here, '..', 'examples');
@@ -65,6 +65,25 @@ describe('write → read round-trip', () => {
       expect(back).toEqual(wb);
     });
   }
+
+  it('refuses to write a workbook with duplicate topic ids', () => {
+    const wb = createWorkbook('Root');
+    const a = addChild(wb.sheets[0]!.rootTopic, 'A');
+    const b = addChild(wb.sheets[0]!.rootTopic, 'B');
+    b.id = a.id; // force a duplicate
+    expect(() => writeVmm(wb)).toThrow(VmmFormatError);
+  });
+});
+
+describe('newDocument', () => {
+  it('wraps a workbook in a valid VmmDocument shell', () => {
+    const wb = createWorkbook('Root');
+    const doc = newDocument(wb);
+    expect(doc.workbook).toBe(wb);
+    expect(doc.manifest.formatVersion).toBeTruthy();
+    expect(doc.manifest.app).toBeTruthy();
+    expect(doc.resources).toEqual({});
+  });
 });
 
 describe('forward-compat: unknown fields', () => {

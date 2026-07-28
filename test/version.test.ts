@@ -10,7 +10,8 @@ import {
   readVmm,
   VmmVersionError,
   VmmFormatError,
-  createWorkbook
+  createWorkbook,
+  MIGRATORS
 } from '../src/index.js';
 
 function makeVmm(formatVersion: string, content: unknown): Uint8Array {
@@ -68,6 +69,23 @@ describe('migrateContent gate', () => {
     // file has no path forward — surfaced as a clear error.
     expect(() => migrateContent(content, '0.9')).toThrow(/No migrator/);
   });
+
+  it('applies registered migrators sequentially', () => {
+    const originalLength = MIGRATORS.length;
+    MIGRATORS.push({
+      fromMajor: 0,
+      to: '1.0',
+      migrate: (c) => ({ ...c, migratedKey: true })
+    });
+    try {
+      const r = migrateContent(content, '0.9');
+      expect(r.migrated).toBe(true);
+      expect(r.version).toBe('1.0');
+      expect(r.content).toHaveProperty('migratedKey', true);
+    } finally {
+      MIGRATORS.length = originalLength;
+    }
+  });
 });
 
 describe('isReadable', () => {
@@ -113,5 +131,19 @@ describe('readVmm error handling', () => {
       'content.json': strToU8('{}')
     });
     expect(() => readVmm(bytes)).toThrow(/format/i);
+  });
+  it('rejects manifest if formatVersion is not a string', () => {
+    const bytes = zipSync({
+      'manifest.json': strToU8(JSON.stringify({ format: 'vmm', formatVersion: 1 })),
+      'content.json': strToU8('{}')
+    });
+    expect(() => readVmm(bytes)).toThrow(/formatVersion/i);
+  });
+  it('rejects content if sheets is not an array', () => {
+    const bytes = zipSync({
+      'manifest.json': strToU8(JSON.stringify({ format: 'vmm', formatVersion: '1.0' })),
+      'content.json': strToU8('{"sheets": "bad"}')
+    });
+    expect(() => readVmm(bytes)).toThrow(/content\.sheets/i);
   });
 });
