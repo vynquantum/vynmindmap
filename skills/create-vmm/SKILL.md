@@ -19,8 +19,9 @@ VynMM has a specific Markdown format for representing mind maps. Create a tempor
 4. **Sub-topics**: Use `-` lists for deeper topics. Indent by 2 spaces for each nested level.
 5. **Notes**: Any plain, unformatted text paragraphs beneath a heading or list item will automatically be added as a note for that topic.
 6. **Metadata**: You can attach extra metadata to a topic by appending an HTML comment to the end of the heading or list item: `<!-- vmm: {"markers":["priority-1"],"collapsed":true} -->`
+7. **Multiple Sheets (Tabs)**: To create a mind map with multiple tabs, separate each sheet's markdown with `<!-- vmm:sheet -->` on its own line. Each sheet can have its own frontmatter and `# H1` root topic.
 
-### Example Markdown:
+### Example Markdown (Multi-tab):
 
 ```markdown
 ---
@@ -40,6 +41,17 @@ structure: map.balanced
 Start the email campaign.
 
 - Send newsletter
+
+<!-- vmm:sheet -->
+---
+title: Q3 Goals
+structure: org.down
+---
+
+# Q3 Goals
+
+## Revenue
+- Increase MRR by 20%
 ```
 
 ## Step 2: Compile the Markdown to `.vmm`
