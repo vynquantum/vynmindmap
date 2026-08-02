@@ -76,6 +76,24 @@ describe('mergeDocuments', () => {
     expect(merged.resources['resources/img-2.png']).toEqual(png(2));
   });
 
+  it('repoints a topic-to-topic link and an attachment at their renamed targets', () => {
+    const original = doc('Linked', { 'resources/spec.pdf': new Uint8Array([1]) });
+    const branch = original.workbook.sheets[0]!.rootTopic.children![0]!;
+    original.workbook.sheets[0]!.rootTopic.hyperlink = { type: 'topic', value: branch.id };
+    branch.attachments = [{ resource: 'resources/spec.pdf', name: 'spec.pdf' }];
+    const copy = structuredClone(original);
+    copy.resources['resources/spec.pdf'] = new Uint8Array([2]); // same name, other file
+
+    const merged = mergeDocuments([original, copy]);
+    const [first, second] = merged.workbook.sheets;
+    for (const sheet of [first!, second!]) {
+      // The link must land on this sheet's own branch, not the other copy's.
+      expect(sheet.rootTopic.hyperlink!.value).toBe(sheet.rootTopic.children![0]!.id);
+    }
+    expect(first!.rootTopic.children![0]!.attachments![0]!.resource).toBe('resources/spec.pdf');
+    expect(second!.rootTopic.children![0]!.attachments![0]!.resource).toBe('resources/spec-2.pdf');
+  });
+
   it('shares one copy when the same path holds the same bytes', () => {
     const png = new Uint8Array([1, 2, 3]);
     const merged = mergeDocuments([
