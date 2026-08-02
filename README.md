@@ -92,7 +92,7 @@ Prefer not to click through a warning? Build it yourself from source — see
 - **Inspector** (right panel): edit text, shape, fill/border/text color, full
   **fonts** (family, size, **bold / italic / underline / strikethrough**),
   markers, an **emoji picker**, note, link, labels, the sheet's **structure**,
-  and a **theme** (classic / dark / paper / mint / rose).
+  and a **theme** (classic / ocean / forest / sunset / lavender / monochrome).
 - **Images**: embedded topic images (from the `.vmm` `resources/`) render on nodes.
 - **Floating topics**: double-click empty canvas to add one; drag to reposition.
 - **Create connectors**: select a topic → **Relate →** then click a target to draw

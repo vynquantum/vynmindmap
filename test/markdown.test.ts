@@ -152,6 +152,16 @@ describe('round-trip: sheet → markdown → sheet', () => {
     expect(back.background).toEqual(sheet.background);
   });
 
+  it('keeps a tab name that differs from the central topic', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    sheet.title = 'Q3 Plan';
+
+    const back = markdownToSheet(sheetToMarkdown(sheet));
+    expect(back.title).toBe('Q3 Plan');
+    expect(back.rootTopic.title).toBe('Root');
+  });
+
   it('preserves per-topic style, image, and shape', () => {
     const wb = createWorkbook('Root');
     const sheet = wb.sheets[0]!;

@@ -64,16 +64,17 @@ file. You never write the binary format by hand.
 
 | Key             | Value                                                                       |
 | --------------- | --------------------------------------------------------------------------- |
-| `title`         | Sheet name. Defaults to the `# H1`.                                         |
+| `title`         | Tab name. Defaults to the `# H1` (the central topic).                       |
 | `structure`     | Layout id (below). A typo falls back to `map.balanced` instead of failing.  |
 | `theme`         | `classic` (default), `ocean`, `forest`, `sunset`, `lavender`, `monochrome`. |
 | `settings`      | One line of JSON — the Inspector's **Map** tab. See below.                  |
 | `background`    | One line of JSON: `{"color":"#f7f7f7"}`.                                    |
 | `relationships` | One line of JSON array; each `{"id","end1Id","end2Id","title"?}`.           |
 | `boundaries`    | One line of JSON array; each `{"id","parentId","childIds":[…],"title"?}`.   |
-| `summaries`     | Same shape as `boundaries`, plus `topicId` (the summary topic).             |
+| `summaries`     | Like `boundaries`, but carrying a whole `summaryTopic` object.              |
 
-Structures: `map.balanced`, `map.left`, `map.right`, `logic.right`, `logic.left`,
+Structures: `map.balanced`, `map.left`, `map.right`, `map.underline`,
+`logic.right`, `logic.left`,
 `org.down`, `org.up`, `tree.right`, `tree.left`, `timeline.h`, `timeline.v`,
 `fishbone.right`, `fishbone.left`, `matrix`, `tree-table`, `grid`, `brace.right`,
 `brace.left`.

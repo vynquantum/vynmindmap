@@ -219,7 +219,7 @@ existing `.vmm` keeps that file's resources.
 
 ### 5.1 Structures (per sheet) — `structure` ids
 
-- `map.balanced`, `map.left`, `map.right` — classic mind map
+- `map.balanced`, `map.left`, `map.right`, `map.underline` — classic mind map
 - `logic.right`, `logic.left` — logic chart
 - `org.down`, `org.up` — org chart
 - `tree.right`, `tree.left` — tree / right-logic hybrid

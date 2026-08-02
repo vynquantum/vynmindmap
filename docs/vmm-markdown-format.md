@@ -35,7 +35,8 @@ theme: classic
 
 Rules:
 
-1. **Frontmatter** (optional) sets the sheet's `title`, `structure`, and `theme`.
+1. **Frontmatter** (optional) sets the sheet's `title` (the tab name — the `# H1`
+   stays the central topic's own text), `structure`, and `theme`.
 2. **`# H1`** is the single **central topic** (the root).
 3. **`## H2`** lines are the **level-1 branches**.
 4. **`-` list items** under a branch are its children; nested lists nest deeper.
@@ -48,7 +49,8 @@ Rules:
 
 Set `structure:` in the frontmatter to one of:
 
-`map.balanced`, `map.left`, `map.right`, `logic.right`, `logic.left`, `org.down`,
+`map.balanced`, `map.left`, `map.right`, `map.underline`, `logic.right`,
+`logic.left`, `org.down`,
 `org.up`, `tree.right`, `tree.left`, `timeline.h`, `timeline.v`, `fishbone.right`,
 `fishbone.left`, `matrix`, `tree-table`, `grid`, `brace.right`, `brace.left`.
 
@@ -99,7 +101,7 @@ loses nothing: `style`, `image`, `position`, `attachments`, `structureClass`, a
 rich `note` object, a non-web `hyperlink`, and any key a newer build adds.
 
 ```markdown
-## Build <!-- vmm: {"style":{"fillColor":"#1f4fd0","fontBold":true},"image":{"resource":"resources/logo.png","width":120}} -->
+## Build <!-- vmm: {"style":{"fillColor":"#1f4fd0","font":{"weight":"bold"}},"image":{"resource":"resources/logo.png","width":120}} -->
 ```
 
 `id` is written only for topics a relationship, boundary, or summary points at —
@@ -118,7 +120,7 @@ These live in the frontmatter, one line of JSON each, referencing topics by `id`
 title: Project Plan
 relationships: [{"id":"r1","end1Id":"t-a","end2Id":"t-b","title":"blocks"}]
 boundaries: [{"id":"b1","parentId":"t-a","childIds":["t-a1","t-a2"],"title":"Phase 1"}]
-summaries: [{"id":"s1","parentId":"t-a","childIds":["t-a1"],"topicId":"t-sum"}]
+summaries: [{"id":"s1","parentId":"t-a","childIds":["t-a1"],"summaryTopic":{"id":"t-s","title":"Total"}}]
 ---
 ```
 

@@ -352,7 +352,9 @@ export function sheetToMarkdown(sheet: Sheet, opts: ToMarkdownOptions = {}): str
 
   if (opts.frontmatter !== false) {
     out.push('---');
-    out.push(`title: ${sheet.rootTopic.title.replace(/\r?\n/g, ' ')}`);
+    // The sheet's own title, not the root topic's: they differ whenever a tab
+    // has been renamed, and writing the root's would rename the tab on import.
+    out.push(`title: ${sheet.title.replace(/\r?\n/g, ' ')}`);
     out.push(`structure: ${sheet.structure}`);
     out.push(`theme: ${sheet.theme}`);
     // Sheet-level blocks ride as one line of JSON each: settings are a flat bag
