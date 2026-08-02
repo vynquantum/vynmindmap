@@ -3,12 +3,14 @@
  *
  * A `.vmm` is the canonical, feature-rich format; Markdown is a *projection* of it.
  * Markdown captures the topic tree plus the handful of per-topic extras that fit
- * cleanly in text (markers, labels, note, collapsed, link). Structure type, styles,
- * relationships, boundaries, summaries, and floating topics are not representable
- * in Markdown and are dropped on export / added in-app after import.
+ * cleanly in text (markers, labels, note, collapsed, link), and the sheet-level
+ * settings. Per-topic styles, relationships, boundaries, summaries, and floating
+ * topics are not representable in Markdown and are dropped on export / added
+ * in-app after import.
  *
  * Format:
- *   - Optional YAML-ish frontmatter (title / structure / theme).
+ *   - Optional YAML-ish frontmatter (title / structure / theme / settings /
+ *     background; the last two are one line of JSON each).
  *   - `# H1` = central (root) topic.
  *   - `##` = level-1 branches; deeper topics are nested `-` lists.
  *   - The parser is lenient: it also accepts headings or lists at any level.
@@ -17,7 +19,14 @@
 
 import { createSheet, createTopic } from './model.js';
 import { isStructureId } from './types.js';
-import type { Sheet, StructureId, Topic, Workbook } from './types.js';
+import type {
+  Sheet,
+  SheetBackground,
+  SheetSettings,
+  StructureId,
+  Topic,
+  Workbook
+} from './types.js';
 
 const SHEET_SEPARATOR = '<!-- vmm:sheet -->';
 
@@ -79,6 +88,25 @@ interface Frontmatter {
   title?: string;
   structure?: StructureId;
   theme?: string;
+  settings?: SheetSettings;
+  background?: SheetBackground;
+}
+
+/**
+ * A frontmatter value holding a JSON object, used for the sheet-level blocks
+ * (settings, background) that have no readable one-line YAML form. Anything
+ * that isn't a plain object is ignored rather than fatal, like the rest of the
+ * parser: a hand-edited file should still import.
+ */
+function jsonObject<T>(value: string): T | undefined {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as T)
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function parseFrontmatter(md: string): { body: string; fm: Frontmatter } {
@@ -98,6 +126,8 @@ function parseFrontmatter(md: string): { body: string; fm: Frontmatter } {
     // caller falls back to the documented default rather than losing the import.
     else if (key === 'structure' && isStructureId(value)) fm.structure = value;
     else if (key === 'theme') fm.theme = value;
+    else if (key === 'settings') fm.settings = jsonObject<SheetSettings>(value);
+    else if (key === 'background') fm.background = jsonObject<SheetBackground>(value);
   }
   return { body: text.slice(m[0].length), fm };
 }
@@ -194,7 +224,9 @@ export function markdownToSheet(md: string): Sheet {
   return createSheet(fm.title ?? rootTopic.title, {
     rootTopic,
     structure: fm.structure ?? 'map.balanced',
-    theme: fm.theme ?? 'classic'
+    theme: fm.theme ?? 'classic',
+    ...(fm.settings ? { settings: fm.settings } : {}),
+    ...(fm.background ? { background: fm.background } : {})
   });
 }
 
@@ -221,6 +253,15 @@ export function sheetToMarkdown(sheet: Sheet, opts: ToMarkdownOptions = {}): str
     out.push(`title: ${sheet.rootTopic.title.replace(/\r?\n/g, ' ')}`);
     out.push(`structure: ${sheet.structure}`);
     out.push(`theme: ${sheet.theme}`);
+    // Sheet-level settings ride as one line of JSON: they are a flat bag of
+    // flags with no fixed key set, so a per-key YAML mapping would need its own
+    // reader and would still lose anything a newer build added.
+    if (sheet.settings && Object.keys(sheet.settings).length) {
+      out.push(`settings: ${JSON.stringify(sheet.settings)}`);
+    }
+    if (sheet.background && Object.keys(sheet.background).length) {
+      out.push(`background: ${JSON.stringify(sheet.background)}`);
+    }
     out.push('---', '');
   }
 

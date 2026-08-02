@@ -229,6 +229,10 @@ export interface SheetSettings {
   uniformTopicLength?: boolean;
   /** Show each topic's note under its title instead of only the 📝 badge. */
   displayAllNotes?: boolean;
+  /** Wrap long titles onto several lines. Defaults to true; set false to keep
+   * every title on one line (explicit newlines still break) and let the topic
+   * grow as wide as it needs. */
+  wrapText?: boolean;
   /** Give floating topics a palette color instead of the neutral gray. */
   autoColorFloating?: boolean;
   /** Draw relationship lines in their source topic's color. */

@@ -103,6 +103,15 @@
     node.select();
   }
 
+  /** Keep the current sheet's tab on screen once the strip starts scrolling. */
+  function revealTab(node: HTMLElement, active: boolean) {
+    const show = (on: boolean) => {
+      if (on) node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    };
+    show(active);
+    return { update: show };
+  }
+
   function markDirty() {
     dirty = true;
     if (!workbook) return;
@@ -1308,7 +1317,7 @@
       {#if !zenMode}
         <nav class="tabs">
           {#each workbook.sheets as s, i (s.id)}
-            <div class="tab" class:active={i === activeSheet}>
+            <div class="tab" class:active={i === activeSheet} use:revealTab={i === activeSheet}>
               {#if editingTab === i}
                 <input
                   class="tab-edit"
@@ -1323,6 +1332,7 @@
               {:else}
                 <button
                   class="tab-label"
+                  title={s.title}
                   onclick={() => (activeSheet = i)}
                   ondblclick={() => (editingTab = i)}
                 >
@@ -1664,11 +1674,25 @@
     background: var(--panel);
     box-shadow: var(--elev-1);
     z-index: 4;
+    /* Browser-tab behaviour: one row, tabs shrink to share it, and once they
+       hit their floor the strip scrolls instead of wrapping or pushing the
+       canvas around. */
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar {
+    display: none;
   }
   .tab {
     display: flex;
     align-items: center;
     position: relative;
+    flex: 0 1 auto;
+    min-width: 64px;
+    max-width: 220px;
+    overflow: hidden;
   }
   .tab.active {
     box-shadow: inset 0 -3px 0 var(--accent);
@@ -1681,6 +1705,11 @@
     background: transparent;
     color: var(--muted);
     font-weight: 500;
+    /* The name is what gives way when the tab shrinks. */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .tab.active .tab-label {
     color: var(--accent);
@@ -1697,6 +1726,15 @@
     padding: 0 8px;
     font-size: 15px;
     line-height: 1;
+    flex: none;
+    /* Reserved space, shown on the tab you are working with — otherwise a
+       narrow tab would be mostly close button. */
+    opacity: 0;
+  }
+  .tab:hover .tab-x,
+  .tab.active .tab-x,
+  .tab-x:focus-visible {
+    opacity: 1;
   }
   .tab-x:hover:not(:disabled) {
     color: #c0392b;
@@ -1704,10 +1742,14 @@
   }
   .tab-add {
     border: none;
-    background: none;
+    background: var(--panel);
     color: var(--muted);
     padding: 9px 12px;
     font-size: 17px;
+    /* Stays reachable at the end of the strip once the tabs start scrolling. */
+    flex: none;
+    position: sticky;
+    right: 0;
   }
   .tab-add:hover:not(:disabled) {
     background: color-mix(in srgb, var(--accent) 8%, transparent);

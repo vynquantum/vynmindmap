@@ -14,7 +14,7 @@
     supportsTextOnLines
   } from './mapAppearance.js';
   import { clampTopicMinHeight, clampTopicWidth } from './layout.js';
-  import { attachImage } from './images.js';
+  import { attachImage, clampImageSize, IMG_DEFAULT } from './images.js';
   import {
     STRUCTURE_CATEGORIES,
     STRUCTURE_ITEMS,
@@ -407,6 +407,19 @@
     localStorage.setItem(TAB_KEY, activeTab);
   });
 
+  /**
+   * Selecting a topic brings up its style, the panel's reason for being open.
+   * Keyed on the id, not on `topic` itself: only a *change of selection* jumps
+   * tabs, so editing the current topic — or deliberately opening Map while it
+   * stays selected — leaves the tab where the user put it.
+   */
+  let shownTopicId: string | null = null;
+  $effect(() => {
+    const id = topic?.id ?? null;
+    if (id && id !== shownTopicId) activeTab = 'style';
+    shownTopicId = id;
+  });
+
   const currentTheme = $derived(COLOR_THEMES.find((t) => t.id === sheet.theme) ?? COLOR_THEMES[0]);
   const structFamily = $derived((sheet.structure ?? 'map.balanced').split('.')[0]!);
 
@@ -761,6 +774,30 @@
       markDirty();
     }
   }
+
+  /** Displayed image size. Both edges are set together so a typed width keeps
+   * the aspect ratio the drag handle and the initial fit established. */
+  function setImageSize(edge: 'width' | 'height', v: string) {
+    const img = topic?.image;
+    const n = Number(v);
+    if (!img || v === '' || !Number.isFinite(n)) return;
+    const ratio = (img.width ?? IMG_DEFAULT.width) / (img.height ?? IMG_DEFAULT.height);
+    if (edge === 'width') {
+      img.width = clampImageSize(n);
+      img.height = clampImageSize(img.width / ratio);
+    } else {
+      img.height = clampImageSize(n);
+      img.width = clampImageSize(img.height * ratio);
+    }
+    markDirty();
+  }
+
+  function resetImageSize() {
+    if (!topic?.image) return;
+    delete topic.image.width;
+    delete topic.image.height;
+    markDirty();
+  }
 </script>
 
 {#snippet swatches(set: (c: string) => void)}
@@ -1048,6 +1085,13 @@
       {@render toggleRow('Display All Notes', flag('displayAllNotes'), (v) =>
         setFlag('displayAllNotes', v)
       )}
+      {@render toggleRow('Wrap Text', sheet.settings?.wrapText !== false, (v) =>
+        setFlag('wrapText', v)
+      )}
+      <p class="hint">
+        Off keeps every title on a single line — the topic widens instead. Line breaks you typed
+        still break.
+      </p>
       {@render toggleRow('Auto-colour Floating Topic', flag('autoColorFloating'), (v) =>
         setFlag('autoColorFloating', v)
       )}
@@ -1084,7 +1128,8 @@
       {#if open.layout}
         <div class="body">
           <p class="hint">
-            Leave width empty for automatic sizing. A fixed width controls where the title wraps.
+            Leave width empty for automatic sizing. With Wrap Text on, a fixed width controls where
+            the title wraps; with it off, it is a minimum.
           </p>
           <div class="row">
             <label class="col"
@@ -1389,6 +1434,34 @@
               <button class="remove-img-btn" onclick={removeImage}>Remove Image</button>
             {/if}
           </div>
+          {#if topic.image}
+            <div class="row">
+              <label class="col"
+                >Image width
+                <input
+                  type="number"
+                  min="24"
+                  max="600"
+                  step="4"
+                  value={topic.image.width ?? IMG_DEFAULT.width}
+                  oninput={(e) => setImageSize('width', e.currentTarget.value)}
+                />
+              </label>
+              <label class="col"
+                >Image height
+                <input
+                  type="number"
+                  min="24"
+                  max="600"
+                  step="4"
+                  value={topic.image.height ?? IMG_DEFAULT.height}
+                  oninput={(e) => setImageSize('height', e.currentTarget.value)}
+                />
+              </label>
+            </div>
+            <button class="reset" onclick={resetImageSize}>Reset image size</button>
+            <p class="hint">Or drag the handle at the image's corner on the map.</p>
+          {/if}
         </div>
       {/if}
     </section>

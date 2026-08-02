@@ -24,5 +24,34 @@ export async function attachImage(
   const ext = (named ?? file.type.split('/')[1] ?? 'png').toLowerCase().replace('+xml', '');
   const path = `resources/${crypto.randomUUID()}.${ext}`;
   resources[path] = new Uint8Array(await file.arrayBuffer());
-  topic.image = { resource: path };
+  topic.image = { resource: path, ...(await fitSize(file)) };
+}
+
+/** Size an image renders at when it carries none of its own (legacy topics, or
+ * a format the decoder could not measure). */
+export const IMG_DEFAULT = { width: 96, height: 64 };
+
+/** Bounds a rendered topic image is held to, wherever it is resized from. */
+export const clampImageSize = (px: number): number => Math.max(24, Math.min(600, Math.round(px)));
+
+/** Default display box for a freshly attached image. */
+const FIT_W = 120;
+const FIT_H = 90;
+
+/**
+ * Start an image at its own aspect ratio, scaled down into the default box.
+ * Without this every image would open as a fixed 96×64 and the first resize
+ * drag would stretch it. Formats the decoder can't measure (SVG in some
+ * engines) fall back to the renderer's default, which is why this is optional.
+ */
+async function fitSize(file: File): Promise<{ width?: number; height?: number }> {
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(FIT_W / bmp.width, FIT_H / bmp.height, 1);
+    const size = { width: Math.round(bmp.width * k), height: Math.round(bmp.height * k) };
+    bmp.close();
+    return size;
+  } catch {
+    return {};
+  }
 }

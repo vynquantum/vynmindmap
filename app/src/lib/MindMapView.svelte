@@ -47,7 +47,8 @@
     type Rect
   } from './layout.js';
   import { isBoxedLevelOne, isTextOnLines } from './mapAppearance.js';
-  import { attachImage, mimeForPath } from './images.js';
+  import { attachImage, clampImageSize, IMG_DEFAULT, mimeForPath } from './images.js';
+  import { clipText, topicsFromText } from './clipboard.js';
 
   let {
     sheet,
@@ -119,6 +120,11 @@
   // Resize-to-wrap state: dragging the corner handle gives the topic an
   // explicit width (controls wrapping) and minimum height.
   let resizing = $state<{ id: string; sx: number; sy: number; w: number; h: number } | null>(null);
+  // Same gesture for the picture attached above a topic; kept apart from
+  // `resizing` so a topic with an image can be resized either way.
+  let imgResizing = $state<{ id: string; sx: number; sy: number; w: number; h: number } | null>(
+    null
+  );
 
   let startX = 0,
     startY = 0,
@@ -398,6 +404,23 @@
       }
       return;
     }
+    if (imgResizing) {
+      const t = findTopic(sheet, imgResizing.id);
+      if (t?.image) {
+        // The handle sits at the image's bottom-right, but the image is drawn
+        // upwards from the topic, so dragging *up* is what enlarges it.
+        const dx = (e.clientX - imgResizing.sx) / scale;
+        const dy = (imgResizing.sy - e.clientY) / scale;
+        // Aspect is locked unless Shift is held: the common case is scaling a
+        // photo, and a free drag would silently distort it.
+        const w = clampImageSize(imgResizing.w + dx);
+        t.image.width = w;
+        t.image.height = e.shiftKey
+          ? clampImageSize(imgResizing.h + dy)
+          : clampImageSize((w / imgResizing.w) * imgResizing.h);
+      }
+      return;
+    }
     if (pressed) {
       // Promote a press into a drag once the pointer moves enough.
       const moved = Math.hypot(e.clientX - pressed.sx, e.clientY - pressed.sy);
@@ -467,6 +490,11 @@
     if (resizing) {
       notify();
       resizing = null;
+      return;
+    }
+    if (imgResizing) {
+      notify();
+      imgResizing = null;
       return;
     }
     if (relDragId) {
@@ -731,6 +759,15 @@
     }
   }
 
+  /** Every branch on the sheet, selection or not. The root stays open when
+   * collapsing: a map showing nothing but its centre is never what was meant. */
+  export function setAllCollapsed(collapsed: boolean) {
+    for (const t of sheet.rootTopic.children ?? []) setCollapsedRecursive(t, collapsed);
+    for (const f of sheet.floatingTopics ?? []) setCollapsedRecursive(f, collapsed);
+    if (collapsed) sheet.rootTopic.collapsed = false;
+    notify();
+  }
+
   function expandSelectedSubtree(recursive: boolean) {
     if (selectedId) {
       const t = findTopic(sheet, selectedId);
@@ -743,9 +780,7 @@
         notify();
       }
     } else {
-      if (sheet.rootTopic) setCollapsedRecursive(sheet.rootTopic, false);
-      for (const f of sheet.floatingTopics ?? []) setCollapsedRecursive(f, false);
-      notify();
+      setAllCollapsed(false);
     }
   }
 
@@ -761,9 +796,7 @@
         notify();
       }
     } else {
-      if (sheet.rootTopic) setCollapsedRecursive(sheet.rootTopic, true);
-      for (const f of sheet.floatingTopics ?? []) setCollapsedRecursive(f, true);
-      notify();
+      setAllCollapsed(true);
     }
   }
 
@@ -781,10 +814,6 @@
     if (!topics.length) return false;
     clipboard = topics.map((t) => structuredClone($state.snapshot(t)) as Topic);
     return true;
-  }
-
-  function cutSelected() {
-    if (copySelected()) deleteSelected();
   }
 
   /** Paste into a parent topic, or as floating topics at a canvas point. */
@@ -850,6 +879,73 @@
       notify();
       selectOnly(lastId);
     }
+  }
+
+  // --- system clipboard -----------------------------------------------------
+  // The in-app `clipboard` above is per-window, so it can't carry a subtree to
+  // another VynMM window or to any other app. These handlers move the same
+  // subtrees through the OS clipboard (see ./clipboard.ts for the format).
+
+  /** Whether a clipboard event belongs to the map rather than to a text field. */
+  function clipEventIsOurs(e: ClipboardEvent): boolean {
+    if (editingId || !e.clipboardData) return false;
+    const tag = (e.target as HTMLElement | null)?.tagName;
+    return tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT';
+  }
+
+  function onSystemCopy(e: ClipboardEvent, cut: boolean) {
+    if (!clipEventIsOurs(e) || !copySelected()) return;
+    e.clipboardData!.setData('text/plain', clipText(clipboard as Topic[]));
+    e.preventDefault();
+    if (cut) deleteSelected();
+  }
+
+  /** Menu copy/cut: same result as Ctrl+C, but with no clipboard event to ride
+   * on it has to write the text itself. A blocked write still leaves the
+   * subtree on the in-app clipboard, so paste inside this window keeps working. */
+  async function copySelectedToSystem(cut: boolean) {
+    if (!copySelected()) return;
+    try {
+      await navigator.clipboard.writeText(clipText(clipboard as Topic[]));
+    } catch {
+      /* no clipboard permission — in-app copy stands */
+    }
+    if (cut) deleteSelected();
+  }
+
+  /** Menu paste: prefer whatever the OS clipboard holds, fall back to in-app. */
+  async function pasteFromSystem(parentId?: string | null, floatAt?: { x: number; y: number }) {
+    try {
+      const text = await navigator.clipboard.readText();
+      const topics = text.trim() ? topicsFromText(text) : [];
+      if (topics.length) clipboard = topics;
+    } catch {
+      /* no clipboard permission — in-app clipboard stands */
+    }
+    pasteClipboard(parentId, floatAt);
+  }
+
+  async function onSystemPaste(e: ClipboardEvent) {
+    if (!clipEventIsOurs(e)) return;
+    const img = [...e.clipboardData!.items].find((i) => i.type.startsWith('image/'));
+    const target = selectedId ? findTopic(sheet, selectedId) : null;
+    if (img && target) {
+      const file = img.getAsFile();
+      if (file) {
+        e.preventDefault();
+        await attachImage(file, target, resources);
+        markDirty();
+        return;
+      }
+    }
+    const text = e.clipboardData!.getData('text/plain');
+    const topics = text.trim() ? topicsFromText(text) : [];
+    // Nothing usable on the system clipboard (or reading it was blocked): the
+    // in-app clipboard is still the better answer to Ctrl+V.
+    if (!topics.length && !clipboard.length) return;
+    e.preventDefault();
+    if (topics.length) clipboard = topics;
+    pasteIntoSelected();
   }
 
   // --- search ----------------------------------------------------------------
@@ -1035,18 +1131,17 @@
         } else if (k === '0') {
           e.preventDefault();
           zoomReset();
-        } else if (k.toLowerCase() === 'c') {
-          e.preventDefault();
-          copySelected();
-        } else if (k.toLowerCase() === 'x') {
-          e.preventDefault();
-          cutSelected();
-        } else if (k.toLowerCase() === 'v') {
-          e.preventDefault();
-          pasteIntoSelected();
         } else if (k.toLowerCase() === 'd') {
           e.preventDefault();
           duplicateSelected();
+        } else if (k === '*') {
+          // Whole sheet, whatever is selected — the plain keys below act on the
+          // selected branch, and there has to be a way to reach the rest.
+          e.preventDefault();
+          setAllCollapsed(false);
+        } else if (k === '/') {
+          e.preventDefault();
+          setAllCollapsed(true);
         }
         return;
       }
@@ -1122,8 +1217,21 @@
           break;
       }
     }
+    // Ctrl+C/X/V are deliberately not handled above: letting the browser turn
+    // them into clipboard events is what carries topics to other windows and
+    // other apps, and it also picks up Edit-menu and right-click paste.
+    const onCopy = (e: ClipboardEvent) => onSystemCopy(e, false);
+    const onCut = (e: ClipboardEvent) => onSystemCopy(e, true);
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    document.addEventListener('copy', onCopy);
+    document.addEventListener('cut', onCut);
+    document.addEventListener('paste', onSystemPaste);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('copy', onCopy);
+      document.removeEventListener('cut', onCut);
+      document.removeEventListener('paste', onSystemPaste);
+    };
   });
 
   // Keep multi-select array in sync with the (bindable) primary selection.
@@ -1494,11 +1602,33 @@
     imgCache.set(path, url);
     return url;
   }
+  /** ponytail: images are drawn above the topic box and layout measures only the
+   * box, so a tall image can reach into the row above it. Reserving the space
+   * would mean carrying an image height through `sizeOf` and every structure's
+   * edge anchoring; the clamp keeps the overlap bounded until that is worth it. */
   function imgSize(n: LaidOutNode): { w: number; h: number } {
     const img = n.topic.image!;
-    const w = Math.min(img.width ?? 96, 120);
-    const h = Math.min(img.height ?? 64, 90);
-    return { w, h };
+    return {
+      w: clampImageSize(img.width ?? IMG_DEFAULT.width),
+      h: clampImageSize(img.height ?? IMG_DEFAULT.height)
+    };
+  }
+
+  function onImagePointerDown(e: PointerEvent, n: LaidOutNode) {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    const sz = imgSize(n);
+    imgResizing = { id: n.id, sx: e.clientX, sy: e.clientY, w: sz.w, h: sz.h };
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+  }
+
+  /** Back to the size the image was attached at (its own aspect, fitted). */
+  function resetImageSize(e: Event, t: Topic) {
+    e.stopPropagation();
+    if (!t.image) return;
+    delete t.image.width;
+    delete t.image.height;
+    notify();
   }
 
   const boxedLevelOne = $derived(isBoxedLevelOne(sheet));
@@ -1620,6 +1750,9 @@
     return (n.h - n.noteLines.length * NOTE_LINE_H) / 2;
   }
   function badges(t: Topic): string {
+    // Badges are editing affordances, not content: while presenting they only
+    // tell the audience that something is hidden from them.
+    if (presenterMode) return '';
     let s = '';
     // With the note spelled out under the title the badge is just noise.
     if (t.note?.plain && !sheet.settings?.displayAllNotes) s += '📝';
@@ -1990,14 +2123,33 @@
 
           {#if n.topic.image && imgUrl(n.topic.image.resource)}
             {@const sz = imgSize(n)}
+            {@const ix = (n.w - sz.w) / 2}
             <image
               href={imgUrl(n.topic.image.resource)}
-              x={(n.w - sz.w) / 2}
+              x={ix}
               y={-(sz.h + 6)}
               width={sz.w}
               height={sz.h}
               preserveAspectRatio="xMidYMid meet"
             />
+            {#if n.id === selectedId && n.id !== editingId && !presenterMode && !dragId}
+              <rect
+                class="resize-handle img-handle"
+                x={ix + sz.w - 5}
+                y={-11}
+                width="10"
+                height="10"
+                rx="2"
+                fill="#fff"
+                stroke="#1d4ed8"
+                stroke-width="1.5"
+                role="button"
+                tabindex={-1}
+                aria-label="Resize image (Shift to stretch, double-click to reset)"
+                onpointerdown={(e) => onImagePointerDown(e, n)}
+                ondblclick={(e) => resetImageSize(e, n.topic)}
+              />
+            {/if}
           {/if}
 
           {#if n.topic.markers?.length}
@@ -2032,7 +2184,7 @@
             >
           {/if}
 
-          {#if hasChildren(n.topic)}
+          {#if hasChildren(n.topic) && !presenterMode}
             <g
               class="toggle"
               role="button"
@@ -2173,20 +2325,18 @@
           role="menuitem"
           onclick={() => {
             ctxMenu = null;
-            copySelected();
+            copySelectedToSystem(false);
           }}>Copy <kbd>Ctrl+C</kbd></button
         >
         <button
           role="menuitem"
           onclick={() => {
             ctxMenu = null;
-            cutSelected();
+            copySelectedToSystem(true);
           }}>Cut <kbd>Ctrl+X</kbd></button
         >
-        <button
-          role="menuitem"
-          disabled={!clipboard.length}
-          onclick={() => runOnCtxTopic(pasteClipboard)}>Paste as child <kbd>Ctrl+V</kbd></button
+        <button role="menuitem" onclick={() => runOnCtxTopic(pasteFromSystem)}
+          >Paste as child <kbd>Ctrl+V</kbd></button
         >
         <button
           role="menuitem"
@@ -2207,6 +2357,22 @@
           >
             {ctxTopic.collapsed ? 'Expand' : 'Collapse'} <kbd>Space</kbd>
           </button>
+          <button
+            role="menuitem"
+            onclick={() =>
+              runOnCtxTopic((id) => {
+                selectOnly(id);
+                expandSelectedSubtree(true);
+              })}>Expand branch <kbd>*</kbd></button
+          >
+          <button
+            role="menuitem"
+            onclick={() =>
+              runOnCtxTopic((id) => {
+                selectOnly(id);
+                collapseSelectedSubtree(true);
+              })}>Collapse branch <kbd>/</kbd></button
+          >
         {/if}
         <button
           role="menuitem"
@@ -2228,11 +2394,10 @@
         >
         <button
           role="menuitem"
-          disabled={!clipboard.length}
           onclick={() => {
             const p = ctxPoint;
             ctxMenu = null;
-            pasteClipboard(null, p);
+            pasteFromSystem(null, p);
           }}>Paste here</button
         >
         <hr />
@@ -2249,6 +2414,21 @@
             ctxMenu = null;
             zoomReset();
           }}>Zoom 100%</button
+        >
+        <hr />
+        <button
+          role="menuitem"
+          onclick={() => {
+            ctxMenu = null;
+            setAllCollapsed(false);
+          }}>Expand all <kbd>Ctrl+*</kbd></button
+        >
+        <button
+          role="menuitem"
+          onclick={() => {
+            ctxMenu = null;
+            setAllCollapsed(true);
+          }}>Collapse all <kbd>Ctrl+/</kbd></button
         >
       {/if}
     </div>
@@ -2315,16 +2495,19 @@
     </div>
   {/if}
 
-  <div class="zoombar" role="toolbar" tabindex={-1} onpointerdown={(e) => e.stopPropagation()}>
-    <button title="Zoom out (Ctrl+-)" onclick={zoomOut}>−</button>
-    <button class="pct" title="Reset to 100% (Ctrl+0)" onclick={zoomReset}
-      >{Math.round(scale * 100)}%</button
-    >
-    <button title="Zoom in (Ctrl+=)" onclick={zoomIn}>+</button>
-    <button title="Fit map to view" onclick={fitView}>⛶</button>
-  </div>
+  <!-- Editing chrome: kept off the screen the audience is looking at. -->
+  {#if !presenterMode}
+    <div class="zoombar" role="toolbar" tabindex={-1} onpointerdown={(e) => e.stopPropagation()}>
+      <button title="Zoom out (Ctrl+-)" onclick={zoomOut}>−</button>
+      <button class="pct" title="Reset to 100% (Ctrl+0)" onclick={zoomReset}
+        >{Math.round(scale * 100)}%</button
+      >
+      <button title="Zoom in (Ctrl+=)" onclick={zoomIn}>+</button>
+      <button title="Fit map to view" onclick={fitView}>⛶</button>
+    </div>
+  {/if}
 
-  {#if layout.nodes.length > 1}
+  {#if layout.nodes.length > 1 && !presenterMode}
     <svg
       class="minimap"
       width={mini.w}
@@ -2361,10 +2544,10 @@
     </svg>
   {/if}
 
-  {#if showHint}
+  {#if showHint && !presenterMode}
     <div class="hint">
-      Tab: child · Enter: sibling · F2: rename · Del: delete · Ctrl+C/V: copy/paste · Ctrl+F: find ·
-      right-click: menu
+      Tab: child · Enter: sibling · F2: rename · Del: delete · Ctrl+C/V: copy/paste · "*" expand all
+      · "/" collapse all · Ctrl+F: find · right-click: menu
     </div>
   {/if}
 </div>
@@ -2423,6 +2606,10 @@
   }
   .resize-handle {
     cursor: nwse-resize;
+  }
+  /* The image grows up and to the right, away from the topic. */
+  .img-handle {
+    cursor: nesw-resize;
   }
   text {
     pointer-events: none;

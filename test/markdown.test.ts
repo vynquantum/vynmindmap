@@ -77,6 +77,26 @@ theme: dark
     expect(sheet.rootTopic.children?.map((c) => c.title)).toEqual(['lonely', 'items']);
   });
 
+  it('reads sheet settings and background from the frontmatter', () => {
+    const md = `---
+title: Plan
+settings: {"wrapText":false,"branchColor":"#ff0000"}
+background: {"color":"#eeeeee"}
+---
+# Plan
+`;
+    const sheet = markdownToSheet(md);
+    expect(sheet.settings?.wrapText).toBe(false);
+    expect(sheet.settings?.branchColor).toBe('#ff0000');
+    expect(sheet.background?.color).toBe('#eeeeee');
+  });
+
+  it('ignores settings that are not a JSON object instead of failing the import', () => {
+    const sheet = markdownToSheet(`---\ntitle: Plan\nsettings: nonsense\n---\n# Plan\n`);
+    expect(sheet.settings).toBeUndefined();
+    expect(sheet.rootTopic.title).toBe('Plan');
+  });
+
   it('parses per-topic metadata from the trailing comment', () => {
     const md = `# Root
 ## Task <!-- vmm: {"markers":["priority-1"],"note":"do it","collapsed":true} -->
@@ -115,6 +135,17 @@ describe('round-trip: sheet → markdown → sheet', () => {
     const md = sheetToMarkdown(wb.sheets[0]!);
     const back = markdownToSheet(md);
     expect(outline(back)).toEqual(outline(wb.sheets[0]!));
+  });
+
+  it('preserves sheet settings and background', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    sheet.settings = { wrapText: false, compactMap: true, branchLineWidth: 3 };
+    sheet.background = { color: '#101010' };
+
+    const back = markdownToSheet(sheetToMarkdown(sheet));
+    expect(back.settings).toEqual(sheet.settings);
+    expect(back.background).toEqual(sheet.background);
   });
 
   it('preserves markers, notes, links, and collapsed state', () => {

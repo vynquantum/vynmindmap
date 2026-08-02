@@ -109,6 +109,7 @@ const SUMMARY_COLOR = '#64748b';
  */
 let uniformW = 0;
 let showNotes = false;
+let wrapTitles = true;
 
 /** Reset the knobs from a sheet's settings. Call once, before placement. */
 function applySettings(sheet: Sheet): void {
@@ -118,6 +119,7 @@ function applySettings(sheet: Sheet): void {
   LEVEL_GAP = Math.round(SPACING.level * density);
 
   showNotes = sheet.settings?.displayAllNotes === true;
+  wrapTitles = sheet.settings?.wrapText !== false;
   // Measured with the knob off so the widest topic is its own natural width,
   // not a previous sheet's uniform width fed back in.
   uniformW = 0;
@@ -303,16 +305,27 @@ export function sizeOf(t: Topic): TopicSize {
   // layout preference: it controls wrapping and is retained in the document.
   const requestedWidth = t.style?.width;
   const fixedWidth = Number.isFinite(requestedWidth) ? clampTopicWidth(requestedWidth!) : undefined;
-  const maxChars = Math.max(4, Math.floor(((fixedWidth ?? MAX_W) - PAD_X) / cw));
+  // Wrapping off: an infinite line budget, so `wrap` only honors the explicit
+  // newlines already in the title.
+  const maxChars = wrapTitles
+    ? Math.max(4, Math.floor(((fixedWidth ?? MAX_W) - PAD_X) / cw))
+    : Infinity;
 
   const lines = wrap(t.title ?? '', maxChars);
 
   const longest = lines.reduce((m, l) => Math.max(m, l.length), 0);
   const lineH = Math.max(18, size + 5);
-  const natural = Math.max(MIN_W, Math.min(MAX_W, longest * cw + PAD_X));
+  const natural = Math.max(
+    MIN_W,
+    Math.min(wrapTitles ? MAX_W : MAX_MANUAL_W, longest * cw + PAD_X)
+  );
   // Uniform length only ever widens: the shared width is the widest natural
   // width on the sheet, so no title has to re-wrap to fit it.
-  const w = fixedWidth ?? Math.max(natural, uniformW);
+  // With wrapping off a requested width can no longer make the text re-flow, so
+  // it acts as a minimum instead of a cap — otherwise the title would be clipped.
+  const w = wrapTitles
+    ? (fixedWidth ?? Math.max(natural, uniformW))
+    : Math.max(fixedWidth ?? 0, natural, uniformW);
 
   const note = showNotes ? (t.note?.plain ?? '').trim() : '';
   const noteLines = note

@@ -58,6 +58,26 @@ costs you the layout, not the import.
 (Only the topic tree is shared across structures; the structure just changes how
 VynMM lays it out.)
 
+## Sheet settings
+
+Everything on the Inspector's **Map** tab round-trips through the frontmatter,
+as one line of JSON each:
+
+```text
+---
+title: Project Plan
+structure: map.balanced
+theme: classic
+settings: {"wrapText":false,"compactMap":true,"branchColor":"#1f4fd0"}
+background: {"color":"#f7f7f7"}
+---
+```
+
+Export writes them only when the sheet has any, and unknown keys survive the
+trip — so a file written by a newer build keeps its settings when an older one
+re-exports it. A value that isn't a JSON object is ignored rather than fatal,
+like everything else here.
+
 ## Per-topic extras
 
 Attach a trailing HTML comment to any heading or list item to add metadata:
@@ -72,9 +92,9 @@ It will be appended to the topic's note.
 ```
 
 Supported keys: `markers` (string[]), `labels` (string[]), `note` (string),
-`collapsed` (boolean), `link` (string URL). Other VynMM features (styles,
-relationships, boundaries, summaries, floating topics, images) are **not**
-expressible in Markdown — add them in the app.
+`collapsed` (boolean), `link` (string URL). Other VynMM features (per-topic
+styles, relationships, boundaries, summaries, floating topics, images) are
+**not** expressible in Markdown — add them in the app.
 
 ## Multiple sheets
 

@@ -98,20 +98,35 @@ The clipboard survives sheet switches, so you can copy on one sheet and paste
 on another. To drop a copy somewhere specific, right-click empty canvas and
 choose **Paste here** — it lands as a floating topic at the cursor.
 
+Copy also puts the map on the **system clipboard**, so it travels further:
+
+- Paste into another VynMM window, or another document, and the whole subtree
+  arrives with its styles, notes, images and children intact.
+- Paste into a text editor, chat, or email and you get a plain indented
+  outline.
+- Paste an outline _from_ anywhere back into a map and the indentation becomes
+  the tree — tabs, two spaces or four all work.
+- Paste an image while a topic is selected and it attaches to that topic.
+
 Pasted topics get fresh ids, so nothing collides with the original.
 
 ## Collapsing and expanding
 
-| Key       | Effect                                                       |
-| --------- | ------------------------------------------------------------ |
-| **Space** | Collapse/expand the selected topic one level                 |
-| **-**     | Collapse the selected topic                                  |
-| **=**     | Expand the selected topic                                    |
-| **/**     | Collapse the entire subtree under the selection, recursively |
-| **\***    | Expand the entire subtree, recursively                       |
+| Key         | Effect                                                       |
+| ----------- | ------------------------------------------------------------ |
+| **Space**   | Collapse/expand the selected topic one level                 |
+| **-**       | Collapse the selected topic                                  |
+| **=**       | Expand the selected topic                                    |
+| **/**       | Collapse the entire subtree under the selection, recursively |
+| **\***      | Expand the entire subtree, recursively                       |
+| **Ctrl+/**  | Collapse every branch on the sheet, whatever is selected     |
+| **Ctrl+\*** | Expand every branch on the sheet, whatever is selected       |
 
-With nothing selected, **/** and **\*** collapse or expand the whole map.
-Topics with hidden children show a toggle you can click instead.
+With nothing selected, **/** and **\*** act on the whole map too. Collapse-all
+leaves the central topic open, so you're left looking at the top-level
+branches rather than a single box. Both are also in the right-click menu:
+**Expand / Collapse branch** on a topic, **Expand all / Collapse all** on empty
+canvas. Topics with hidden children show a toggle you can click instead.
 
 ## Floating topics
 
@@ -145,8 +160,11 @@ Same selection, click **Add summary**; a new "Summary" topic appears.
 
 ## Styling a topic
 
-Open the style panel (toolbar, or the button on a selected topic) and use the
-**Style** tab:
+Open the style panel (toolbar, or the button on a selected topic). Selecting a
+topic brings the **Style** tab up by itself; it stays where you leave it while
+that topic is selected, so you can work in **Map** without it jumping back.
+
+The **Style** tab holds:
 
 - **Size & wrapping** — fixed width, wrap behaviour
 - **Appearance** — fill colour, border colour, shape
@@ -173,7 +191,12 @@ All in the Style tab's last section:
 - **Link** — one of four kinds: a **web** URL, a local **file** path, another
   **topic** in the map, or an **email** address.
 - **Labels** — short tags rendered under the title.
-- **Image** — an image embedded in the node.
+- **Image** — an image embedded in the node, drawn above the title. It arrives
+  at its own aspect ratio; resize it by dragging the small handle at its
+  top-right corner (hold **Shift** to stretch it freely), by typing an **Image
+  width / height**, or double-click the handle to go back to the attached size.
+  You can also drop an image file onto a topic, or paste one from the
+  clipboard.
 - **Markers** — icon chips shown before the title; priority markers render as
   coloured numbered chips.
 
@@ -204,6 +227,9 @@ Also on the **Map** tab, as toggles:
 - **Compact Map** — tighter spacing
 - **Uniform Topic Length** — every node the same width
 - **Display All Notes** — render notes inline instead of as badges
+- **Wrap Text** — on by default; turn it off and every title stays on one line,
+  widening its topic instead. Line breaks you typed yourself still break, and a
+  fixed width becomes a minimum rather than a wrap point.
 - **Auto-colour Floating Topic** — give new floating topics their own colours
 - **Line Colour Follow Topic** — branch lines take the topic's colour
 - **Free Branch Position** — drop on empty canvas repositions instead of
@@ -219,7 +245,12 @@ canvas.
 - **+** adds a sheet
 - Click a tab to switch
 - **Double-click** a tab to rename it
-- **×** on the tab closes it
+- **×** on the tab closes it (it appears on the active tab and on hover)
+
+Tabs behave like a browser's: they share the strip and shrink as you add more,
+long names truncate with an ellipsis rather than wrapping the bar onto a second
+row, and once they hit their minimum the strip scrolls sideways with the
+current tab kept in view. Hover a truncated tab to see its full name.
 
 The clipboard is shared across sheets, so copy on one and paste on another.
 
@@ -246,6 +277,11 @@ branches on the way. The audience sees the structure and how each point hangs
 off it, which is the argument a mind map is making. A second window gives you
 the presenter view — the current topic's note, what's next, progress, a timer,
 and a clock.
+
+Editing chrome stays out of the picture while you present: the note, link and
+image badges, the collapse toggles, the zoom bar and the minimap are all
+hidden, so the audience sees the map and nothing else. They come back the
+moment you leave presenter mode, and exports are unaffected.
 
 The walk order is depth-first through the tree, then any floating topics, so
 it follows the map top to bottom. You can't reorder it or skip branches; every

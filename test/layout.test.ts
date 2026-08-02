@@ -389,6 +389,32 @@ describe('map display settings', () => {
     expect(shown.h).toBeGreaterThan(plain.h);
   });
 
+  it('keeps a long title on one line, and widens the topic, when wrapping is off', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    const title = 'A branch title long enough that it has to wrap onto several lines';
+    const long = addChild(sheet.rootTopic, title);
+    const lay = () => layoutSheet(sheet).nodes.find((n) => n.id === long.id)!;
+
+    const wrapped = lay();
+    expect(wrapped.lines.length).toBeGreaterThan(1);
+
+    sheet.settings = { wrapText: false };
+    const flat = lay();
+    expect(flat.lines).toHaveLength(1);
+    expect(flat.w).toBeGreaterThan(wrapped.w);
+    expect(flat.h).toBeLessThan(wrapped.h);
+
+    // Typed line breaks are the user's own, so they still break.
+    long.title = 'two\nlines';
+    expect(lay().lines).toEqual(['two', 'lines']);
+
+    // Module state again: a later layout must not inherit the knob.
+    long.title = title;
+    sheet.settings = {};
+    expect(lay().lines).toEqual(wrapped.lines);
+  });
+
   it('colors floating topics from the palette only when asked', () => {
     const { sheet } = sample();
     sheet.floatingTopics = [{ id: 'f1', title: 'One', children: [] } as Topic];
