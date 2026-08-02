@@ -131,13 +131,13 @@ A `●` dirty indicator and an unsaved-changes warning on close round it out.
 LLMs (and humans) author maps as **Markdown**, which converts to/from the canonical
 `.vmm`. See [docs/vmm-markdown-format.md](docs/vmm-markdown-format.md).
 
-| Surface       | Where                           | Use                                                                                   |
-| ------------- | ------------------------------- | ------------------------------------------------------------------------------------- |
-| Markdown lane | `src/markdown.ts`               | `.vmm` ⇄ Markdown in code                                                             |
-| CLI           | `src/cli.ts`                    | `vynmm new / import / export / merge / info`                                          |
-| MCP server    | `mcp/server.ts`                 | tools: `create_map`, `read_map`, `update_map`, `add_topics`, `merge_maps`, `map_info` |
-| Skill         | `.claude/skills/vynmm-mindmap/` | teaches an LLM to author maps                                                         |
-| App           | Import MD / Export MD / Merge   | round-trip Markdown and combine maps in the UI                                        |
+| Surface       | Where                         | Use                                                                                   |
+| ------------- | ----------------------------- | ------------------------------------------------------------------------------------- |
+| Markdown lane | `src/markdown.ts`             | `.vmm` ⇄ Markdown in code                                                             |
+| CLI           | `src/cli.ts`                  | `vynmm new / import / export / merge / info`                                          |
+| MCP server    | `mcp/server.ts`               | tools: `create_map`, `read_map`, `update_map`, `add_topics`, `merge_maps`, `map_info` |
+| Skill         | `skills/create-vmm/`          | teaches any agent to author maps                                                      |
+| App           | Import MD / Export MD / Merge | round-trip Markdown and combine maps in the UI                                        |
 
 The round-trip is lossless — styles, images, positions, relationships,
 boundaries, summaries and floating topics all survive it. **Merge** puts every

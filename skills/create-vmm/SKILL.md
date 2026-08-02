@@ -1,49 +1,90 @@
 ---
 name: create-vmm-mindmap
-description: Instructs the agent on how to author and compile a VynMM (.vmm) mind map using Markdown and the CLI.
+description: >-
+  Create, edit, or combine VynMM mind maps (.vmm files). Use when the user wants
+  to make a mind map, brainstorm a topic into a map, outline something visually,
+  convert notes into a .vmm, or merge several maps into one. Authors a Markdown
+  outline and converts it with the vynmm CLI.
 ---
 
-# Creating a VynMM Mind Map (.vmm)
+# Creating VynMM mind maps
 
-When a user asks you to create, generate, or build a `.vmm` (VynMM) mind map file, you must follow this two-step process. A `.vmm` file is a zipped binary file containing JSON, so **you should never attempt to write the JSON or zip file manually**. Instead, you will write a specific Markdown format and use the built-in CLI to compile it.
+A `.vmm` mind map is authored as a **Markdown outline** and converted to the `.vmm`
+file. You never write the binary format by hand.
 
-## Step 1: Write the Mind Map in Markdown
+## Steps
 
-VynMM has a specific Markdown format for representing mind maps. Create a temporary `.md` file using this format.
+1. Draft the map as Markdown:
+   - `# Central topic` (exactly one).
+   - `## Branch` for each main branch.
+   - `-` list items (indent 2 spaces per level) for sub-topics.
+   - A plain paragraph under a heading or list item becomes that topic's **note**.
+   - Optional frontmatter for the layout, theme and map settings (below).
+   - Optional per-topic metadata: `Task <!-- vmm: {"markers":["priority-1"]} -->`.
+   - `<!-- vmm:sheet -->` on its own line starts another **tab**, each with its
+     own frontmatter and `# H1`.
 
-### Format Rules:
+   ```markdown
+   ---
+   title: Launch Plan
+   structure: map.balanced
+   ---
 
-1. **Frontmatter**: (Optional) Use YAML frontmatter to set the `title`, `structure` (e.g. `map.balanced`, `org.down`, `tree.right`), and `theme`.
-2. **Root Topic**: The single `# H1` heading in the file represents the central topic (root).
-3. **Branches**: Use `## H2` headings for level-1 branches.
-4. **Sub-topics**: Use `-` lists for deeper topics. Indent by 2 spaces for each nested level.
-5. **Notes**: Any plain, unformatted text paragraphs beneath a heading or list item will automatically be added as a note for that topic.
-6. **Metadata**: You can attach extra metadata to a topic by appending an HTML comment to the end of the heading or list item: `<!-- vmm: {"markers":["priority-1"],"collapsed":true} -->`
-7. **Multiple Sheets (Tabs)**: To create a mind map with multiple tabs, separate each sheet's markdown with `<!-- vmm:sheet -->` on its own line. Each sheet can have its own frontmatter and `# H1` root topic.
+   # Launch Plan
 
-### Example Markdown (Multi-tab):
+   ## Marketing
+
+   - Landing page
+   - Email campaign
+
+   ## Engineering
+
+   - API
+   - Frontend
+   ```
+
+2. Save the Markdown to a temp file, then convert:
+
+   ```bash
+   vynmm import plan.md -o plan.vmm             # if installed globally
+   npm run vynmm -- import plan.md -o plan.vmm  # from a clone of this repo
+   npx tsx src/cli.ts import plan.md -o plan.vmm
+   ```
+
+3. To edit an existing map: `vynmm export map.vmm -o map.md`, change the Markdown,
+   then `vynmm import map.md -o map.vmm`.
+
+   The round-trip is lossless: styles, images, positions, relationships,
+   boundaries, summaries and floating topics all come back. Only the **bytes**
+   of embedded images can't live in text — importing back over the original
+   `.vmm` (as above) keeps them, so pass the same file to `-o`.
+
+4. To combine maps: `vynmm merge q1.vmm q2.vmm notes.md -o all.vmm` — every
+   sheet of every input becomes its own tab, in the order given, `.vmm` and
+   `.md` freely mixed. Colliding ids, resource paths and tab names are
+   renamed rather than dropped; the inputs are left alone.
+
+## Multiple tabs
+
+Separate each sheet with `<!-- vmm:sheet -->` on its own line:
 
 ```markdown
 ---
-title: Project Launch Plan
-structure: map.balanced
+title: Launch Plan
 ---
 
 # Launch Plan
 
 ## Engineering
-- API Deploy <!-- vmm: {"markers":["priority-1"]} -->
-  - Verify endpoints
-  - Database migration
-- Frontend Deploy
 
-## Marketing
-Start the email campaign.
+Ship the API first.
 
-- Send newsletter
+- API
 
 <!-- vmm:sheet -->
+
 ---
+
 title: Q3 Goals
 structure: org.down
 ---
@@ -51,19 +92,98 @@ structure: org.down
 # Q3 Goals
 
 ## Revenue
+
 - Increase MRR by 20%
 ```
 
-## Step 2: Compile the Markdown to `.vmm`
+Here "Ship the API first." becomes the note on **Engineering**, and the file
+imports as a two-tab map.
 
-Once you have written the `.md` file, use the built-in VynMM CLI tool to convert it to a `.vmm` file.
+## Frontmatter
 
-Run the following command using your shell/terminal execution tool (if you are inside the `vynmindmap` repository):
+| Key             | Value                                                                       |
+| --------------- | --------------------------------------------------------------------------- |
+| `title`         | Tab name. Defaults to the `# H1` (the central topic).                       |
+| `structure`     | Layout id (below). A typo falls back to `map.balanced` instead of failing.  |
+| `theme`         | `classic` (default), `ocean`, `forest`, `sunset`, `lavender`, `monochrome`. |
+| `settings`      | One line of JSON — the Inspector's **Map** tab. See below.                  |
+| `background`    | One line of JSON: `{"color":"#f7f7f7"}`.                                    |
+| `relationships` | One line of JSON array; each `{"id","end1Id","end2Id","title"?}`.           |
+| `boundaries`    | One line of JSON array; each `{"id","parentId","childIds":[…],"title"?}`.   |
+| `summaries`     | Like `boundaries`, but carrying a whole `summaryTopic` object.              |
 
-```bash
-npx tsx src/cli.ts import path/to/your_file.md -o path/to/output.vmm
+Structures: `map.balanced`, `map.left`, `map.right`, `map.underline`,
+`logic.right`, `logic.left`,
+`org.down`, `org.up`, `tree.right`, `tree.left`, `timeline.h`, `timeline.v`,
+`fishbone.right`, `fishbone.left`, `matrix`, `tree-table`, `grid`, `brace.right`,
+`brace.left`.
+
+```text
+---
+title: Launch Plan
+structure: map.balanced
+theme: ocean
+settings: {"wrapText":false,"compactMap":true,"branchColor":"#1f4fd0"}
+background: {"color":"#f7f7f7"}
+---
 ```
 
-*(Note: If the CLI is installed globally, you can just run `vynmm import path/to/your_file.md -o path/to/output.vmm`)*
+### `settings` keys
 
-After the command completes successfully, you can delete the temporary `.md` file and inform the user that the `.vmm` file has been created!
+All optional; write only the ones you want to change. Unknown keys are kept
+verbatim, so a file from a newer build doesn't lose settings on re-export. A
+`settings:` value that isn't a JSON object is ignored rather than fatal.
+
+| Key                       | Type                                                                   | Effect                                                                       |
+| ------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `wrapText`                | boolean (default `true`)                                               | `false` keeps every title on one line and lets the topic grow wider.         |
+| `compactMap`              | boolean                                                                | Tighten the gaps between topics and levels.                                  |
+| `uniformTopicLength`      | boolean                                                                | Widen every topic to the widest one, so titles line up in columns.           |
+| `displayAllNotes`         | boolean                                                                | Show each note under its title instead of only the 📝 badge.                 |
+| `mapPresentation`         | `boxed` \| `underline`                                                 | Boxed topics, or bare text on an underline.                                  |
+| `boxedLevelOne`           | boolean                                                                | With `underline`, keep the root and its branches boxed.                      |
+| `defaultShape`            | `rounded` \| `rect` \| `ellipse` \| `underline` \| `capsule` \| `none` | Shape for topics without their own.                                          |
+| `coloredBranches`         | boolean                                                                | Each top-level branch takes a color from the theme palette.                  |
+| `rainbowBranches`         | boolean                                                                | Cycle branch colors across the whole palette.                                |
+| `branchColor`             | color string                                                           | Single branch color, used when `coloredBranches` is off.                     |
+| `branchLineWidth`         | number                                                                 | Default branch line width.                                                   |
+| `branchStyle`             | `curve` \| `straight` \| `elbow`                                       | Connector geometry; each structure family has its own default.               |
+| `globalFont`              | font family string                                                     | Default font for topics without their own.                                   |
+| `autoColorFloating`       | boolean                                                                | Give floating topics a palette color instead of gray.                        |
+| `flexibleFloatingTopic`   | boolean                                                                | Shift floating topics clear of the map instead of letting it grow over them. |
+| `relationLineFollowTopic` | boolean                                                                | Draw relationship lines in their source topic's color.                       |
+| `freeBranchPosition`      | boolean                                                                | Dragging a branch to empty canvas moves it there instead of detaching it.    |
+| `topicOverlap`            | boolean (default `true`)                                               | `false` snaps a drop to the nearest free space.                              |
+
+### Per-topic keys
+
+In the trailing `<!-- vmm: {…} -->` comment on any heading or list item:
+`markers` (string array), `labels` (string array), `note` (string),
+`collapsed` (boolean), `link` (URL string).
+
+```markdown
+## Build <!-- vmm: {"markers":["priority-1"],"note":"Start Monday","collapsed":true} -->
+
+- API <!-- vmm: {"link":"https://api.example.com"} -->
+```
+
+Export also writes `style`, `image`, `position`, `attachments` and any other
+topic field verbatim into the same comment, plus `id` on topics that a
+relationship, boundary or summary points at. Leave those alone unless you mean
+to change them; ids you don't write are generated for you.
+
+### Floating topics
+
+A `<!-- vmm:floating -->` line ends the main tree — each `## H2` after it is a
+floating topic, usually with a `position` in its comment.
+
+## Full format reference
+
+See [docs/vmm-markdown-format.md](../../docs/vmm-markdown-format.md) for the
+complete spec (all structures, multi-sheet files, every metadata key).
+
+## When an MCP client is available
+
+If the VynMM MCP server is connected, prefer its tools instead of the CLI:
+`create_map`, `read_map`, `update_map`, `add_topics`, `merge_maps`, `map_info` —
+all take/return the same Markdown.
