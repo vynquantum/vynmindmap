@@ -81,7 +81,14 @@ describe('MCP server', () => {
 
     const tools = await rpc('tools/list', {}, 2);
     const names = tools.result.tools.map((t: any) => t.name).sort();
-    expect(names).toEqual(['add_topics', 'create_map', 'map_info', 'read_map', 'update_map']);
+    expect(names).toEqual([
+      'add_topics',
+      'create_map',
+      'map_info',
+      'merge_maps',
+      'read_map',
+      'update_map'
+    ]);
 
     const file = join(tmp, 'mcp.vmm');
     const created = await rpc(

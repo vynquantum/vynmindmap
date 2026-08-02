@@ -32,6 +32,17 @@ export async function nativeOpenDialog(): Promise<string | null> {
   return typeof res === 'string' ? res : null;
 }
 
+/** Pick several maps or outlines at once (Merge). Empty if the user cancels. */
+export async function nativeOpenManyDialog(): Promise<string[]> {
+  const { open } = await import('@tauri-apps/plugin-dialog');
+  const res = await open({
+    multiple: true,
+    directory: false,
+    filters: [{ name: 'Mind maps and outlines', extensions: ['vmm', 'md', 'markdown'] }]
+  });
+  return Array.isArray(res) ? res : res ? [res] : [];
+}
+
 export async function nativeWrite(path: string, bytes: Uint8Array): Promise<void> {
   await invoke('write_file_bytes', { path, contents: Array.from(bytes) });
 }

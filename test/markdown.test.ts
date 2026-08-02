@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  addBoundary,
   addChild,
+  addFloatingTopic,
+  addRelationship,
+  addSummary,
   createWorkbook,
   markdownToSheet,
   markdownToWorkbook,
@@ -146,6 +150,103 @@ describe('round-trip: sheet → markdown → sheet', () => {
     const back = markdownToSheet(sheetToMarkdown(sheet));
     expect(back.settings).toEqual(sheet.settings);
     expect(back.background).toEqual(sheet.background);
+  });
+
+  it('preserves per-topic style, image, and shape', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    addChild(sheet.rootTopic, 'Styled', {
+      style: { fillColor: '#ff8800', shape: 'capsule', font: { size: 20, weight: 'bold' } },
+      image: { resource: 'resources/logo.png', width: 120, height: 90 },
+      structureClass: 'org.down'
+    });
+
+    const styled = markdownToSheet(sheetToMarkdown(sheet)).rootTopic.children![0]!;
+    expect(styled.style).toEqual({
+      fillColor: '#ff8800',
+      shape: 'capsule',
+      font: { size: 20, weight: 'bold' }
+    });
+    expect(styled.image).toEqual({ resource: 'resources/logo.png', width: 120, height: 90 });
+    expect(styled.structureClass).toBe('org.down');
+  });
+
+  it('keeps a rich note and a non-web link, which have no short form', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    addChild(sheet.rootTopic, 'Rich', {
+      note: { plain: 'plain text', rich: '<p>plain <b>text</b></p>' },
+      hyperlink: { type: 'file', value: 'C:/notes/spec.pdf' }
+    });
+
+    const back = markdownToSheet(sheetToMarkdown(sheet)).rootTopic.children![0]!;
+    expect(back.note).toEqual({ plain: 'plain text', rich: '<p>plain <b>text</b></p>' });
+    expect(back.hyperlink).toEqual({ type: 'file', value: 'C:/notes/spec.pdf' });
+  });
+
+  it('preserves relationships, boundaries, and summaries', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    const a = addChild(sheet.rootTopic, 'A');
+    const b = addChild(sheet.rootTopic, 'B');
+    addRelationship(sheet, a.id, b.id, 'depends on');
+    addBoundary(sheet, sheet.rootTopic.id, [a.id, b.id], 'Phase 1');
+    addSummary(sheet, sheet.rootTopic.id, [a.id, b.id], 'Both');
+
+    const back = markdownToSheet(sheetToMarkdown(sheet));
+    expect(back.relationships).toEqual(sheet.relationships);
+    expect(back.boundaries).toEqual(sheet.boundaries);
+    expect(back.summaries).toEqual(sheet.summaries);
+    // The endpoints only reconnect if their ids survived the trip.
+    expect(back.rootTopic.children!.map((c) => c.id)).toEqual([a.id, b.id]);
+  });
+
+  it('leaves ids out of a map that has no connectors', () => {
+    const wb = createWorkbook('Root');
+    addChild(wb.sheets[0]!.rootTopic, 'A');
+    expect(sheetToMarkdown(wb.sheets[0]!)).not.toContain('"id"');
+  });
+
+  it('preserves floating topics, their positions, and their children', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    addChild(sheet.rootTopic, 'Branch');
+    const parked = addFloatingTopic(sheet, 'Parked idea', { x: 320, y: -80 });
+    addChild(parked, 'Detail');
+
+    const back = markdownToSheet(sheetToMarkdown(sheet));
+    expect(back.floatingTopics).toHaveLength(1);
+    expect(back.floatingTopics![0]!.title).toBe('Parked idea');
+    expect(back.floatingTopics![0]!.position).toEqual({ x: 320, y: -80 });
+    expect(back.floatingTopics![0]!.children!.map((c) => c.title)).toEqual(['Detail']);
+    // The floating section must not leak into the main tree.
+    expect(outline(back)).toEqual(['0:Root', '1:Branch']);
+  });
+
+  it('re-ids a duplicated topic and drops the connector left pointing nowhere', () => {
+    const md = `---
+title: Plan
+relationships: [{"id":"r-1","end1Id":"t-dup","end2Id":"t-b"}]
+---
+# Plan
+## A <!-- vmm: {"id":"t-dup"} -->
+## B <!-- vmm: {"id":"t-dup"} -->
+`;
+    const sheet = markdownToSheet(md);
+    const [a, b] = sheet.rootTopic.children!;
+    expect(a!.id).toBe('t-dup');
+    expect(b!.id).not.toBe('t-dup');
+    // t-b was never in the file, so the relationship goes rather than dangling.
+    expect(sheet.relationships ?? []).toEqual([]);
+  });
+
+  it('never lets a hand-written comment overwrite the title or children', () => {
+    const sheet = markdownToSheet(
+      `# Root\n## Real <!-- vmm: {"title":"Fake","children":[{"id":"x","title":"Ghost"}]} -->\n`
+    );
+    const branch = sheet.rootTopic.children![0]!;
+    expect(branch.title).toBe('Real');
+    expect(branch.children).toEqual([]);
   });
 
   it('preserves markers, notes, links, and collapsed state', () => {

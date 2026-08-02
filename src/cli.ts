@@ -8,19 +8,23 @@
  *   vynmm new "My Map" [-o map.vmm]      create a new map
  *   vynmm import notes.md [-o notes.vmm] Markdown → .vmm
  *   vynmm export map.vmm [-o map.md]     .vmm → Markdown (stdout if no -o)
+ *   vynmm merge a.vmm b.md [-o all.vmm]  many files → one, a tab per sheet
  *   vynmm info map.vmm                   summarize a .vmm
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 
 import {
   createWorkbook,
   markdownToWorkbook,
+  mergeDocuments,
+  newDocument,
   readVmm,
   walkSheetTopics,
   workbookToMarkdown,
-  writeVmm
+  writeVmm,
+  type VmmDocument
 } from './index.js';
 
 function parseArgs(argv: string[]): { _: string[]; out?: string } {
@@ -43,12 +47,21 @@ function slug(s: string): string {
   );
 }
 
+/** Read either lane into a document, so `merge` can take a mix of both. */
+function readDocument(file: string): VmmDocument {
+  if (/\.(md|markdown|txt)$/i.test(file)) {
+    return newDocument(markdownToWorkbook(readFileSync(file, 'utf8')));
+  }
+  return readVmm(readFileSync(file));
+}
+
 const USAGE = `vynmm — mind-map (.vmm) command-line tool
 
 Usage:
   vynmm new "<title>" [-o file.vmm]
   vynmm import <input.md> [-o output.vmm]
   vynmm export <input.vmm> [-o output.md]
+  vynmm merge <input...> [-o merged.vmm]   .vmm and/or .md, one tab per sheet
   vynmm info <input.vmm>
 `;
 
@@ -68,11 +81,20 @@ function main(): void {
     case 'import': {
       const input = _[0];
       if (!input) fail('import: missing <input.md>');
-      const md = readFileSync(input!, 'utf8');
-      const wb = markdownToWorkbook(md);
-      const file = out ?? input!.replace(/\.md$/i, '') + '.vmm';
-      writeFileSync(file, writeVmm(wb));
-      console.log(`Imported ${input} → ${file} (${wb.sheets.length} sheet(s))`);
+      // Several files import as one map, a tab per file, same as `merge`.
+      const wb =
+        _.length > 1
+          ? mergeDocuments(_.map(readDocument)).workbook
+          : markdownToWorkbook(readFileSync(input, 'utf8'));
+      const file = out ?? input.replace(/\.md$/i, '') + '.vmm';
+      // Re-importing an edited export must not delete the pictures: Markdown
+      // references resources but can't carry their bytes, so keep the ones
+      // already in the file we're about to overwrite.
+      writeFileSync(
+        file,
+        writeVmm(wb, existsSync(file) ? readVmm(readFileSync(file)).resources : {})
+      );
+      console.log(`Imported ${_.join(', ')} → ${file} (${wb.sheets.length} sheet(s))`);
       break;
     }
     case 'export': {
@@ -86,6 +108,18 @@ function main(): void {
       } else {
         process.stdout.write(md);
       }
+      break;
+    }
+    case 'merge': {
+      if (_.length < 2) fail('merge: give at least two input files');
+      const docs = _.map(readDocument);
+      const merged = mergeDocuments(docs);
+      const file = out ?? 'merged.vmm';
+      writeFileSync(file, writeVmm(merged.workbook, merged.resources));
+      console.log(
+        `Merged ${_.length} file(s) → ${file} (${merged.workbook.sheets.length} sheet(s): ` +
+          `${merged.workbook.sheets.map((s) => `"${s.title}"`).join(', ')})`
+      );
       break;
     }
     case 'info': {

@@ -21,6 +21,8 @@
     markdown:
       '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 15V9l3 3 3-3v6"/><path d="M17 9v4"/><path d="M15 13l2 2 2-2"/>',
     'chevron-down': '<path d="m6 9 6 6 6-6"/>',
+    layers:
+      '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m22 12.5-9.17 4.16a2 2 0 0 1-1.66 0L2 12.5"/><path d="m22 17.5-9.17 4.16a2 2 0 0 1-1.66 0L2 17.5"/>',
     plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
     sitemap:
       '<rect width="8" height="6" x="8" y="2" rx="1"/><rect width="6" height="5" x="2" y="16" rx="1"/><rect width="6" height="5" x="16" y="16" rx="1"/><path d="M12 8v4"/><path d="M5 16v-1a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v1"/>',

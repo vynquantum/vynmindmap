@@ -192,10 +192,16 @@ mymap.vmm
 
 ### 4.4 Markdown lane (LLM / text export)
 
-A `.vmm` can be exported to / imported from Markdown. Markdown captures the topic
-tree + markers/notes/links where expressible; floating topics, relationships,
-boundaries, summaries, styles, and structure type are **not** representable and are
-either dropped on export or added in-app after import.
+A `.vmm` can be exported to / imported from Markdown, and the round-trip is
+lossless. The outline carries the topic tree; frontmatter carries the sheet
+title, structure, theme, settings, background, relationships, boundaries and
+summaries; a trailing `<!-- vmm: {…} -->` comment carries everything else a
+topic holds (markers, note, link, style, image, position, attachments, and any
+field a later version adds, verbatim); a `<!-- vmm:floating -->` marker
+introduces the floating topics. Topic `id`s appear only where a connector needs
+them; duplicates are re-generated and dangling connectors pruned on import.
+Resource **bytes** are the one thing text can't carry, so importing over an
+existing `.vmm` keeps that file's resources.
 
 ```markdown
 # Central Topic

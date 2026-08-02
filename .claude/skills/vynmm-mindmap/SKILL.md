@@ -50,20 +50,28 @@ file. You never write the binary format by hand.
 3. To edit an existing map: `vynmm export map.vmm -o map.md`, change the Markdown,
    then `vynmm import map.md -o map.vmm`.
 
-   Markdown carries the tree, the frontmatter and the per-topic keys below —
-   nothing else. Per-topic styles, relationships, boundaries, summaries,
-   floating topics and images do **not** survive that round-trip, so edit a
-   styled map in the app rather than through Markdown.
+   The round-trip is lossless: styles, images, positions, relationships,
+   boundaries, summaries and floating topics all come back. Only the **bytes**
+   of embedded images can't live in text — importing back over the original
+   `.vmm` (as above) keeps them, so pass the same file to `-o`.
+
+4. To combine maps: `vynmm merge q1.vmm q2.vmm notes.md -o all.vmm` — every
+   sheet of every input becomes its own tab, in the order given, `.vmm` and
+   `.md` freely mixed. Colliding ids, resource paths and tab names are
+   renamed rather than dropped; the inputs are left alone.
 
 ## Frontmatter
 
-| Key          | Value                                                                       |
-| ------------ | --------------------------------------------------------------------------- |
-| `title`      | Sheet name. Defaults to the `# H1`.                                         |
-| `structure`  | Layout id (below). A typo falls back to `map.balanced` instead of failing.  |
-| `theme`      | `classic` (default), `ocean`, `forest`, `sunset`, `lavender`, `monochrome`. |
-| `settings`   | One line of JSON — the Inspector's **Map** tab. See below.                  |
-| `background` | One line of JSON: `{"color":"#f7f7f7"}`.                                    |
+| Key             | Value                                                                       |
+| --------------- | --------------------------------------------------------------------------- |
+| `title`         | Sheet name. Defaults to the `# H1`.                                         |
+| `structure`     | Layout id (below). A typo falls back to `map.balanced` instead of failing.  |
+| `theme`         | `classic` (default), `ocean`, `forest`, `sunset`, `lavender`, `monochrome`. |
+| `settings`      | One line of JSON — the Inspector's **Map** tab. See below.                  |
+| `background`    | One line of JSON: `{"color":"#f7f7f7"}`.                                    |
+| `relationships` | One line of JSON array; each `{"id","end1Id","end2Id","title"?}`.           |
+| `boundaries`    | One line of JSON array; each `{"id","parentId","childIds":[…],"title"?}`.   |
+| `summaries`     | Same shape as `boundaries`, plus `topicId` (the summary topic).             |
 
 Structures: `map.balanced`, `map.left`, `map.right`, `logic.right`, `logic.left`,
 `org.down`, `org.up`, `tree.right`, `tree.left`, `timeline.h`, `timeline.v`,
@@ -119,6 +127,16 @@ In the trailing `<!-- vmm: {…} -->` comment on any heading or list item:
 - API <!-- vmm: {"link":"https://api.example.com"} -->
 ```
 
+Export also writes `style`, `image`, `position`, `attachments` and any other
+topic field verbatim into the same comment, plus `id` on topics that a
+relationship, boundary or summary points at. Leave those alone unless you mean
+to change them; ids you don't write are generated for you.
+
+### Floating topics
+
+A `<!-- vmm:floating -->` line ends the main tree — each `## H2` after it is a
+floating topic, usually with a `position` in its comment.
+
 ## Full format reference
 
 See [docs/vmm-markdown-format.md](../../../docs/vmm-markdown-format.md) for the
@@ -127,5 +145,5 @@ complete spec (all structures, multi-sheet files, every metadata key).
 ## When an MCP client is available
 
 If the VynMM MCP server is connected, prefer its tools instead of the CLI:
-`create_map`, `read_map`, `update_map`, `add_topics`, `map_info` — all take/return
-the same Markdown.
+`create_map`, `read_map`, `update_map`, `add_topics`, `merge_maps`, `map_info` —
+all take/return the same Markdown.

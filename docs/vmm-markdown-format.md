@@ -91,15 +91,71 @@ It will be appended to the topic's note.
 - API <!-- vmm: {"link":"https://api.example.com"} -->
 ```
 
-Supported keys: `markers` (string[]), `labels` (string[]), `note` (string),
-`collapsed` (boolean), `link` (string URL). Other VynMM features (per-topic
-styles, relationships, boundaries, summaries, floating topics, images) are
-**not** expressible in Markdown — add them in the app.
+Readable shorthands: `markers` (string[]), `labels` (string[]), `note` (string),
+`collapsed` (boolean), `link` (string URL).
+
+Everything else a topic carries is written verbatim under its own key, so export
+loses nothing: `style`, `image`, `position`, `attachments`, `structureClass`, a
+rich `note` object, a non-web `hyperlink`, and any key a newer build adds.
+
+```markdown
+## Build <!-- vmm: {"style":{"fillColor":"#1f4fd0","fontBold":true},"image":{"resource":"resources/logo.png","width":120}} -->
+```
+
+`id` is written only for topics a relationship, boundary, or summary points at —
+ordinary outlines stay free of id noise. On import, ids you didn't supply are
+generated; a duplicate id is replaced and connectors that end up pointing
+nowhere are dropped, so a hand-edited file can't produce a broken map.
+
+`title` and `children` in a comment are ignored: the outline is the tree.
+
+## Relationships, boundaries and summaries
+
+These live in the frontmatter, one line of JSON each, referencing topics by `id`:
+
+```text
+---
+title: Project Plan
+relationships: [{"id":"r1","end1Id":"t-a","end2Id":"t-b","title":"blocks"}]
+boundaries: [{"id":"b1","parentId":"t-a","childIds":["t-a1","t-a2"],"title":"Phase 1"}]
+summaries: [{"id":"s1","parentId":"t-a","childIds":["t-a1"],"topicId":"t-sum"}]
+---
+```
+
+Export writes these itself, with matching `id`s on the topics involved — the
+easiest way to get the shape right is to export a map that has them.
+
+## Floating topics
+
+A `<!-- vmm:floating -->` line ends the main tree; each `## H2` after it is a
+floating topic (with its own list children and per-topic comment, usually
+carrying a `position`).
+
+```markdown
+# Project Plan
+
+## Research
+
+<!-- vmm:floating -->
+
+## Parking lot <!-- vmm: {"position":{"x":320,"y":-140}} -->
+
+- Revisit pricing
+```
 
 ## Multiple sheets
 
 Separate sheets with a `<!-- vmm:sheet -->` line. Each section is a full document
 (its own frontmatter + `# H1`).
+
+## What doesn't survive
+
+Only the **bytes** of embedded images and attachments: Markdown is text, so it
+keeps the reference (`resources/logo.png`) but not the file. Import back over
+the original `.vmm` and the pictures come back — `vynmm import edited.md -o
+map.vmm` and the MCP tools keep the resources already in the file they rewrite.
+Importing Markdown in the app opens it as a new map, so pick the `.vmm` route
+when the map has images.
 
 ## Converting
 
@@ -108,11 +164,23 @@ Separate sheets with a `<!-- vmm:sheet -->` line. Each section is a full documen
 If you have the package installed globally, you can use `vynmm`. If you are working in the repository locally, you can use `npx tsx src/cli.ts` or `npm run vynmm`.
 
 ```bash
-vynmm import plan.md -o plan.vmm    # Markdown → .vmm
-vynmm export plan.vmm -o plan.md    # .vmm → Markdown
-vynmm new "My Map" -o my.vmm        # empty map
-vynmm info plan.vmm                 # summary
+vynmm import plan.md -o plan.vmm         # Markdown → .vmm
+vynmm import a.md b.md -o all.vmm        # several outlines, a tab each
+vynmm export plan.vmm -o plan.md         # .vmm → Markdown
+vynmm merge q1.vmm q2.vmm notes.md       # any mix → merged.vmm, a tab per sheet
+vynmm new "My Map" -o my.vmm             # empty map
+vynmm info plan.vmm                      # summary
 ```
 
 **MCP** (for LLM clients): tools `create_map`, `read_map`, `update_map`,
-`add_topics`, `map_info` — all speak this Markdown.
+`add_topics`, `merge_maps`, `map_info` — all speak this Markdown.
+
+## Combining maps
+
+`merge` (and multi-file `import`, and the app's **Merge** toolbar button) puts
+every sheet of every input into one workbook as its own tab, in the order given.
+Collisions are resolved rather than dropped: duplicate topic ids are renumbered
+with their relationships, boundaries and summaries following them; resources
+that share a path but differ in content are stored side by side
+(`resources/logo-2.png`) and the topics repointed; duplicate tab names become
+`Plan (2)`. Inputs are never modified.

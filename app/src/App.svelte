@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Workbook, Sheet, Topic } from '../../src/index.js';
+  import type { Workbook, Sheet, Topic, VmmDocument } from '../../src/index.js';
   import {
     createWorkbook,
     writeVmm,
@@ -8,6 +8,8 @@
     markdownToWorkbook,
     findTopic,
     addSheet,
+    mergeDocuments,
+    newDocument,
     readVmm
   } from '../../src/index.js';
   import { readVmmFromFile, readVmmFromUrl } from './lib/loadVmm.js';
@@ -16,6 +18,7 @@
     basename,
     nativeSaveDialog,
     nativeOpenDialog,
+    nativeOpenManyDialog,
     nativeWrite,
     nativeRead,
     nativeModifiedMs,
@@ -901,9 +904,95 @@
     download((fileName || 'untitled').replace(/\.vmm$/, '') + '.md', md, 'text/markdown');
   }
 
+  // --- merging several files into one map -----------------------------------
+
+  /** Bytes from either lane → a document. The name decides which reader runs. */
+  function docFromBytes(name: string, bytes: Uint8Array): VmmDocument {
+    if (/\.(md|markdown|txt)$/i.test(name)) {
+      return newDocument(markdownToWorkbook(new TextDecoder().decode(bytes)));
+    }
+    const res = readVmm(bytes);
+    return { ...newDocument(res.workbook), resources: res.resources };
+  }
+
+  const fileBytes = async (f: File) => new Uint8Array(await f.arrayBuffer());
+
+  /**
+   * Append every sheet of the picked files to the open map as new tabs, or open
+   * them as a map of their own when nothing is open. Colliding ids, resource
+   * names and tab titles are resolved by the core merge.
+   */
+  async function mergeInto(docs: VmmDocument[]) {
+    if (!docs.length) return;
+    error = '';
+    try {
+      const open = workbook
+        ? [
+            {
+              ...newDocument($state.snapshot(workbook) as Workbook),
+              resources: $state.snapshot(resources) as Record<string, Uint8Array>
+            }
+          ]
+        : [];
+      const firstNewTab = workbook?.sheets.length ?? 0;
+      const merged = mergeDocuments([...open, ...docs]);
+      workbook = merged.workbook;
+      resources = merged.resources;
+      selectedId = null;
+      activeSheet = firstNewTab; // land on the first tab that just arrived
+      if (open.length) {
+        markDirty();
+      } else {
+        fileName = 'merged.vmm';
+        currentPath = null;
+        fileHandle = null; // a new document — Save must ask where to put it
+        dirty = true;
+        stopWatch();
+        resetHistory();
+      }
+      queueFit();
+    } catch (err) {
+      error = `Merge failed: ${(err as Error).message}`;
+    }
+  }
+
+  let mergeInput = $state<HTMLInputElement>();
+  async function mergeFiles() {
+    if (!isTauri()) {
+      mergeInput?.click();
+      return;
+    }
+    try {
+      const paths = await nativeOpenManyDialog();
+      const docs = await Promise.all(paths.map(async (p) => docFromBytes(p, await nativeRead(p))));
+      await mergeInto(docs);
+    } catch (e) {
+      error = (e as Error).message;
+    }
+  }
+
+  async function onPickMerge(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const files = [...(input.files ?? [])];
+    input.value = ''; // let the same files be picked again
+    await mergeInto(
+      await Promise.all(files.map(async (f) => docFromBytes(f.name, await fileBytes(f))))
+    );
+  }
+
   let mdInput = $state<HTMLInputElement>();
   async function onPickMarkdown(e: Event) {
-    const f = (e.target as HTMLInputElement).files?.[0];
+    const files = [...((e.target as HTMLInputElement).files ?? [])];
+    // Several outlines at once open as one map with a tab per file.
+    if (files.length > 1) {
+      workbook = null;
+      await mergeInto(
+        await Promise.all(files.map(async (f) => docFromBytes(f.name, await fileBytes(f))))
+      );
+      fileName = files[0]!.name.replace(/\.(md|markdown)$/i, '.vmm');
+      return;
+    }
+    const f = files[0];
     if (!f) return;
     error = '';
     warning = '';
@@ -1149,8 +1238,14 @@
           <button
             class="ic"
             onclick={() => mdInput?.click()}
-            title="Import a Markdown outline"
+            title="Import Markdown outlines (pick several for a tab each)"
             aria-label="Import Markdown"><Icon name="upload" /></button
+          >
+          <button
+            class="ic"
+            onclick={mergeFiles}
+            title="Merge maps or outlines into this one — a tab per sheet"
+            aria-label="Merge files"><Icon name="layers" /></button
           >
           <div class="menu-wrap">
             <button
@@ -1261,7 +1356,16 @@
           bind:this={mdInput}
           type="file"
           accept=".md,.markdown,text/markdown"
+          multiple
           onchange={onPickMarkdown}
+          hidden
+        />
+        <input
+          bind:this={mergeInput}
+          type="file"
+          accept=".vmm,.md,.markdown,text/markdown"
+          multiple
+          onchange={onPickMerge}
           hidden
         />
 

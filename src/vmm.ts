@@ -12,7 +12,7 @@
  */
 
 import { unzipSync, zipSync, strToU8, strFromU8 } from 'fflate';
-import { type Manifest, type VmmDocument, type Workbook } from './types.js';
+import { type Manifest, type Sheet, type VmmDocument, type Workbook } from './types.js';
 import {
   APP_NAME,
   APP_VERSION,
@@ -21,7 +21,7 @@ import {
   parseVersion,
   VmmVersionError
 } from './version.js';
-import { findDuplicateIds } from './model.js';
+import { findDuplicateIds, newId, walkSheetTopics } from './model.js';
 
 const MANIFEST_PATH = 'manifest.json';
 const CONTENT_PATH = 'content.json';
@@ -194,6 +194,102 @@ export function writeVmm(
 // ---------------------------------------------------------------------------
 // Convenience
 // ---------------------------------------------------------------------------
+
+/**
+ * Combine several documents into one: every sheet of every input becomes a tab,
+ * in the order given. The inputs are left untouched.
+ *
+ * Two files that never met can still collide — same topic id (a file merged
+ * with a copy of itself), same resource path (`resources/image-1.png` is what
+ * both apps called it), same sheet title. Ids and paths are rewritten where they
+ * clash, and every reference to them — relationships, boundaries, summaries,
+ * topic hyperlinks, topic images, sheet backgrounds — is moved with them, so the
+ * merge is a real merge rather than a pile of broken references.
+ */
+export function mergeDocuments(docs: readonly VmmDocument[]): VmmDocument {
+  const merged = newDocument({ id: newId('wb'), sheets: [] });
+  const takenTopicIds = new Set<string>();
+  const takenSheetIds = new Set<string>();
+  const takenTitles = new Set<string>();
+
+  for (const doc of docs) {
+    // Clone first: a merge must not renumber the caller's open document.
+    const sheets = structuredClone(doc.workbook.sheets) as Sheet[];
+
+    const resourcePaths = new Map<string, string>();
+    for (const [path, bytes] of Object.entries(doc.resources)) {
+      const clash = merged.resources[path];
+      // Identical bytes under the same name are the same asset: share it.
+      const target = clash && !sameBytes(clash, bytes) ? freePath(merged.resources, path) : path;
+      merged.resources[target] = bytes;
+      if (target !== path) resourcePaths.set(path, target);
+    }
+    const movedResource = (path: string): string => resourcePaths.get(path) ?? path;
+
+    const topicIds = new Map<string, string>();
+    for (const sheet of sheets) {
+      for (const topic of walkSheetTopics(sheet)) {
+        if (takenTopicIds.has(topic.id)) {
+          const fresh = newId('t');
+          topicIds.set(topic.id, fresh);
+          topic.id = fresh;
+        }
+        takenTopicIds.add(topic.id);
+      }
+    }
+    const movedTopic = (id: string): string => topicIds.get(id) ?? id;
+
+    for (const sheet of sheets) {
+      if (takenSheetIds.has(sheet.id)) sheet.id = newId('sheet');
+      takenSheetIds.add(sheet.id);
+      sheet.title = freeTitle(takenTitles, sheet.title);
+
+      for (const topic of walkSheetTopics(sheet)) {
+        if (topic.hyperlink?.type === 'topic') {
+          topic.hyperlink = { ...topic.hyperlink, value: movedTopic(topic.hyperlink.value) };
+        }
+        if (topic.image)
+          topic.image = { ...topic.image, resource: movedResource(topic.image.resource) };
+        for (const a of topic.attachments ?? []) a.resource = movedResource(a.resource);
+      }
+      if (sheet.background?.image) {
+        sheet.background = { ...sheet.background, image: movedResource(sheet.background.image) };
+      }
+      for (const r of sheet.relationships ?? []) {
+        r.end1Id = movedTopic(r.end1Id);
+        r.end2Id = movedTopic(r.end2Id);
+      }
+      for (const group of [...(sheet.boundaries ?? []), ...(sheet.summaries ?? [])]) {
+        group.parentId = movedTopic(group.parentId);
+        group.childIds = group.childIds.map(movedTopic);
+      }
+      merged.workbook.sheets.push(sheet);
+    }
+  }
+
+  return merged;
+}
+
+const sameBytes = (a: Uint8Array, b: Uint8Array): boolean =>
+  a.length === b.length && a.every((v, i) => v === b[i]);
+
+/** `resources/logo.png` → `resources/logo-2.png`, keeping the extension. */
+function freePath(taken: Record<string, Uint8Array>, path: string): string {
+  const dot = path.lastIndexOf('.');
+  const cut = dot > path.lastIndexOf('/') ? dot : path.length;
+  const [stem, ext] = [path.slice(0, cut), path.slice(cut)];
+  let n = 2;
+  while (taken[`${stem}-${n}${ext}`]) n++;
+  return `${stem}-${n}${ext}`;
+}
+
+/** Tabs are told apart by their labels, so two "Sheet 1"s become "Sheet 1 (2)". */
+function freeTitle(taken: Set<string>, title: string): string {
+  let candidate = title;
+  for (let n = 2; taken.has(candidate); n++) candidate = `${title} (${n})`;
+  taken.add(candidate);
+  return candidate;
+}
 
 /** Build a fresh `VmmDocument` wrapper around a workbook. */
 export function newDocument(workbook: Workbook): VmmDocument {

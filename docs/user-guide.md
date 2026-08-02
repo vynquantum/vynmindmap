@@ -303,8 +303,16 @@ Maps save as `.vmm` files on your own disk — no account, no cloud.
 **Autosave** can be toggled in the toolbar. If you try to close with unsaved
 changes, you get a warning.
 
-**Import**: Markdown, via the toolbar. **Export**: the Export menu offers
-Markdown (`.md`), Image (`.png`), and Document (`.pdf`).
+**Import**: Markdown, via the toolbar — pick several `.md` files at once and
+each becomes its own tab. **Export**: the Export menu offers Markdown (`.md`),
+Image (`.png`), and Document (`.pdf`). Markdown export keeps everything except
+the image files themselves, so you can edit a map in a text editor and import it
+back without losing styles, links, boundaries or floating topics.
+
+**Merge**: the layers button folds other maps into the one you have open — pick
+any mix of `.vmm` and `.md` files and every sheet in them arrives as a new tab.
+Nothing is overwritten: maps that share topic ids, images or tab names get the
+copies renamed, and the files you picked are left as they were.
 
 The Markdown lane is also how AI tools read and write these maps — see
 [vmm-markdown-format.md](vmm-markdown-format.md).

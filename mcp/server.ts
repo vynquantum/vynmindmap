@@ -9,7 +9,7 @@
  *   { "command": "npx", "args": ["tsx", "mcp/server.ts"] }
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -18,11 +18,14 @@ import {
   addChild,
   createWorkbook,
   markdownToWorkbook,
+  mergeDocuments,
+  newDocument,
   readVmm,
   walkSheetTopics,
   workbookToMarkdown,
   writeVmm,
   type Topic,
+  type VmmDocument,
   type Workbook
 } from '../src/index.js';
 
@@ -36,8 +39,22 @@ function loadWorkbook(path: string): Workbook {
   return readVmm(readFileSync(path)).workbook;
 }
 
-function save(path: string, wb: Workbook): void {
-  writeFileSync(path, writeVmm(wb));
+/** The embedded images and attachments of a file we are about to rewrite; they
+ * are not in the Markdown, so writing without them would delete them. */
+function keptResources(path: string): Record<string, Uint8Array> {
+  return existsSync(path) ? readVmm(readFileSync(path)).resources : {};
+}
+
+function save(path: string, wb: Workbook, resources: Record<string, Uint8Array> = {}): void {
+  writeFileSync(path, writeVmm(wb, resources));
+}
+
+/** Either lane, so merge_maps can take a mix of `.vmm` and Markdown files. */
+function readDocument(path: string): VmmDocument {
+  if (/\.(md|markdown|txt)$/i.test(path)) {
+    return newDocument(markdownToWorkbook(readFileSync(path, 'utf8')));
+  }
+  return readVmm(readFileSync(path));
 }
 
 function findByText(wb: Workbook, needle: string): Topic | undefined {
@@ -97,7 +114,7 @@ server.registerTool(
   },
   async ({ path, markdown }) => {
     const wb = markdownToWorkbook(markdown);
-    save(path, wb);
+    save(path, wb, keptResources(path));
     return text(`Updated ${path}.`);
   }
 );
@@ -120,8 +137,32 @@ server.registerTool(
     const parent = findByText(wb, parentText);
     if (!parent) return text(`No topic matching "${parentText}" was found.`);
     for (const item of items) addChild(parent, item);
-    save(path, wb);
+    save(path, wb, keptResources(path));
     return text(`Added ${items.length} topic(s) under "${parent.title}".`);
+  }
+);
+
+server.registerTool(
+  'merge_maps',
+  {
+    title: 'Merge mind maps',
+    description:
+      'Combine several maps into one file. Every sheet of every input becomes a tab, ' +
+      'in the order given; inputs may be .vmm files, Markdown files, or a mix. ' +
+      'Colliding topic ids, resource names and sheet titles are renamed, and the ' +
+      'inputs are left untouched.',
+    inputSchema: {
+      paths: z.array(z.string()).min(2).describe('Input .vmm and/or .md files, in tab order'),
+      out: z.string().describe('Destination .vmm file path')
+    }
+  },
+  async ({ paths, out }) => {
+    const merged = mergeDocuments(paths.map(readDocument));
+    save(out, merged.workbook, merged.resources);
+    const tabs = merged.workbook.sheets.map((s) => `"${s.title}"`).join(', ');
+    return text(
+      `Merged ${paths.length} file(s) → ${out} with ${merged.workbook.sheets.length} tab(s): ${tabs}`
+    );
   }
 );
 
