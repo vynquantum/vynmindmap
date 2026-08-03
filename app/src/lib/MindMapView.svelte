@@ -1525,12 +1525,14 @@
 
   const EXPORT_FONT = "Inter, 'Segoe UI', system-ui, -apple-system, sans-serif";
 
-  /** Rasterize the current sheet to a canvas (white background, 2× scale). */
-  async function renderCanvas(): Promise<{
-    canvas: HTMLCanvasElement;
-    W: number;
-    H: number;
-  } | null> {
+  /**
+   * The whole sheet as a standalone SVG document: the same markup the canvas
+   * draws, but sized to the map instead of the viewport, with the pan/zoom
+   * transform undone, the font pinned (a serialized SVG inherits no page CSS)
+   * and the background painted in. Embedded images are already data URLs, so
+   * the result is self-contained.
+   */
+  function svgMarkup(): string | null {
     if (!svgEl) return null;
     const W = Math.ceil(layout.width),
       H = Math.ceil(layout.height);
@@ -1540,8 +1542,6 @@
     clone.setAttribute('width', String(W));
     clone.setAttribute('height', String(H));
     clone.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    // The live SVG inherits its font from the page CSS; a serialized SVG does
-    // not, so pin the family explicitly or the export falls back to serif.
     clone.setAttribute('font-family', EXPORT_FONT);
     const ns = 'http://www.w3.org/2000/svg';
     const bg = document.createElementNS(ns, 'rect');
@@ -1549,8 +1549,19 @@
     bg.setAttribute('height', String(H));
     bg.setAttribute('fill', sheet.background?.color ?? '#ffffff');
     clone.insertBefore(bg, clone.firstChild);
+    return new XMLSerializer().serializeToString(clone);
+  }
 
-    const xml = new XMLSerializer().serializeToString(clone);
+  /** Rasterize the current sheet to a canvas (2× scale). */
+  async function renderCanvas(): Promise<{
+    canvas: HTMLCanvasElement;
+    W: number;
+    H: number;
+  } | null> {
+    const xml = svgMarkup();
+    if (!xml) return null;
+    const W = Math.ceil(layout.width),
+      H = Math.ceil(layout.height);
     const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml;charset=utf-8' }));
     const img = new Image();
     await new Promise((res, rej) => {
@@ -1576,6 +1587,18 @@
     a.download = name;
     a.click();
     URL.revokeObjectURL(u);
+  }
+
+  /** Save the sheet as vector SVG — scales without blurring, and stays editable
+   * in Illustrator/Inkscape/Figma, which a PNG never is. */
+  export function exportSvg() {
+    const xml = svgMarkup();
+    if (xml) {
+      download(
+        new Blob([xml], { type: 'image/svg+xml;charset=utf-8' }),
+        `${sheet.title || 'mindmap'}.svg`
+      );
+    }
   }
 
   /** Rasterize the current sheet to a PNG and download it. */

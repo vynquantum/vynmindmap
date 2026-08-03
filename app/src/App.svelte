@@ -1288,6 +1288,13 @@
                 <button
                   role="menuitem"
                   onclick={() => {
+                    view?.exportSvg();
+                    exportOpen = false;
+                  }}><Icon name="image" size={16} /> Vector (.svg)</button
+                >
+                <button
+                  role="menuitem"
+                  onclick={() => {
                     view?.exportPdf();
                     exportOpen = false;
                   }}><Icon name="file-text" size={16} /> Document (.pdf)</button

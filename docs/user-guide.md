@@ -312,7 +312,9 @@ changes, you get a warning.
 
 **Import**: Markdown, via the toolbar — pick several `.md` files at once and
 each becomes its own tab. **Export**: the Export menu offers Markdown (`.md`),
-Image (`.png`), and Document (`.pdf`). Markdown export keeps everything except
+Image (`.png`), Vector (`.svg`) and Document (`.pdf`). SVG is the one to pick
+for a slide, a poster or any print: it stays sharp at any size and opens in
+Illustrator, Inkscape or Figma as editable shapes. Markdown export keeps everything except
 the image files themselves, so you can edit a map in a text editor and import it
 back without losing styles, links, boundaries or floating topics.
 

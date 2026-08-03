@@ -99,8 +99,8 @@ Prefer not to click through a warning? Build it yourself from source — see
 - **Create connectors**: select a topic → **Relate →** then click a target to draw
   a relationship; **Ctrl-click** multiple contiguous siblings → **Add boundary** /
   **Add summary**. Click any relationship/boundary/summary and press `Delete`.
-- **Export**: **Export PNG** / **Export PDF** rasterize the current sheet; Export MD
-  for Markdown.
+- **Export**: PNG and PDF rasterize the current sheet, SVG saves it as vector art,
+  MD writes the whole map back out as Markdown.
 - **Drag**: drop on a node's middle to reparent, or near its top/bottom edge to
   reorder as a sibling (blue insertion line).
 - **Sheets**: add (`+`), rename (double-click a tab), delete (`×`), switch.
