@@ -141,7 +141,9 @@ export function addSibling(
   sheet: Sheet,
   siblingId: string,
   title: string,
-  partial: Partial<Topic> = {}
+  partial: Partial<Topic> = {},
+  /** Place the new topic before the given sibling instead of after it. */
+  before = false
 ): Topic {
   const found = findWithParent(sheet, siblingId);
   if (!found?.parent) {
@@ -150,8 +152,39 @@ export function addSibling(
   const child = createTopic(title, partial);
   const siblings = found.parent.children!;
   const idx = siblings.findIndex((t) => t.id === siblingId);
-  siblings.splice(idx + 1, 0, child);
+  siblings.splice(before ? idx : idx + 1, 0, child);
   return child;
+}
+
+/**
+ * Slot a new topic between `id` and its parent, carrying `id`'s subtree with it —
+ * the "I forgot a level" edit. Roots have no parent to split, so they throw.
+ */
+export function insertParent(sheet: Sheet, id: string, title: string): Topic {
+  const found = findWithParent(sheet, id);
+  if (!found?.parent) {
+    throw new ModelError(`Cannot insert a parent above "${id}": it has no parent.`);
+  }
+  const siblings = found.parent.children!;
+  const at = siblings.findIndex((t) => t.id === id);
+  const parent = createTopic(title);
+  siblings.splice(at, 1, parent);
+  parent.children = [found.topic];
+  return parent;
+}
+
+/**
+ * Fold the whole sheet to a depth: level 1 leaves the central topic and its
+ * branches showing, level 2 one more, and so on. The root itself always stays
+ * open — a map showing nothing but its centre is never what was meant.
+ */
+export function collapseToLevel(sheet: Sheet, level: number): void {
+  const apply = (t: Topic, depth: number): void => {
+    if (t.children?.length) t.collapsed = depth >= level;
+    for (const c of t.children ?? []) apply(c, depth + 1);
+  };
+  apply(sheet.rootTopic, 0);
+  for (const f of sheet.floatingTopics ?? []) apply(f, 0);
 }
 
 export function editText(topic: Topic, title: string): void {

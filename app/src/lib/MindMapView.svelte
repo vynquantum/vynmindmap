@@ -20,11 +20,13 @@
     addRelationship,
     addSummary,
     cloneTopicWithNewIds,
+    collapseToLevel,
     deleteTopic,
     detachTopic,
     editText,
     findTopic,
     findWithParent,
+    insertParent,
     moveTopic,
     toggleCollapse,
     removeBoundary,
@@ -49,6 +51,7 @@
   import { isBoxedLevelOne, isTextOnLines } from './mapAppearance.js';
   import { attachImage, clampImageSize, IMG_DEFAULT, mimeForPath } from './images.js';
   import { clipText, topicsFromText } from './clipboard.js';
+  import { matchField, type MatchField } from './search.js';
 
   let {
     sheet,
@@ -715,6 +718,53 @@
     }
   }
 
+  /** Enter adds after the selection; Shift+Enter is "I meant before this one". */
+  function addSiblingBeforeSelected() {
+    if (!selectedId) return;
+    try {
+      const sib = addSibling(sheet, selectedId, 'New topic', {}, true);
+      notify();
+      beginEdit(sib.id);
+    } catch {
+      addChildToSelected(); // a root has no siblings to sit before
+    }
+  }
+
+  /** A new topic slotted between the selection and its parent, keeping the subtree. */
+  function insertParentOfSelected() {
+    if (!selectedId) return;
+    try {
+      const parent = insertParent(sheet, selectedId, 'New topic');
+      notify();
+      beginEdit(parent.id);
+    } catch {
+      /* roots and floating roots have no parent to split */
+    }
+  }
+
+  /** Reorder the selection among its siblings; a no-op at either end. */
+  function moveSelectedAmongSiblings(delta: -1 | 1) {
+    if (!selectedId) return;
+    const found = findWithParent(sheet, selectedId);
+    const siblings = found?.parent?.children;
+    if (!siblings) return;
+    const at = siblings.indexOf(found!.topic) + delta;
+    if (at < 0 || at >= siblings.length) return;
+    moveTopic(sheet, selectedId, found!.parent!.id, at);
+    notify();
+  }
+
+  function selectAll() {
+    selection = [...walkSheetTopics(sheet)].map((t) => t.id);
+    selectedId = selection[0] ?? null;
+  }
+
+  /** Ctrl+1…9: show the map down to that depth, fold everything under it. */
+  function foldToLevel(level: number) {
+    collapseToLevel(sheet, level);
+    notify();
+  }
+
   function deleteSelected() {
     if (selectedDeco) {
       const { type, id } = selectedDeco;
@@ -951,13 +1001,20 @@
   // --- search ----------------------------------------------------------------
   const searchMatches = $derived.by(() => {
     const q = searchQ.trim().toLowerCase();
-    if (!q) return [] as Topic[];
-    const out: Topic[] = [];
+    if (!q) return [] as { topic: Topic; field: MatchField }[];
+    const out: { topic: Topic; field: MatchField }[] = [];
     for (const t of walkSheetTopics(sheet)) {
-      if (t.title.toLowerCase().includes(q)) out.push(t);
+      const field = matchField(t, q);
+      if (field) out.push({ topic: t, field });
     }
     return out;
   });
+  /** Where the current hit was found, so a jump to a title-less match makes sense. */
+  const searchHint = $derived(
+    searchMatches[searchIdx] && searchMatches[searchIdx]!.field !== 'title'
+      ? `in ${searchMatches[searchIdx]!.field}`
+      : ''
+  );
 
   function openSearch() {
     searchOpen = true;
@@ -988,7 +1045,7 @@
     if (!m.length) return;
     const idx = ((i % m.length) + m.length) % m.length;
     searchIdx = idx;
-    const t = m[idx]!;
+    const t = m[idx]!.topic;
     expandAncestors(t.id);
     selectOnly(t.id);
     centerOn(t.id);
@@ -1131,9 +1188,30 @@
         } else if (k === '0') {
           e.preventDefault();
           zoomReset();
+        } else if (k >= '1' && k <= '9') {
+          e.preventDefault();
+          foldToLevel(Number(k));
         } else if (k.toLowerCase() === 'd') {
           e.preventDefault();
           duplicateSelected();
+        } else if (k.toLowerCase() === 'a') {
+          e.preventDefault();
+          selectAll();
+        } else if (k.toLowerCase() === 'l') {
+          e.preventDefault();
+          startRelate();
+        } else if (k.toLowerCase() === 'b' && e.shiftKey) {
+          e.preventDefault();
+          makeBoundary();
+        } else if (k === ']') {
+          e.preventDefault();
+          makeSummary();
+        } else if (k === 'Enter') {
+          e.preventDefault();
+          insertParentOfSelected();
+        } else if (e.shiftKey && (k === 'ArrowUp' || k === 'ArrowDown')) {
+          e.preventDefault();
+          moveSelectedAmongSiblings(k === 'ArrowUp' ? -1 : 1);
         } else if (k === '*') {
           // Whole sheet, whatever is selected — the plain keys below act on the
           // selected branch, and there has to be a way to reach the rest.
@@ -1177,6 +1255,19 @@
         collapseSelectedSubtree(true);
         return;
       }
+      if (e.key === 'F3') {
+        // The find bar is usually closed by the time you want the next hit.
+        e.preventDefault();
+        if (!searchOpen) openSearch();
+        else gotoMatch(searchIdx + (e.shiftKey ? -1 : 1));
+        return;
+      }
+      if (e.key === 'Home') {
+        e.preventDefault();
+        selectOnly(sheet.rootTopic.id);
+        centerOn(sheet.rootTopic.id);
+        return;
+      }
       if (!selectedId) return;
       switch (e.key) {
         case 'Tab':
@@ -1189,7 +1280,8 @@
           break;
         case 'Enter':
           e.preventDefault();
-          addSiblingToSelected();
+          if (e.shiftKey) addSiblingBeforeSelected();
+          else addSiblingToSelected();
           break;
         case 'F2':
           e.preventDefault();
@@ -2439,13 +2531,13 @@
       <input
         bind:this={searchInput}
         bind:value={searchQ}
-        placeholder="Find topics…"
+        placeholder="Find in titles, notes, labels…"
         onkeydown={onSearchKey}
       />
       <span class="count"
         >{searchQ.trim()
           ? `${searchMatches.length ? searchIdx + 1 : 0}/${searchMatches.length}`
-          : ''}</span
+          : ''}{searchHint ? ` ${searchHint}` : ''}</span
       >
       <button
         title="Previous (Shift+Enter)"

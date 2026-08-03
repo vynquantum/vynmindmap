@@ -112,15 +112,16 @@ Pasted topics get fresh ids, so nothing collides with the original.
 
 ## Collapsing and expanding
 
-| Key         | Effect                                                       |
-| ----------- | ------------------------------------------------------------ |
-| **Space**   | Collapse/expand the selected topic one level                 |
-| **-**       | Collapse the selected topic                                  |
-| **=**       | Expand the selected topic                                    |
-| **/**       | Collapse the entire subtree under the selection, recursively |
-| **\***      | Expand the entire subtree, recursively                       |
-| **Ctrl+/**  | Collapse every branch on the sheet, whatever is selected     |
-| **Ctrl+\*** | Expand every branch on the sheet, whatever is selected       |
+| Key          | Effect                                                       |
+| ------------ | ------------------------------------------------------------ |
+| **Space**    | Collapse/expand the selected topic one level                 |
+| **-**        | Collapse the selected topic                                  |
+| **=**        | Expand the selected topic                                    |
+| **/**        | Collapse the entire subtree under the selection, recursively |
+| **\***       | Expand the entire subtree, recursively                       |
+| **Ctrl+/**   | Collapse every branch on the sheet, whatever is selected     |
+| **Ctrl+\***  | Expand every branch on the sheet, whatever is selected       |
+| **Ctrl+1…9** | Fold the whole map to that many levels                       |
 
 With nothing selected, **/** and **\*** act on the whole map too. Collapse-all
 leaves the central topic open, so you're left looking at the top-level
@@ -263,8 +264,14 @@ noise. Selecting in the outline selects on the canvas.
 ## Finding topics
 
 **Ctrl+F** opens the find bar. Type; matches are counted and highlighted.
-**Enter** goes to the next match, **Shift+Enter** to the previous, **Esc**
-closes. The canvas pans to each match.
+**Enter** goes to the next match, **Shift+Enter** to the previous, **F3** does
+the same without reopening the bar, **Esc** closes. The canvas pans to each
+match.
+
+Find looks at **titles, notes, labels and markers** — the sentence you're after
+is usually in a note rather than a heading. When the hit was outside the title,
+the counter says where (`3/7 in note`), so a jump to a topic that doesn't
+visibly contain the words still makes sense.
 
 ## Presenting
 
@@ -331,19 +338,27 @@ The Markdown lane is also how AI tools read and write these maps — see
 | Ctrl+Y or Ctrl+Shift+Z | Redo                |
 | F8                     | Full-window (zen)   |
 | PageDown / PageUp      | Present next / prev |
+| F1 or ?                | Show every shortcut |
 
 ### Editing
 
 | Key                      | Action                                          |
 | ------------------------ | ----------------------------------------------- |
 | Tab / Insert             | Add child                                       |
-| Enter                    | Add sibling                                     |
+| Enter                    | Add sibling after                               |
+| Shift+Enter              | Add sibling before (line break while renaming)  |
+| Ctrl+Enter               | Insert a parent above the selection             |
+| Ctrl+Shift+↑ / ↓         | Move the topic among its siblings               |
+| Ctrl+A                   | Select every topic on the sheet                 |
+| Home                     | Select and centre the central topic             |
 | F2                       | Rename (double-click also works)                |
-| Shift+Enter              | Line break, while renaming                      |
 | Esc                      | Commit the edit / cancel drag / clear selection |
 | Delete or Backspace      | Delete topic and subtree                        |
 | Ctrl+C / Ctrl+X / Ctrl+V | Copy / Cut / Paste as child                     |
 | Ctrl+D                   | Duplicate                                       |
+| Ctrl+L                   | Start a relationship from the selection         |
+| Ctrl+Shift+B             | Boundary around the selected siblings           |
+| Ctrl+]                   | Summary of the selected siblings                |
 
 ### View
 
@@ -354,7 +369,10 @@ The Markdown lane is also how AI tools read and write these maps — see
 | Space               | Collapse/expand one level       |
 | `-` / `=`           | Collapse / expand selected      |
 | `/` / `*`           | Collapse / expand whole subtree |
+| Ctrl+/ / Ctrl+\*    | Collapse / expand the sheet     |
+| Ctrl+1 … Ctrl+9     | Fold the map to that level      |
 | Ctrl+F              | Find                            |
+| F3 / Shift+F3       | Next / previous match           |
 | Ctrl+= / Ctrl+-     | Zoom in / out                   |
 | Ctrl+0              | Zoom to 100%                    |
 

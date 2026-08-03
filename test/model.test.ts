@@ -3,8 +3,11 @@ import { describe, it, expect } from 'vitest';
 import {
   addBoundary,
   addChild,
+  addFloatingTopic,
   addSheet,
   cloneTopicWithNewIds,
+  collapseToLevel,
+  insertParent,
   walkTopic,
   addRelationship,
   addSibling,
@@ -47,6 +50,42 @@ describe('tree mutations', () => {
   it('refuses a sibling on a root', () => {
     const { sheet } = fixture();
     expect(() => addSibling(sheet, sheet.rootTopic.id, 'X')).toThrow(ModelError);
+  });
+
+  it('puts a sibling before the given one when asked', () => {
+    const { sheet } = fixture();
+    const a = sheet.rootTopic.children![0]!;
+    addSibling(sheet, a.children![1]!.id, 'A1.5', {}, true);
+    expect(a.children!.map((c) => c.title)).toEqual(['A1', 'A1.5', 'A2']);
+  });
+
+  it('inserts a parent above a topic, keeping its place and its subtree', () => {
+    const { sheet } = fixture();
+    const a = sheet.rootTopic.children![0]!;
+    const mid = insertParent(sheet, a.id, 'Middle');
+    expect(sheet.rootTopic.children!.map((c) => c.title)).toEqual(['Middle', 'B']);
+    expect(mid.children).toEqual([a]);
+    expect(a.children!.map((c) => c.title)).toEqual(['A1', 'A2']);
+  });
+
+  it('refuses to insert a parent above a root', () => {
+    const { sheet } = fixture();
+    expect(() => insertParent(sheet, sheet.rootTopic.id, 'X')).toThrow(ModelError);
+  });
+
+  it('folds the sheet to a level, leaving the root open', () => {
+    const { sheet } = fixture();
+    const floating = addFloatingTopic(sheet, 'Parked', { x: 0, y: 0 });
+    addChild(addChild(floating, 'Detail'), 'Sub-detail');
+    const collapsed = () =>
+      [...walkSheetTopics(sheet)].filter((t) => t.collapsed).map((t) => t.title);
+
+    // A floating topic is a peer of the central one, so its own branches count
+    // as level 1 too. Childless topics (B, A1, A2) are never marked collapsed.
+    collapseToLevel(sheet, 1);
+    expect(collapsed()).toEqual(['A', 'Detail']);
+    collapseToLevel(sheet, 2);
+    expect(collapsed()).toEqual([]);
   });
 
   it('generates unique ids across the workbook', () => {

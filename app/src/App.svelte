@@ -48,6 +48,7 @@
   import Inspector from './lib/Inspector.svelte';
   import OutlinePanel from './lib/OutlinePanel.svelte';
   import ConfirmHost from './lib/ConfirmHost.svelte';
+  import ShortcutsDialog from './lib/ShortcutsDialog.svelte';
   import { confirmDialog } from './lib/confirm.svelte.js';
   import Icon from './lib/Icon.svelte';
   import logoUrl from '../../app-icon.png';
@@ -174,6 +175,7 @@
   });
 
   let zenMode = $state(false);
+  let shortcutsOpen = $state(false);
   let presenterMode = $state(false);
   let isPresenterWindow = $state(window.location.search.includes('presenter=true'));
   let currentTitle = $state('No topic selected');
@@ -1080,6 +1082,16 @@
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return; // let fields do native keys
 
+      if (e.key === 'F1' || (e.key === '?' && !e.ctrlKey && !e.metaKey)) {
+        e.preventDefault();
+        shortcutsOpen = !shortcutsOpen;
+        return;
+      }
+      if (e.key === 'Escape' && shortcutsOpen) {
+        e.preventDefault();
+        shortcutsOpen = false;
+        return;
+      }
       if (e.key === 'F8') {
         e.preventDefault();
         zenMode = !zenMode;
@@ -1349,6 +1361,12 @@
             title="Check for updates"
             aria-label="Check for updates"><Icon name="cloud-download" /></button
           >
+          <button
+            class="ic"
+            onclick={() => (shortcutsOpen = true)}
+            title="Keyboard shortcuts (F1)"
+            aria-label="Keyboard shortcuts">?</button
+          >
         </div>
 
         <input bind:this={fileInput} type="file" accept=".vmm" onchange={onPick} hidden />
@@ -1576,6 +1594,10 @@
           </div>
         </div>
       </div>
+    {/if}
+
+    {#if shortcutsOpen}
+      <ShortcutsDialog onClose={() => (shortcutsOpen = false)} />
     {/if}
 
     <ConfirmHost />
