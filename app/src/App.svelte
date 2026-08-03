@@ -51,6 +51,7 @@
   import ConfirmHost from './lib/ConfirmHost.svelte';
   import ShortcutsDialog from './lib/ShortcutsDialog.svelte';
   import { confirmDialog } from './lib/confirm.svelte.js';
+  import { TEMPLATES, templateWorkbook } from './lib/templates.js';
   import Icon from './lib/Icon.svelte';
   import logoUrl from '../../app-icon.png';
 
@@ -645,12 +646,13 @@
     }
   }
 
-  function newMap() {
+  /** Start an unsaved map: blank by default, or the workbook of a template. */
+  function newMap(wb: Workbook = createWorkbook('Central Topic'), name = 'untitled.vmm') {
     error = '';
     warning = '';
-    workbook = createWorkbook('Central Topic');
+    workbook = wb;
     resources = {};
-    fileName = 'untitled.vmm';
+    fileName = name;
     currentPath = null;
     fileHandle = null;
     activeSheet = 0;
@@ -1227,7 +1229,7 @@
         </div>
 
         <div class="group">
-          <button class="ic" onclick={newMap} title="New map (Ctrl+N)" aria-label="New"
+          <button class="ic" onclick={() => newMap()} title="New map (Ctrl+N)" aria-label="New"
             ><Icon name="file-plus" /></button
           >
           <button class="ic" onclick={openFile} title="Open…  (Ctrl+O)" aria-label="Open"
@@ -1576,7 +1578,7 @@
           <h1>VynMindMap</h1>
           <p class="tagline">Visual mind mapping, stored as plain <code>.vmm</code> files.</p>
           <div class="cta">
-            <button class="primary" onclick={newMap}
+            <button class="primary" onclick={() => newMap()}
               ><Icon name="file-plus" size={18} /> New mind map</button
             >
             <button class="outlined" onclick={openFile}
@@ -1614,6 +1616,24 @@
             </div>
           </div>
         {/if}
+
+        <div class="samples">
+          <div class="samples-label">Start from a template</div>
+          <div class="sample-grid">
+            {#each TEMPLATES as t (t.id)}
+              <button
+                class="sample"
+                onclick={() => newMap(templateWorkbook(t.id)!, `${t.title}.vmm`)}
+              >
+                <span class="sample-icon"><Icon name="file-text" size={20} /></span>
+                <span class="sample-text">
+                  <strong>{t.title}</strong>
+                  <small>{t.note}</small>
+                </span>
+              </button>
+            {/each}
+          </div>
+        </div>
 
         <div class="samples">
           <div class="samples-label">Sample maps</div>

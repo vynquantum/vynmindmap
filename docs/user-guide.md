@@ -39,6 +39,12 @@ read [Your first map](#your-first-map) and the
 That loop — Tab for deeper, Enter for wider, type, Esc — is the whole editor.
 Everything below is refinement.
 
+If a blank canvas is the wrong place to start, the welcome screen offers
+**templates** — meeting notes, project plan, retrospective, decision, SWOT,
+study notes. Picking one opens an unsaved map with the branches already there;
+edit or delete anything you don't need, then save it wherever you like. Below
+them, **sample maps** show off styling, relationships and every chart type.
+
 ## Getting around the canvas
 
 | You want to           | Do this                                                                                       |
