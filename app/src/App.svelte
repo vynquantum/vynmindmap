@@ -24,6 +24,7 @@
     nativeModifiedMs,
     getOpenedFile,
     onOpenFile,
+    onFileDrop,
     hasFilePicker,
     hasOpenPicker,
     browserSavePicker,
@@ -920,14 +921,17 @@
   const fileBytes = async (f: File) => new Uint8Array(await f.arrayBuffer());
 
   /**
-   * Append every sheet of the picked files to the open map as new tabs, or open
+   * Append every sheet of the given files to the open map as new tabs, or open
    * them as a map of their own when nothing is open. Colliding ids, resource
-   * names and tab titles are resolved by the core merge.
+   * names and tab titles are resolved by the core merge. Reading happens inside
+   * the try, so one unreadable file reports an error instead of throwing at the
+   * caller.
    */
-  async function mergeInto(docs: VmmDocument[]) {
-    if (!docs.length) return;
+  async function mergeInto(files: { name: string; bytes: Uint8Array }[]) {
+    if (!files.length) return;
     error = '';
     try {
+      const docs = files.map((f) => docFromBytes(f.name, f.bytes));
       const open = workbook
         ? [
             {
@@ -966,8 +970,9 @@
     }
     try {
       const paths = await nativeOpenManyDialog();
-      const docs = await Promise.all(paths.map(async (p) => docFromBytes(p, await nativeRead(p))));
-      await mergeInto(docs);
+      await mergeInto(
+        await Promise.all(paths.map(async (p) => ({ name: p, bytes: await nativeRead(p) })))
+      );
     } catch (e) {
       error = (e as Error).message;
     }
@@ -978,7 +983,7 @@
     const files = [...(input.files ?? [])];
     input.value = ''; // let the same files be picked again
     await mergeInto(
-      await Promise.all(files.map(async (f) => docFromBytes(f.name, await fileBytes(f))))
+      await Promise.all(files.map(async (f) => ({ name: f.name, bytes: await fileBytes(f) })))
     );
   }
 
@@ -989,7 +994,7 @@
     if (files.length > 1) {
       workbook = null;
       await mergeInto(
-        await Promise.all(files.map(async (f) => docFromBytes(f.name, await fileBytes(f))))
+        await Promise.all(files.map(async (f) => ({ name: f.name, bytes: await fileBytes(f) })))
       );
       fileName = files[0]!.name.replace(/\.(md|markdown)$/i, '.vmm');
       return;
@@ -1014,6 +1019,30 @@
       error = (err as Error).message;
     }
   }
+
+  // --- files dropped on the window ------------------------------------------
+  const MAP_FILE = /\.(vmm|md|markdown|txt)$/i;
+  let dropOver = $state(false);
+
+  onMount(() =>
+    onFileDrop(
+      async (files) => {
+        // Anything else on the drop (images, PDFs) belongs to whatever it landed
+        // on, not to the window.
+        const maps = files.filter((f) => MAP_FILE.test(f.name));
+        if (!maps.length) return;
+        const only = maps[0]!;
+        // A single map with nothing open is an "open" — keeping its path so Save
+        // writes back to it. Everything else merges in as extra tabs.
+        if (!workbook && maps.length === 1 && /\.vmm$/i.test(only.name)) {
+          await load(async () => readVmm(only.bytes), only.name, only.path);
+          return;
+        }
+        await mergeInto(maps);
+      },
+      (over) => (dropOver = over)
+    )
+  );
 
   function queueFit() {
     // Wait for the view + layout to mount, then fit to the viewport.
@@ -1603,6 +1632,16 @@
       </div>
     {/if}
 
+    {#if dropOver}
+      <div class="drop-overlay">
+        <div class="drop-card">
+          <Icon name="upload" size={28} />
+          <strong>{workbook ? 'Drop to add as tabs' : 'Drop to open'}</strong>
+          <span>.vmm maps and .md outlines</span>
+        </div>
+      </div>
+    {/if}
+
     {#if shortcutsOpen}
       <ShortcutsDialog onClose={() => (shortcutsOpen = false)} />
     {/if}
@@ -1616,6 +1655,33 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+  }
+
+  /* Drop target feedback. Pointer-events off: the overlay must not eat the drop. */
+  .drop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    outline: 3px dashed var(--accent);
+    outline-offset: -14px;
+  }
+  .drop-card {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    padding: 22px 30px;
+    border-radius: 14px;
+    background: var(--panel);
+    box-shadow: var(--elev-3);
+    color: var(--text);
+  }
+  .drop-card span {
+    font-size: 12px;
+    color: var(--muted);
   }
 
   /* Material top app bar with grouped icon buttons. */

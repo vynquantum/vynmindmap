@@ -102,7 +102,8 @@ Prefer not to click through a warning? Build it yourself from source — see
 - **Export**: PNG and PDF rasterize the current sheet, SVG saves it as vector art,
   MD writes the whole map back out as Markdown.
 - **Drag**: drop on a node's middle to reparent, or near its top/bottom edge to
-  reorder as a sibling (blue insertion line).
+  reorder as a sibling (blue insertion line). Drop `.vmm`/`.md` files on the
+  window to open them, or to add them to the open map as tabs.
 - **Sheets**: add (`+`), rename (double-click a tab), delete (`×`), switch.
 - **Undo / redo**: `Ctrl+Z` / `Ctrl+Y` (and toolbar `↶ ↷`); `Ctrl+S` saves.
 - **Markdown**: Import MD / Export MD in the toolbar (import several `.md` files

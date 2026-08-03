@@ -318,6 +318,11 @@ Illustrator, Inkscape or Figma as editable shapes. Markdown export keeps everyth
 the image files themselves, so you can edit a map in a text editor and import it
 back without losing styles, links, boundaries or floating topics.
 
+**Drag and drop**: drop `.vmm` or `.md` files straight onto the window. With
+nothing open, a single `.vmm` opens as itself (Save writes back to that file);
+anything else — several files, or Markdown — arrives as extra tabs on the map
+you already have open, exactly like Merge.
+
 **Merge**: the layers button folds other maps into the one you have open — pick
 any mix of `.vmm` and `.md` files and every sheet in them arrives as a new tab.
 Nothing is overwritten: maps that share topic ids, images or tab names get the

@@ -76,6 +76,86 @@ export async function onOpenFile(cb: (path: string) => void): Promise<() => void
   return listen<string>('open-file', (e) => cb(e.payload));
 }
 
+export interface DroppedFile {
+  name: string;
+  bytes: Uint8Array;
+  /** Real path, native only — it lets Save write back to the file that was dropped. */
+  path: string | null;
+}
+
+/**
+ * Files dropped anywhere on the app window.
+ *
+ * The native webview intercepts HTML drag-and-drop and reports the drop itself
+ * (with real paths), so the two lanes need different plumbing; both hand back
+ * the file contents. `onHover` drives the drop overlay. Returns an unsubscribe.
+ */
+export function onFileDrop(
+  onDrop: (files: DroppedFile[]) => void,
+  onHover: (over: boolean) => void = () => {}
+): () => void {
+  if (isTauri()) {
+    let stop: (() => void) | null = null;
+    let cancelled = false;
+    void import('@tauri-apps/api/webview').then(async ({ getCurrentWebview }) => {
+      const un = await getCurrentWebview().onDragDropEvent(async (e) => {
+        if (e.payload.type === 'enter' || e.payload.type === 'over') return onHover(true);
+        if (e.payload.type === 'leave') return onHover(false);
+        onHover(false);
+        onDrop(
+          await Promise.all(
+            e.payload.paths.map(async (p) => ({
+              name: basename(p),
+              bytes: await nativeRead(p),
+              path: p
+            }))
+          )
+        );
+      });
+      if (cancelled) un();
+      else stop = un;
+    });
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }
+
+  const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
+  const over = (e: DragEvent) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); // without this the browser opens the file instead
+    onHover(true);
+  };
+  // relatedTarget is null only when the pointer leaves the window itself.
+  const leave = (e: DragEvent) => {
+    if (!e.relatedTarget) onHover(false);
+  };
+  const drop = async (e: DragEvent) => {
+    onHover(false);
+    const files = [...(e.dataTransfer?.files ?? [])];
+    if (!files.length) return;
+    e.preventDefault();
+    onDrop(
+      await Promise.all(
+        files.map(async (f) => ({
+          name: f.name,
+          bytes: new Uint8Array(await f.arrayBuffer()),
+          path: null
+        }))
+      )
+    );
+  };
+  window.addEventListener('dragover', over);
+  window.addEventListener('dragleave', leave);
+  window.addEventListener('drop', drop);
+  return () => {
+    window.removeEventListener('dragover', over);
+    window.removeEventListener('dragleave', leave);
+    window.removeEventListener('drop', drop);
+  };
+}
+
 /** Open a URL in the user's default browser (native) or a new tab (browser). */
 export async function openExternal(url: string): Promise<void> {
   if (isTauri()) await invoke('open_external', { url });
