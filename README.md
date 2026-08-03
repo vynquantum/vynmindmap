@@ -89,7 +89,8 @@ Prefer not to click through a warning? Build it yourself from source — see
   corrupt the map); the Tauri app watches the open file and reloads it (or
   warns, if you have unsaved edits) when the CLI / an LLM edits it on disk.
 - **Thumbnails**: every save embeds a PNG preview at
-  `thumbnails/thumbnail.png` inside the `.vmm`.
+  `thumbnails/thumbnail.png` inside the `.vmm` (autosave reuses the last one,
+  so background writes stay instant).
 - **Inspector** (right panel): edit text, shape, fill/border/text color, full
   **fonts** (family, size, **bold / italic / underline / strikethrough**),
   markers, an **emoji picker**, note, link, labels, the sheet's **structure**,

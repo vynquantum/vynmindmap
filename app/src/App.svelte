@@ -469,7 +469,7 @@
     if (!currentPath && !fileHandle) return; // nowhere to save silently yet
     clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(() => {
-      if (dirty && workbook) save();
+      if (dirty && workbook) save(false, true);
     }, 1200);
   }
 
@@ -777,9 +777,23 @@
     return fileName && fileName.endsWith('.vmm') ? fileName : 'Untitled.vmm';
   }
 
-  /** Serialize the workbook (+ a best-effort thumbnail) to .vmm bytes. */
-  async function buildVmmBytes(): Promise<Uint8Array> {
-    const thumbnail = (await view?.thumbnail()) ?? undefined;
+  // Thumbnail of the last save, reused by autosave. Rasterizing the sheet
+  // (SVG → canvas → PNG) is the slow half of a save, and doing it every 1.2s
+  // in the background stutters typing on a big map. Cleared with the workbook.
+  let lastThumb: Uint8Array | undefined;
+  $effect(() => {
+    workbook; // a different map is open — its preview is not this map's
+    lastThumb = undefined;
+  });
+
+  /**
+   * Serialize the workbook (+ a best-effort thumbnail) to .vmm bytes. `quick`
+   * reuses the previous thumbnail instead of re-rendering — the file keeps a
+   * preview, it's just a few edits behind until the next explicit save.
+   */
+  async function buildVmmBytes(quick = false): Promise<Uint8Array> {
+    const thumbnail = quick && lastThumb ? lastThumb : ((await view?.thumbnail()) ?? undefined);
+    lastThumb = thumbnail;
     // $state.snapshot unwraps Svelte's reactive proxy to a plain object.
     return writeVmm(
       $state.snapshot(workbook!) as Workbook,
@@ -796,8 +810,10 @@
    * Ordering matters in the browser: pickers must run first, while the click's
    * transient user activation is still live — serializing the map (thumbnail
    * rendering can take a moment on big sheets) happens after the dialog.
+   *
+   * `quick` is the autosave path: same write, no fresh thumbnail.
    */
-  async function save(forceDialog = false) {
+  async function save(forceDialog = false, quick = false) {
     if (!workbook) return;
     error = '';
 
@@ -812,7 +828,7 @@
         }
         if (!path) return; // user cancelled
       }
-      const bytes = await buildVmmBytes();
+      const bytes = await buildVmmBytes(quick);
       try {
         await nativeWrite(path, bytes);
       } catch (e) {
@@ -838,7 +854,7 @@
         }
         if (!handle) return; // user cancelled
       }
-      const bytes = await buildVmmBytes();
+      const bytes = await buildVmmBytes(quick);
       try {
         await browserWriteHandle(handle, bytes);
       } catch (e) {
@@ -872,7 +888,7 @@
       directWriteBlocked = false; // a write went through — permission is fine
       addRecentHandle(handle, handle.name).then(refreshRecents);
     } else {
-      const bytes = await buildVmmBytes();
+      const bytes = await buildVmmBytes(quick);
       browserDownload(defaultSaveName(), bytes);
       dirty = false;
     }
