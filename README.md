@@ -91,6 +91,9 @@ Prefer not to click through a warning? Build it yourself from source — see
 - **Thumbnails**: every save embeds a PNG preview at
   `thumbnails/thumbnail.png` inside the `.vmm` (autosave reuses the last one,
   so background writes stay instant).
+- **Big maps stay smooth**: past a few hundred topics the canvas only draws
+  what the viewport can see (plus a margin, so panning never shows a gap).
+  Exports and thumbnails still render the whole sheet.
 - **Inspector** (right panel): edit text, shape, fill/border/text color, full
   **fonts** (family, size, **bold / italic / underline / strikethrough**),
   markers, an **emoji picker**, note, link, labels, the sheet's **structure**,

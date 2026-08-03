@@ -10,7 +10,7 @@
 </script>
 
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import type { Sheet, Topic } from '../../../src/index.js';
   import {
     addChild,
@@ -43,7 +43,9 @@
     clampTopicMinHeight,
     clampTopicWidth,
     NOTE_LINE_H,
+    touches,
     titleAnchor,
+    viewRect,
     type Layout,
     type LaidOutNode,
     type Rect
@@ -92,6 +94,37 @@
   let canvasEl = $state<HTMLDivElement | null>(null);
   let viewW = $state(0);
   let viewH = $state(0);
+
+  // Viewport culling. Each node is a group of a dozen elements, so on a big map
+  // most of the DOM sits off screen and every layout change pays for it. Past
+  // this many nodes we build only the ones the viewport can see; below it the
+  // filter costs more than it saves. Exports need the whole map, so they flip
+  // `showAll` on for a frame (see withFullRender).
+  const CULL_FROM = 250;
+  let showAll = $state(false);
+  // Not while presenting: the viewport transition animates between two topics,
+  // and culling for the destination would sweep blank space along the way.
+  const culling = $derived(
+    !showAll && !presenterMode && layout.nodes.length > CULL_FROM && viewW > 0
+  );
+  const view = $derived(viewRect(tx, ty, scale, viewW, viewH));
+  const visibleNodes = $derived(
+    culling ? layout.nodes.filter((n) => touches(view, n)) : layout.nodes
+  );
+  // An edge is drawn as a curve between its endpoints; the bounding box of the
+  // two ends plus the view padding covers however far the curve bulges.
+  const visibleEdges = $derived(
+    culling
+      ? layout.edges.filter((e) =>
+          touches(view, {
+            x: Math.min(e.x1, e.x2),
+            y: Math.min(e.y1, e.y2),
+            w: Math.abs(e.x2 - e.x1),
+            h: Math.abs(e.y2 - e.y1)
+          })
+        )
+      : layout.edges
+  );
 
   // Context menu (canvas-relative pixel position + canvas point for inserts).
   let ctxMenu = $state<{ x: number; y: number; nodeId: string | null } | null>(null);
@@ -1532,6 +1565,21 @@
    * and the background painted in. Embedded images are already data URLs, so
    * the result is self-contained.
    */
+  /**
+   * Run `f` with culling off, so it sees the whole map in the DOM. One frame of
+   * full render is cheap next to rasterizing, and it keeps exports complete
+   * however far the map is scrolled.
+   */
+  async function withFullRender<T>(f: () => T): Promise<T> {
+    showAll = true;
+    await tick();
+    try {
+      return f();
+    } finally {
+      showAll = false;
+    }
+  }
+
   function svgMarkup(): string | null {
     if (!svgEl) return null;
     const W = Math.ceil(layout.width),
@@ -1558,7 +1606,7 @@
     W: number;
     H: number;
   } | null> {
-    const xml = svgMarkup();
+    const xml = await withFullRender(svgMarkup);
     if (!xml) return null;
     const W = Math.ceil(layout.width),
       H = Math.ceil(layout.height);
@@ -1591,8 +1639,8 @@
 
   /** Save the sheet as vector SVG — scales without blurring, and stays editable
    * in Illustrator/Inkscape/Figma, which a PNG never is. */
-  export function exportSvg() {
-    const xml = svgMarkup();
+  export async function exportSvg() {
+    const xml = await withFullRender(svgMarkup);
     if (xml) {
       download(
         new Blob([xml], { type: 'image/svg+xml;charset=utf-8' }),
@@ -2079,7 +2127,7 @@
         />
       {/each}
 
-      {#each layout.edges as e (e.id)}
+      {#each visibleEdges as e (e.id)}
         {#if !edgeDragged(e.id)}
           <path d={edgePath(e)} fill="none" stroke={e.color} stroke-width={e.width ?? 2.5} />
         {/if}
@@ -2147,7 +2195,7 @@
         {/if}
       {/each}
 
-      {#each layout.nodes as n (n.id)}
+      {#each visibleNodes as n (n.id)}
         {@const o = originOf(n)}
         <g
           transform={`translate(${o.x} ${o.y})`}

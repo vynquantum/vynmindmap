@@ -11,7 +11,9 @@ import {
   edgePath,
   escapeOverlap,
   sizeOf,
-  titleAnchor
+  titleAnchor,
+  touches,
+  viewRect
 } from '../app/src/lib/layout.js';
 import { isBoxedLevelOne } from '../app/src/lib/mapAppearance.js';
 
@@ -570,5 +572,51 @@ describe('title alignment', () => {
     expect(left.x).toBe(w - right.x);
     const t: Topic = { id: 'a', title: 'x'.repeat(40), style: { width: w } };
     expect(sizeOf(t).w).toBe(w);
+  });
+});
+
+describe('viewport culling', () => {
+  // A wide map: 60 branches spread far enough that most sit off screen.
+  const wb = createWorkbook('Root');
+  const root = wb.sheets[0]!.rootTopic;
+  for (let i = 0; i < 60; i++) {
+    const b = addChild(root, `Branch ${i}`);
+    for (let j = 0; j < 4; j++) addChild(b, `Leaf ${i}.${j}`);
+  }
+  const layout = layoutSheet(wb.sheets[0]!);
+  const seen = (view: ReturnType<typeof viewRect>) => layout.nodes.filter((n) => touches(view, n));
+
+  it('keeps what the viewport shows and drops the rest', () => {
+    // Top-left corner of the map at 1:1, in a small window.
+    const view = viewRect(0, 0, 1, 800, 600);
+    const kept = seen(view);
+    expect(kept.length).toBeGreaterThan(0);
+    expect(kept.length).toBeLessThan(layout.nodes.length);
+    // Nothing kept is fully outside the padded view, nothing dropped is inside.
+    for (const n of layout.nodes) {
+      const inside =
+        n.x < view.x + view.w && n.x + n.w > view.x && n.y < view.y + view.h && n.y + n.h > view.y;
+      expect(kept.includes(n)).toBe(inside);
+    }
+  });
+
+  it('pads the view, so a small pan reveals boxes that are already drawn', () => {
+    // A node just past the right edge is still built, thanks to the padding.
+    const view = viewRect(0, 0, 1, 800, 600);
+    expect(view.x).toBeLessThan(0);
+    expect(touches(view, { x: 900, y: 100, w: 20, h: 20 })).toBe(true);
+    expect(touches(view, { x: 2000, y: 100, w: 20, h: 20 })).toBe(false);
+  });
+
+  it('shows the whole map when it is zoomed to fit', () => {
+    const s = Math.min(800 / layout.width, 600 / layout.height);
+    expect(seen(viewRect(0, 0, s, 800, 600)).length).toBe(layout.nodes.length);
+  });
+
+  it('follows the pan transform', () => {
+    // Panning far right must surface nodes the initial view had dropped.
+    const first = seen(viewRect(0, 0, 1, 800, 600));
+    const later = seen(viewRect(800 - layout.width, 600 - layout.height, 1, 800, 600));
+    expect(later.some((n) => !first.includes(n))).toBe(true);
   });
 });

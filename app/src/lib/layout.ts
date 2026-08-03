@@ -165,6 +165,32 @@ export interface Rect {
   h: number;
 }
 
+/**
+ * The visible part of the canvas in map coordinates, grown by `pad` on every
+ * side. The padding is what makes culling invisible: a pan of less than `pad`
+ * pixels only reveals boxes that were already drawn.
+ */
+export function viewRect(
+  tx: number,
+  ty: number,
+  scale: number,
+  viewW: number,
+  viewH: number,
+  pad = 400
+): Rect {
+  return {
+    x: -tx / scale - pad,
+    y: -ty / scale - pad,
+    w: viewW / scale + 2 * pad,
+    h: viewH / scale + 2 * pad
+  };
+}
+
+/** Do two boxes meet? Edges count, so a box flush against the view is inside. */
+export function touches(a: Rect, b: Rect): boolean {
+  return a.x <= b.x + b.w && b.x <= a.x + a.w && a.y <= b.y + b.h && b.y <= a.y + a.h;
+}
+
 /** Gap kept between a moved box and whatever it was overlapping. */
 const CLEAR_PAD = 8;
 
