@@ -1,8 +1,9 @@
 # VynMM
 
-A cross-platform mind-mapping app (Windows / Linux / Mac) and an XMind-class
-feature clone. Mind maps are stored locally as `.vmm` files. Humans edit them in a
-visual canvas; LLMs read/write them through a Markdown lane and an MCP/CLI.
+An open-source, cross-platform mind-mapping app (Windows / Linux / Mac). Maps are
+stored locally as `.vmm` files — your disk, no account, no cloud. Humans edit
+them in a visual canvas; LLMs read and write the same maps through a Markdown
+lane and an MCP/CLI.
 
 New here? Start with the [**user guide**](docs/user-guide.md) — every feature and
 how to reach it. See [DESIGN.md](DESIGN.md) for the full design.
@@ -246,7 +247,7 @@ Once open, click an **example** button (rich / minimal / structures) or **Open
 
 ## The `.vmm` file
 
-A `.vmm` is a ZIP archive (like `.xmind`/`.docx`):
+A `.vmm` is a ZIP archive (the same idea as `.docx` or `.odt`):
 
 ```
 mymap.vmm
@@ -280,7 +281,7 @@ const { workbook } = readVmm(bytes); // ← parse a .vmm back into the model
 
 - **Native shell** — install Rust, then `npm run app:dev` for the desktop window
   - native Open/Save dialogs
-- **M4** — XMind breadth (more structures, styles, markers, relationships, …)
+- **M4** — breadth (more structures, styles, markers, relationships, …)
 - **Phase 2** — Markdown lane + MCP/CLI for LLMs
 
 ## License

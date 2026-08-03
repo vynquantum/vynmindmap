@@ -1,6 +1,6 @@
 # VynMM — Design Document
 
-A cross-platform mind-mapping app and an XMind-class feature clone.
+An open-source, cross-platform mind-mapping app.
 The mind map lives in a local **`.vmm`** file. Humans edit it in a visual canvas;
 LLMs read/write it through a Markdown lane and an MCP/CLI. The structured file is
 the single source of truth.
@@ -10,8 +10,8 @@ the single source of truth.
 ## 1. Guiding principles
 
 1. **One canonical file, structured.** `.vmm` is a versioned ZIP container holding
-   structured JSON. It can represent _everything_ XMind can: multiple structures,
-   floating topics, relationships, boundaries, summaries, styles, attachments.
+   structured JSON. It represents the whole map: multiple structures, floating
+   topics, relationships, boundaries, summaries, styles, attachments.
 2. **One core model.** The GUI and the AI tooling both load → mutate → save the
    same in-memory workbook. No second source of truth.
 3. **LLM access via projection, not the raw file.** LLMs work through a Markdown
@@ -215,7 +215,7 @@ existing `.vmm` keeps that file's resources.
 
 ---
 
-## 5. XMind feature inventory (parity target)
+## 5. Feature inventory
 
 ### 5.1 Structures (per sheet) — `structure` ids
 
@@ -332,7 +332,7 @@ All three produce/consume the same model, never the raw zip:
 - [ ] Drag reparent/reorder · explicit save + dirty state
 - [ ] Zoom / pan / keyboard shortcuts
 
-**M4 — XMind breadth (iterative, feature by feature)**
+**M4 — breadth (iterative, feature by feature)**
 
 - [ ] More structures: logic, org, tree, timeline, fishbone, brace, matrix, tree-table
 - [ ] Relationships · boundaries · summaries · floating topics · callouts

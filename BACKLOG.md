@@ -25,17 +25,17 @@ So two gallery cards promise a timeline and draw a chart already available under
 another name: no axis, no date ordering, no milestone markers. Either give them
 real timeline geometry, or drop the cards so the gallery stops overpromising.
 
-## 3. Pitch mode (XMind-style slide deck) — decided against
+## 3. Pitch mode (generated slide deck) — decided against
 
-XMind's Pitch Mode turns the map into a generated slide deck: topic slides and
-list slides, five list layouts, decorative themes, aspect ratios, three delivery
-animations, PPT/video export. The Inspector had a "Pitch" tab stubbed out for it.
+The feature would turn a map into a slide deck: topic slides and list slides,
+several list layouts, decorative themes, aspect ratios, delivery animations,
+PPT/video export. The Inspector had a "Pitch" tab stubbed out for it.
 
 We present the **map** instead — `togglePresenterMode` in `app/src/App.svelte`
 walks the tree with the map on screen. For a mind-mapping tool that's the better
-default: the structure is the argument, and a deck throws it away. Parity with
-Pitch is also the largest piece of work left in the app, most of it visual
-design rather than engineering.
+default: the structure is the argument, and a deck throws it away. A deck builder
+is also the largest piece of work left in the app, most of it visual design
+rather than engineering.
 
 So the tab is removed rather than left promising something that isn't coming.
 Reopen this only if someone needs a **handout** (PDF/PNG export covers most of
