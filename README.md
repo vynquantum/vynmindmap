@@ -103,13 +103,15 @@ Prefer not to click through a warning? Build it yourself from source — see
 - **Export**: PNG and PDF rasterize the current sheet, SVG saves it as vector art,
   MD writes the whole map back out as Markdown.
 - **Drag**: drop on a node's middle to reparent, or near its top/bottom edge to
-  reorder as a sibling (blue insertion line). Drop `.vmm`/`.md` files on the
-  window to open them, or to add them to the open map as tabs.
+  reorder as a sibling (blue insertion line). Drop `.vmm`, `.md`, `.opml` or
+  `.xmind` files on the window to open them, or to add them to the open map as
+  tabs.
 - **Sheets**: add (`+`), rename (double-click a tab), delete (`×`), switch.
 - **Undo / redo**: `Ctrl+Z` / `Ctrl+Y` (and toolbar `↶ ↷`); `Ctrl+S` saves.
-- **Markdown**: Import MD / Export MD in the toolbar (import several `.md` files
+- **Import**: Markdown (`.md`), OPML (`.opml`) and `.xmind` files, from the
+  toolbar or by dropping them on the window (import several files
   at once for a tab each).
-- **Merge**: fold other `.vmm` / `.md` files into the open map — one tab per
+- **Merge**: fold other maps and outlines into the open map — one tab per
   sheet, colliding ids / resources / tab names renamed instead of dropped.
 
 ### M3 — editing
@@ -134,13 +136,13 @@ A `●` dirty indicator and an unsaved-changes warning on close round it out.
 LLMs (and humans) author maps as **Markdown**, which converts to/from the canonical
 `.vmm`. See [docs/vmm-markdown-format.md](docs/vmm-markdown-format.md).
 
-| Surface       | Where                         | Use                                                                                   |
-| ------------- | ----------------------------- | ------------------------------------------------------------------------------------- |
-| Markdown lane | `src/markdown.ts`             | `.vmm` ⇄ Markdown in code                                                             |
-| CLI           | `src/cli.ts`                  | `vynmm new / import / export / merge / info`                                          |
-| MCP server    | `mcp/server.ts`               | tools: `create_map`, `read_map`, `update_map`, `add_topics`, `merge_maps`, `map_info` |
-| Skill         | `skills/create-vmm/`          | teaches any agent to author maps                                                      |
-| App           | Import MD / Export MD / Merge | round-trip Markdown and combine maps in the UI                                        |
+| Surface       | Where                      | Use                                                                                   |
+| ------------- | -------------------------- | ------------------------------------------------------------------------------------- |
+| Markdown lane | `src/markdown.ts`          | `.vmm` ⇄ Markdown in code                                                             |
+| CLI           | `src/cli.ts`               | `vynmm new / import / export / merge / info`                                          |
+| MCP server    | `mcp/server.ts`            | tools: `create_map`, `read_map`, `update_map`, `add_topics`, `merge_maps`, `map_info` |
+| Skill         | `skills/create-vmm/`       | teaches any agent to author maps                                                      |
+| App           | Import / Export MD / Merge | read `.md`, `.opml`, `.xmind`; round-trip Markdown; combine maps                      |
 
 The round-trip is lossless — styles, images, positions, relationships,
 boundaries, summaries and floating topics all survive it. **Merge** puts every

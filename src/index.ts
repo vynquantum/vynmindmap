@@ -4,3 +4,4 @@ export * from './version.js';
 export * from './model.js';
 export * from './vmm.js';
 export * from './markdown.js';
+export * from './foreign.js';

@@ -316,21 +316,25 @@ Maps save as `.vmm` files on your own disk — no account, no cloud.
 **Autosave** can be toggled in the toolbar. If you try to close with unsaved
 changes, you get a warning.
 
-**Import**: Markdown, via the toolbar — pick several `.md` files at once and
-each becomes its own tab. **Export**: the Export menu offers Markdown (`.md`),
+**Import**: the upload button in the toolbar reads Markdown (`.md`), OPML
+(`.opml`) and `.xmind` files — pick several at once and each becomes its own
+tab. An `.xmind` brings its structure, notes, labels, markers, links, images,
+relationships, boundaries and summaries across; a file written by XMind 8 or
+older says so and asks you to re-save it in a current version first. **Export**: the Export menu offers Markdown (`.md`),
 Image (`.png`), Vector (`.svg`) and Document (`.pdf`). SVG is the one to pick
 for a slide, a poster or any print: it stays sharp at any size and opens in
 Illustrator, Inkscape or Figma as editable shapes. Markdown export keeps everything except
 the image files themselves, so you can edit a map in a text editor and import it
 back without losing styles, links, boundaries or floating topics.
 
-**Drag and drop**: drop `.vmm` or `.md` files straight onto the window. With
+**Drag and drop**: drop `.vmm`, `.md`, `.opml` or `.xmind` files straight onto
+the window. With
 nothing open, a single `.vmm` opens as itself (Save writes back to that file);
 anything else — several files, or Markdown — arrives as extra tabs on the map
 you already have open, exactly like Merge.
 
 **Merge**: the layers button folds other maps into the one you have open — pick
-any mix of `.vmm` and `.md` files and every sheet in them arrives as a new tab.
+any mix of the formats above and every sheet in them arrives as a new tab.
 Nothing is overwritten: maps that share topic ids, images or tab names get the
 copies renamed, and the files you picked are left as they were.
 

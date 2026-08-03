@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Workbook, Sheet, Topic, VmmDocument } from '../../src/index.js';
+  import type { Workbook, Sheet, Topic } from '../../src/index.js';
   import {
     createWorkbook,
     writeVmm,
     workbookToMarkdown,
-    markdownToWorkbook,
+    documentFromFile,
     findTopic,
     addSheet,
     mergeDocuments,
@@ -928,14 +928,6 @@
   // --- merging several files into one map -----------------------------------
 
   /** Bytes from either lane → a document. The name decides which reader runs. */
-  function docFromBytes(name: string, bytes: Uint8Array): VmmDocument {
-    if (/\.(md|markdown|txt)$/i.test(name)) {
-      return newDocument(markdownToWorkbook(new TextDecoder().decode(bytes)));
-    }
-    const res = readVmm(bytes);
-    return { ...newDocument(res.workbook), resources: res.resources };
-  }
-
   const fileBytes = async (f: File) => new Uint8Array(await f.arrayBuffer());
 
   /**
@@ -949,7 +941,7 @@
     if (!files.length) return;
     error = '';
     try {
-      const docs = files.map((f) => docFromBytes(f.name, f.bytes));
+      const docs = files.map((f) => documentFromFile(f.name, f.bytes));
       const open = workbook
         ? [
             {
@@ -1006,6 +998,8 @@
   }
 
   let mdInput = $state<HTMLInputElement>();
+  const IMPORTABLE = /\.(md|markdown|txt|opml|xmind)$/i;
+  /** Import an outline or a map from another app: .md, .opml, .xmind. */
   async function onPickMarkdown(e: Event) {
     const files = [...((e.target as HTMLInputElement).files ?? [])];
     // Several outlines at once open as one map with a tab per file.
@@ -1014,7 +1008,7 @@
       await mergeInto(
         await Promise.all(files.map(async (f) => ({ name: f.name, bytes: await fileBytes(f) })))
       );
-      fileName = files[0]!.name.replace(/\.(md|markdown)$/i, '.vmm');
+      fileName = files[0]!.name.replace(IMPORTABLE, '.vmm');
       return;
     }
     const f = files[0];
@@ -1022,9 +1016,10 @@
     error = '';
     warning = '';
     try {
-      workbook = markdownToWorkbook(await f.text());
-      resources = {};
-      fileName = f.name.replace(/\.md$/i, '.vmm');
+      const doc = documentFromFile(f.name, await fileBytes(f));
+      workbook = doc.workbook;
+      resources = doc.resources;
+      fileName = f.name.replace(IMPORTABLE, '.vmm');
       currentPath = null;
       fileHandle = null; // a fresh document — Save must ask where to put it
       activeSheet = 0;
@@ -1039,7 +1034,7 @@
   }
 
   // --- files dropped on the window ------------------------------------------
-  const MAP_FILE = /\.(vmm|md|markdown|txt)$/i;
+  const MAP_FILE = /\.(vmm|md|markdown|txt|opml|xmind)$/i;
   let dropOver = $state(false);
 
   onMount(() =>
@@ -1298,8 +1293,8 @@
           <button
             class="ic"
             onclick={() => mdInput?.click()}
-            title="Import Markdown outlines (pick several for a tab each)"
-            aria-label="Import Markdown"><Icon name="upload" /></button
+            title="Import outlines and maps: .md, .opml, .xmind (pick several for a tab each)"
+            aria-label="Import outline or map"><Icon name="upload" /></button
           >
           <button
             class="ic"
@@ -1428,7 +1423,7 @@
         <input
           bind:this={mdInput}
           type="file"
-          accept=".md,.markdown,text/markdown"
+          accept=".md,.markdown,.opml,.xmind,text/markdown"
           multiple
           onchange={onPickMarkdown}
           hidden
@@ -1436,7 +1431,7 @@
         <input
           bind:this={mergeInput}
           type="file"
-          accept=".vmm,.md,.markdown,text/markdown"
+          accept=".vmm,.md,.markdown,.opml,.xmind,text/markdown"
           multiple
           onchange={onPickMerge}
           hidden

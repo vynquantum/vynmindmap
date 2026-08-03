@@ -38,7 +38,12 @@ export async function nativeOpenManyDialog(): Promise<string[]> {
   const res = await open({
     multiple: true,
     directory: false,
-    filters: [{ name: 'Mind maps and outlines', extensions: ['vmm', 'md', 'markdown'] }]
+    filters: [
+      {
+        name: 'Mind maps and outlines',
+        extensions: ['vmm', 'md', 'markdown', 'opml', 'xmind']
+      }
+    ]
   });
   return Array.isArray(res) ? res : res ? [res] : [];
 }
