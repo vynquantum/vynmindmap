@@ -3,6 +3,8 @@
    * The keyboard cheat sheet (F1 or ?). Every key listed here is handled in
    * App.svelte or MindMapView.svelte — keep the two in step when adding keys.
    */
+  import { trapFocus } from './a11y.js';
+
   let { onClose }: { onClose: () => void } = $props();
 
   let dialogEl = $state<HTMLDivElement | null>(null);
@@ -87,6 +89,7 @@
     aria-label="Keyboard shortcuts"
     tabindex={-1}
     bind:this={dialogEl}
+    use:trapFocus
   >
     <header>
       <h2>Keyboard shortcuts</h2>

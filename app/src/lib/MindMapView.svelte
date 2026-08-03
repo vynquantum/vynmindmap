@@ -2375,6 +2375,7 @@
   {#if relEditBox}
     <input
       class="rel-edit"
+      aria-label="Relationship label"
       bind:this={relEditInput}
       bind:value={relEditValue}
       placeholder="Label…"
@@ -2388,6 +2389,7 @@
   {#if editBox}
     <textarea
       class="edit"
+      aria-label="Topic text"
       bind:this={editInput}
       bind:value={editValue}
       rows="1"
@@ -2553,6 +2555,7 @@
     <div class="searchbar" role="search" onpointerdown={(e) => e.stopPropagation()}>
       <input
         bind:this={searchInput}
+        aria-label="Find topics"
         bind:value={searchQ}
         placeholder="Find in titles, notes, labels…"
         onkeydown={onSearchKey}
@@ -2572,7 +2575,7 @@
         disabled={!searchMatches.length}
         onclick={() => gotoMatch(searchIdx + 1)}>↓</button
       >
-      <button title="Close (Esc)" onclick={closeSearch}>✕</button>
+      <button title="Close (Esc)" aria-label="Close search" onclick={closeSearch}>✕</button>
     </div>
   {/if}
 
@@ -2613,12 +2616,12 @@
   <!-- Editing chrome: kept off the screen the audience is looking at. -->
   {#if !presenterMode}
     <div class="zoombar" role="toolbar" tabindex={-1} onpointerdown={(e) => e.stopPropagation()}>
-      <button title="Zoom out (Ctrl+-)" onclick={zoomOut}>−</button>
-      <button class="pct" title="Reset to 100% (Ctrl+0)" onclick={zoomReset}
+      <button title="Zoom out (Ctrl+-)" aria-label="Zoom out" onclick={zoomOut}>−</button>
+      <button class="pct" title="Reset to 100% (Ctrl+0)" aria-label="Reset zoom" onclick={zoomReset}
         >{Math.round(scale * 100)}%</button
       >
-      <button title="Zoom in (Ctrl+=)" onclick={zoomIn}>+</button>
-      <button title="Fit map to view" onclick={fitView}>⛶</button>
+      <button title="Zoom in (Ctrl+=)" aria-label="Zoom in" onclick={zoomIn}>+</button>
+      <button title="Fit map to view" aria-label="Fit map to view" onclick={fitView}>⛶</button>
     </div>
   {/if}
 

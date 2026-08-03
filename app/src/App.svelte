@@ -1214,6 +1214,7 @@
           {#if isEditingNote}
             <textarea
               class="notes-textarea"
+              aria-label="Presenter notes"
               bind:value={currentNote}
               oninput={() => bc?.postMessage({ action: 'edit_note', note: currentNote })}
               placeholder="Type your notes here (Markdown supported)..."></textarea>
@@ -1497,6 +1498,7 @@
               {#if editingTab === i}
                 <input
                   class="tab-edit"
+                  aria-label="Sheet name"
                   value={s.title}
                   onblur={(e) => renameSheet(i, e.currentTarget.value)}
                   onkeydown={(e) => {
@@ -1515,14 +1517,19 @@
                   {s.title}
                 </button>
                 {#if workbook.sheets.length > 1}
-                  <button class="tab-x" title="Delete sheet" onclick={() => deleteSheet(i)}
-                    >×</button
+                  <button
+                    class="tab-x"
+                    title="Delete sheet"
+                    aria-label={`Delete sheet ${s.title}`}
+                    onclick={() => deleteSheet(i)}>×</button
                   >
                 {/if}
               {/if}
             </div>
           {/each}
-          <button class="tab-add" title="Add sheet" onclick={addNewSheet}>+</button>
+          <button class="tab-add" title="Add sheet" aria-label="Add sheet" onclick={addNewSheet}
+            >+</button
+          >
         </nav>
       {/if}
       <div class="workspace">

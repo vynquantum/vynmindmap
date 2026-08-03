@@ -938,6 +938,7 @@
         ></span>
         <select
           class="cardinput"
+          aria-label="Color theme"
           value={sheet.theme ?? currentTheme.id}
           onchange={(e) => setColorTheme(e.currentTarget.value)}
         >
@@ -975,6 +976,7 @@
         <span class="rowlabel">Background Color</span>
         <input
           type="color"
+          aria-label="Background color"
           value={expand(sheet.background?.color ?? '#f5f6f8')}
           oninput={(e) => setBackground(e.currentTarget.value)}
         />
@@ -1036,6 +1038,7 @@
           <input
             type="color"
             title="Branch color"
+            aria-label="Branch color"
             value={expand(sheet.settings?.branchColor ?? '#4f46d4')}
             oninput={(e) => setBranchColor(e.currentTarget.value)}
           />
@@ -1186,6 +1189,7 @@
           <div class="colorline">
             <input
               type="color"
+              aria-label="Fill color"
               value={expand(topic.style?.fillColor)}
               oninput={(e) => setFill(e.currentTarget.value)}
             />
@@ -1197,6 +1201,7 @@
           <div class="colorline">
             <input
               type="color"
+              aria-label="Border color"
               value={expand(topic.style?.borderColor)}
               oninput={(e) => setBorder(e.currentTarget.value)}
             />
@@ -1205,6 +1210,7 @@
               value={topic.style?.borderWidth ?? 1.5}
               onchange={(e) => setBorderWidth(Number(e.currentTarget.value))}
               title="Border width"
+              aria-label="Border width"
             >
               {#each BORDER_WIDTHS as w (w)}<option value={w}>{w} px</option>{/each}
             </select>
@@ -1215,6 +1221,7 @@
           <div class="colorline">
             <input
               type="color"
+              aria-label="Branch line color"
               value={expand(topic.style?.lineColor)}
               oninput={(e) => setLineColor(e.currentTarget.value)}
             />
@@ -1223,6 +1230,7 @@
               value={topic.style?.lineWidth ?? 2.5}
               onchange={(e) => setLineWidth(Number(e.currentTarget.value))}
               title="Branch line width"
+              aria-label="Branch line width"
             >
               {#each LINE_WIDTHS as w (w)}<option value={w}>{w} px</option>{/each}
             </select>
@@ -1263,6 +1271,7 @@
           <div class="colorline">
             <input
               type="color"
+              aria-label="Text color"
               value={expand(topic.style?.font?.color)}
               oninput={(e) => setFontColor(e.currentTarget.value)}
             />
@@ -1272,24 +1281,32 @@
                 class="ff bold"
                 class:on={font?.weight === 'bold'}
                 title="Bold"
+                aria-label="Bold"
+                aria-pressed={font?.weight === 'bold'}
                 onclick={toggleBold}>B</button
               >
               <button
                 class="ff ital"
                 class:on={font?.style === 'italic'}
                 title="Italic"
+                aria-label="Italic"
+                aria-pressed={font?.style === 'italic'}
                 onclick={toggleItalic}>I</button
               >
               <button
                 class="ff und"
                 class:on={font?.decoration === 'underline'}
                 title="Underline"
+                aria-label="Underline"
+                aria-pressed={font?.decoration === 'underline'}
                 onclick={() => setDecoration('underline')}>U</button
               >
               <button
                 class="ff strike"
                 class:on={font?.decoration === 'line-through'}
                 title="Strikethrough"
+                aria-label="Strikethrough"
+                aria-pressed={font?.decoration === 'line-through'}
                 onclick={() => setDecoration('line-through')}>S</button
               >
             </div>
@@ -1341,6 +1358,7 @@
           <input
             type="text"
             class="emoji-search-input"
+            aria-label="Search emojis"
             placeholder="Search emojis..."
             bind:value={emojiSearchQ}
             onpointerdown={(e) => e.stopPropagation()}
@@ -1376,6 +1394,7 @@
             <input
               type="text"
               class="custom-emoji-input"
+              aria-label="Paste any emoji"
               placeholder="Or paste any emoji..."
               bind:value={anyEmojiInput}
               onpointerdown={(e) => e.stopPropagation()}
@@ -1429,7 +1448,13 @@
           </label>
           <div class="fieldname">Image Attachment</div>
           <div class="image-upload-row">
-            <input type="file" accept="image/*" onchange={handleImageUpload} class="file-input" />
+            <input
+              type="file"
+              accept="image/*"
+              aria-label="Upload an image"
+              onchange={handleImageUpload}
+              class="file-input"
+            />
             {#if topic.image}
               <button class="remove-img-btn" onclick={removeImage}>Remove Image</button>
             {/if}

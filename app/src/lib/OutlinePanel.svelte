@@ -93,6 +93,7 @@
     {#if editingId === t.id}
       <input
         bind:this={editEl}
+        aria-label="Topic text"
         bind:value={editValue}
         onkeydown={(e) => onEditKey(e, t)}
         onblur={() => commitEdit(t)}

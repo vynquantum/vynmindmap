@@ -391,6 +391,17 @@ The Markdown lane is also how AI tools read and write these maps — see
 
 > On macOS use **Cmd** wherever this table says Ctrl.
 
+## Accessibility
+
+- Every icon-only button, colour picker and toolbar control has a spoken
+  name, so a screen reader announces what it does rather than "button".
+- Dialogs (confirmations, the shortcut sheet) keep **Tab** inside them and
+  give focus back to where you were when they close; **Esc** always closes.
+- Turning on your system's **reduce motion** setting removes the app's fades
+  and pop animations.
+- Focus outlines follow the keyboard, not the mouse: they appear when you Tab,
+  not when you click.
+
 ## Known limitations
 
 Honest list of what doesn't work yet, tracked in

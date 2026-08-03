@@ -1,5 +1,6 @@
 <script lang="ts">
   import { confirmStore } from './confirm.svelte.js';
+  import { trapFocus } from './a11y.js';
 
   const cur = $derived(confirmStore.current);
 
@@ -34,6 +35,7 @@
       aria-modal="true"
       tabindex={-1}
       aria-label={cur.opts.title ?? 'Confirm'}
+      use:trapFocus
     >
       {#if cur.opts.title}<h2>{cur.opts.title}</h2>{/if}
       <p>{cur.opts.message}</p>
