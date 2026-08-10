@@ -229,6 +229,10 @@ export interface SheetSettings {
   uniformTopicLength?: boolean;
   /** Show each topic's note under its title instead of only the 📝 badge. */
   displayAllNotes?: boolean;
+  /** Badge a collapsed branch with the number of topics folded under it,
+   * counting every level rather than just its direct children. Defaults to
+   * true; set false to keep the plain '+' button. */
+  showBranchCount?: boolean;
   /** Wrap long titles onto several lines. Defaults to true; set false to keep
    * every title on one line (explicit newlines still break) and let the topic
    * grow as wide as it needs. */

@@ -77,6 +77,29 @@ export function* walkTopic(topic: Topic): Generator<Topic> {
   for (const c of topic.callouts ?? []) yield* walkTopic(c);
 }
 
+/**
+ * Topic id → how many topics sit under it, every level down. Counts children
+ * only: callouts are annotations hanging off a topic, and collapsing never
+ * hides them, so they are not part of what a fold takes away.
+ *
+ * One pass for the whole sheet rather than a `countDescendants(t)` per topic —
+ * the map view needs this for every branch on every frame, and counting each
+ * subtree on its own is O(n · depth).
+ */
+export function subtreeCounts(sheet: Sheet): Map<string, number> {
+  const counts = new Map<string, number>();
+  const walk = (t: Topic): number => {
+    let n = 0;
+    for (const c of t.children ?? []) n += 1 + walk(c);
+    counts.set(t.id, n);
+    return n;
+  };
+  walk(sheet.rootTopic);
+  for (const f of sheet.floatingTopics ?? []) walk(f);
+  for (const s of sheet.summaries ?? []) walk(s.summaryTopic);
+  return counts;
+}
+
 export function findTopic(sheet: Sheet, id: string): Topic | undefined {
   for (const t of walkSheetTopics(sheet)) if (t.id === id) return t;
   return undefined;

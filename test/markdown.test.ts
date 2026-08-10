@@ -126,7 +126,6 @@ background: {"color":"#eeeeee"}
   });
 });
 
-
 describe('round-trip: sheet → markdown → sheet', () => {
   it('preserves the topic hierarchy', () => {
     const wb = createWorkbook('Root');
@@ -144,7 +143,12 @@ describe('round-trip: sheet → markdown → sheet', () => {
   it('preserves sheet settings and background', () => {
     const wb = createWorkbook('Root');
     const sheet = wb.sheets[0]!;
-    sheet.settings = { wrapText: false, compactMap: true, branchLineWidth: 3 };
+    sheet.settings = {
+      wrapText: false,
+      compactMap: true,
+      branchLineWidth: 3,
+      showBranchCount: false
+    };
     sheet.background = { color: '#101010' };
 
     const back = markdownToSheet(sheetToMarkdown(sheet));

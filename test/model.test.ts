@@ -12,6 +12,7 @@ import {
   addRelationship,
   addSibling,
   addSummary,
+  createTopic,
   createWorkbook,
   deleteTopic,
   detachTopic,
@@ -24,6 +25,7 @@ import {
   removeRelationship,
   removeSummary,
   setStructure,
+  subtreeCounts,
   toggleCollapse,
   walkSheetTopics,
   type Sheet
@@ -129,6 +131,34 @@ describe('tree queries & construction', () => {
     const { sheet } = fixture();
     setStructure(sheet, 'org.down');
     expect(sheet.structure).toBe('org.down');
+  });
+
+  it('subtreeCounts counts every level under a topic, not just its children', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    const a = addChild(sheet.rootTopic, 'A');
+    const a1 = addChild(a, 'A1');
+    addChild(a1, 'A1a');
+    addChild(sheet.rootTopic, 'B');
+
+    const counts = subtreeCounts(sheet);
+    expect(counts.get(sheet.rootTopic.id)).toBe(4); // A, A1, A1a, B
+    expect(counts.get(a.id)).toBe(2);
+    expect(counts.get(a1.id)).toBe(1);
+    expect(counts.get('leaf-that-is-not-here')).toBeUndefined();
+  });
+
+  it('subtreeCounts reaches floating topics and ignores callouts', () => {
+    const wb = createWorkbook('Root');
+    const sheet = wb.sheets[0]!;
+    const f = addFloatingTopic(sheet, 'Floater', { x: 0, y: 0 });
+    addChild(f, 'F1');
+    // A callout is an annotation, not a branch — folding never hides one.
+    (sheet.rootTopic.callouts ??= []).push(createTopic('Aside'));
+
+    const counts = subtreeCounts(sheet);
+    expect(counts.get(f.id)).toBe(1);
+    expect(counts.get(sheet.rootTopic.id)).toBe(0);
   });
 });
 

@@ -32,6 +32,7 @@
     removeBoundary,
     removeRelationship,
     removeSummary,
+    subtreeCounts,
     walkSheetTopics,
     walkTopic
   } from '../../../src/index.js';
@@ -1585,6 +1586,10 @@
     const W = Math.ceil(layout.width),
       H = Math.ceil(layout.height);
     const clone = svgEl.cloneNode(true) as SVGSVGElement;
+    // Scoped styles do not travel with the clone, so the hover-only fold buttons
+    // would come back at full opacity. Collapsed badges stay — their count is the
+    // only hint that the export is holding subtopics back.
+    for (const t of clone.querySelectorAll('.toggle:not(.collapsed)')) t.remove();
     const g = clone.querySelector('g');
     if (g) g.setAttribute('transform', 'translate(0,0) scale(1)');
     clone.setAttribute('width', String(W));
@@ -1746,6 +1751,11 @@
   function hasChildren(t: Topic) {
     return (t.children?.length ?? 0) > 0;
   }
+
+  /** Rebuilt only when the tree changes, not when a title is edited: the walk
+   * reads `children`, so Svelte re-runs it on structural edits alone. */
+  const foldedCount = $derived(subtreeCounts(sheet));
+  const showBranchCount = $derived(sheet.settings?.showBranchCount !== false);
 
   const SUMMARY_STROKE = '#94a3b8';
 
@@ -2348,18 +2358,27 @@
           {/if}
 
           {#if hasChildren(n.topic) && !presenterMode}
+            {@const kids = foldedCount.get(n.id) ?? 0}
+            {@const label = !n.topic.collapsed ? '−' : showBranchCount ? String(kids) : '+'}
             <g
               class="toggle"
+              class:collapsed={n.topic.collapsed}
               role="button"
               tabindex={-1}
-              aria-label={n.topic.collapsed ? 'Expand' : 'Collapse'}
+              aria-label={`${n.topic.collapsed ? 'Expand' : 'Collapse'} ${kids} subtopic${
+                kids === 1 ? '' : 's'
+              }`}
               onpointerdown={(e) => onToggle(e, n.topic)}
               transform={`translate(${n.side === 'left' ? -9 : n.w + 9} ${n.h / 2})`}
             >
               <circle r="7" fill="#fff" stroke={n.color} stroke-width="1.5" />
-              <text dominant-baseline="central" text-anchor="middle" font-size="11" fill={n.color}>
-                {n.topic.collapsed ? '+' : '−'}
-              </text>
+              <!-- Shrink the digits rather than the circle, so badges stay on one grid. -->
+              <text
+                dominant-baseline="central"
+                text-anchor="middle"
+                font-size={label.length > 2 ? 7 : label.length > 1 ? 9 : 11}
+                fill={n.color}>{label}</text
+              >
             </g>
           {/if}
 
@@ -2767,8 +2786,23 @@
     animation: pulse-glow 2s infinite ease-in-out;
     stroke: #1d4ed8 !important;
   }
+  /* The fold button is chrome, not content, so it fades in with the pointer.
+     A collapsed branch keeps its badge: the child count is the only sign that
+     subtopics are hidden. Touch has no hover, so there every button stays. */
   .toggle {
     cursor: pointer;
+    transition: opacity 0.12s ease;
+  }
+  @media (hover: hover) {
+    .toggle {
+      opacity: 0;
+    }
+    .node:hover .toggle {
+      opacity: 1;
+    }
+  }
+  .toggle.collapsed {
+    opacity: 1;
   }
   .resize-handle {
     cursor: nwse-resize;

@@ -1088,6 +1088,13 @@
       {@render toggleRow('Display All Notes', flag('displayAllNotes'), (v) =>
         setFlag('displayAllNotes', v)
       )}
+      {@render toggleRow('Branch Count', sheet.settings?.showBranchCount !== false, (v) =>
+        setFlag('showBranchCount', v)
+      )}
+      <p class="hint">
+        A folded branch shows how many topics are hidden under it, counting every level. Off leaves
+        a plain + button.
+      </p>
       {@render toggleRow('Wrap Text', sheet.settings?.wrapText !== false, (v) =>
         setFlag('wrapText', v)
       )}
