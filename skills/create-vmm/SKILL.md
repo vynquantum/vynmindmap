@@ -177,6 +177,16 @@ to change them; ids you don't write are generated for you.
 A `<!-- vmm:floating -->` line ends the main tree — each `## H2` after it is a
 floating topic, usually with a `position` in its comment.
 
+## Maps you present from
+
+If the map will be shown to a room, build it so nothing is readable before it is
+taught. Everything starts `"collapsed":true`; a bare-emoji layer hides the
+branches; and inside a section the points are **chained** — each point is the
+child of the one before it, so opening a point reveals exactly one new line
+instead of the whole list. Presenter-only detail (wording, timings, warnings)
+goes in `note`, which the audience never sees. Full rules and an example:
+`docs/preferences.md` §3.
+
 ## Full format reference
 
 See [docs/vmm-markdown-format.md](../../docs/vmm-markdown-format.md) for the
