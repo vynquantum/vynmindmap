@@ -56,14 +56,13 @@ export function colorThemeFor(sheet: Sheet) {
 
 /** Chart types the text-on-lines treatment can replace connectors in: the
  * horizontally laid-out families, which draw one connector per parent-child
- * link. Vertical and diagram layouts (org, timeline.v, fishbone, brace,
- * matrix, tree table, grid) draw their own geometry and ignore it. */
+ * link. Vertical and diagram layouts (org, timeline, fishbone, brace, matrix,
+ * tree table, grid) draw their own geometry and ignore it. */
 export function supportsTextOnLines(structure: StructureId): boolean {
   return (
     structure.startsWith('map.') ||
     structure.startsWith('logic.') ||
-    structure.startsWith('tree.') ||
-    structure === 'timeline.h'
+    structure.startsWith('tree.')
   );
 }
 

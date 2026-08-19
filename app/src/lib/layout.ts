@@ -942,6 +942,126 @@ function fishbone(
   return { nodes, edges };
 }
 
+// --- timeline: an axis with milestones alternating to either side ----------
+/**
+ * Both timeline variants, which differ only in which way the axis runs.
+ *
+ * The root opens the axis; each of its children is a milestone with a marker on
+ * the axis and a stem out to its box, alternating sides so a long run stays
+ * readable. Everything under a milestone continues outward in the same column,
+ * so depth lengthens a stem instead of needing geometry of its own — the same
+ * outward stack the fishbone uses.
+ */
+function timeline(sheet: Sheet, dir: 'h' | 'v'): { nodes: LaidOutNode[]; edges: LaidOutEdge[] } {
+  const nodes: LaidOutNode[] = [];
+  const edges: LaidOutEdge[] = [];
+  const root = sheet.rootTopic;
+  const rootS = sizeOf(root, 0);
+  const horiz = dir === 'h';
+  /** Axis to the near edge of a milestone box. */
+  const STEM = 44;
+  /** Diameter of the marker sitting on the axis. */
+  const MARKER = 7;
+  /** Gap between two boxes stacked in the same column. */
+  const STACK_GAP = 14;
+
+  // A point in axis coordinates: `along` runs down the axis, `across` is the
+  // offset to one side of it. Writing every position this way is the only
+  // difference between the horizontal and vertical variants.
+  const pt = (along: number, across: number) =>
+    horiz ? { x: along, y: across } : { x: across, y: along };
+
+  const base = sheet.settings?.branchLineWidth ?? BRANCH_W;
+  const stroke = (depth: number) =>
+    sheet.settings?.branchTaper === false ? base : branchWidth(depth, base);
+
+  nodes.push(
+    mkNode(root, -rootS.w / 2, -rootS.h / 2, rootS, 0, 'root', rootColorForSheet(sheet))
+  );
+
+  const palette = paletteForSheet(sheet);
+  const halfRoot = (horiz ? rootS.w : rootS.h) / 2;
+  let along = halfRoot + SPACING.level;
+
+  visibleChildren(root).forEach((stop, i) => {
+    const above = i % 2 === 0;
+    const sgn = above ? -1 : 1;
+    const color = colorFor(i, palette);
+
+    // The milestone and every topic under it, deepest last.
+    const column: { topic: Topic; depth: number; s: TopicSize }[] = [];
+    const walk = (parent: Topic, depth: number) => {
+      for (const c of visibleChildren(parent)) {
+        column.push({ topic: c, depth, s: sizeOf(c, depth) });
+        walk(c, depth + 1);
+      }
+    };
+    column.push({ topic: stop, depth: 1, s: sizeOf(stop, 1) });
+    walk(stop, 2);
+
+    // The slot is as wide as the widest box in the column, so a long sub-topic
+    // pushes the next milestone along rather than overlapping it.
+    const slot = Math.max(...column.map((c) => (horiz ? c.s.w : c.s.h)));
+    const center = along + slot / 2;
+
+    // A short segment with the renderer's round caps: a dot on the axis.
+    const m1 = pt(center - 0.5, 0);
+    const m2 = pt(center + 0.5, 0);
+    edges.push({
+      id: `tl-mark-${stop.id}`,
+      x1: m1.x,
+      y1: m1.y,
+      x2: m2.x,
+      y2: m2.y,
+      color,
+      kind: 'straight',
+      width: MARKER
+    });
+
+    // Each connector starts where the previous box ended, so none of them
+    // crosses a box it doesn't touch.
+    let from = 0;
+    let cursor = STEM;
+    for (const c of column) {
+      const half = (horiz ? c.s.h : c.s.w) / 2;
+      const p = pt(center, sgn * (cursor + half));
+      nodes.push(mkNode(c.topic, p.x - c.s.w / 2, p.y - c.s.h / 2, c.s, c.depth, 'right', color));
+      const a = pt(center, from);
+      const b = pt(center, sgn * cursor);
+      edges.push({
+        id: `tl-${c.topic.id}`,
+        x1: a.x,
+        y1: a.y,
+        x2: b.x,
+        y2: b.y,
+        color,
+        kind: 'straight',
+        width: stroke(c.depth)
+      });
+      from = sgn * (cursor + 2 * half);
+      cursor += 2 * half + STACK_GAP;
+    }
+
+    along += slot + SPACING.col;
+  });
+
+  // The axis runs from the root to the last marker, with a stub so an empty map
+  // still reads as a timeline rather than a lone box.
+  const start = pt(halfRoot, 0);
+  const end = pt(Math.max(along - SPACING.col, halfRoot + 120), 0);
+  edges.unshift({
+    id: 'axis',
+    x1: start.x,
+    y1: start.y,
+    x2: end.x,
+    y2: end.y,
+    color: '#64748b',
+    kind: 'straight',
+    width: 3
+  });
+  return { nodes, edges };
+}
+
 // --- matrix: columns of cells under level-1 headers ------------------------
 function matrix(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
   const nodes: LaidOutNode[] = [];
@@ -1133,8 +1253,9 @@ export function layoutSheet(sheet: Sheet): Layout {
     treeLike = false;
   } else if (s === 'org.down' || s === 'org.up') {
     nodes = vertical(sheet, s === 'org.up' ? 'up' : 'down');
-  } else if (s === 'timeline.v') {
-    nodes = vertical(sheet, 'down');
+  } else if (s === 'timeline.h' || s === 'timeline.v') {
+    ({ nodes, edges } = timeline(sheet, s.endsWith('.h') ? 'h' : 'v'));
+    treeLike = false;
   } else if (s === 'map.balanced') {
     kind = branchKind(sheet, 'bezier');
     nodes = horizontal(sheet, 'balanced');

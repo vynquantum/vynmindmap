@@ -562,6 +562,70 @@ describe('flexible floating topic', () => {
   });
 });
 
+describe('timeline', () => {
+  /** Root, four milestones, one of them with a sub-topic of its own. */
+  function sheetWith(structure: 'timeline.h' | 'timeline.v') {
+    const sheet = createWorkbook('Launch').sheets[0]!;
+    sheet.structure = structure;
+    for (const name of ['Q1', 'Q2', 'Q3', 'Q4']) addChild(sheet.rootTopic, name);
+    addChild(sheet.rootTopic.children![1]!, 'Beta');
+    return sheet;
+  }
+
+  it('draws an axis with milestones to either side of it, both ways round', () => {
+    for (const dir of ['timeline.h', 'timeline.v'] as const) {
+      const layout = layoutSheet(sheetWith(dir));
+      const axis = layout.edges.find((e) => e.id === 'axis')!;
+      expect(axis, dir).toBeTruthy();
+
+      // The axis runs one way only; milestones sit off it in both directions.
+      const along = dir === 'timeline.h' ? 'x' : 'y';
+      expect(axis[`${along}2`], dir).toBeGreaterThan(axis[`${along}1`]);
+      expect(dir === 'timeline.h' ? axis.y1 === axis.y2 : axis.x1 === axis.x2, dir).toBe(true);
+
+      // Relative to the axis, since the finished layout is translated to sit in
+      // positive coordinates.
+      const axisAt = dir === 'timeline.h' ? axis.y1 : axis.x1;
+      const across = (n: { x: number; y: number; w: number; h: number }) =>
+        (dir === 'timeline.h' ? n.y + n.h / 2 : n.x + n.w / 2) - axisAt;
+      const stops = layout.nodes.filter((n) => n.depth === 1);
+      expect(stops.length, dir).toBe(4);
+      expect(stops.some((n) => across(n) < 0), dir).toBe(true);
+      expect(stops.some((n) => across(n) > 0), dir).toBe(true);
+
+      // Every topic gets a marker or a connector — nothing floats unattached.
+      for (const n of layout.nodes) {
+        if (n.depth === 0) continue;
+        expect(layout.edges.some((e) => e.id === `tl-${n.id}`), `${dir} ${n.id}`).toBe(true);
+      }
+    }
+  });
+
+  it('is its own chart rather than another one under a different name', () => {
+    // BACKLOG.md §2: timeline.v used to be byte-identical to org.down, and
+    // timeline.h fell through to the logic chart.
+    const asTimeline = layoutSheet(sheetWith('timeline.v'));
+    const org = sheetWith('timeline.v');
+    org.structure = 'org.down';
+    const asOrg = layoutSheet(org);
+    expect(asTimeline.nodes.map((n) => n.x)).not.toEqual(asOrg.nodes.map((n) => n.x));
+  });
+
+  it('keeps a milestone clear of its neighbours however deep it runs', () => {
+    for (const dir of ['timeline.h', 'timeline.v'] as const) {
+      const sheet = sheetWith(dir);
+      // A wide sub-topic must widen its own slot, not overlap the next one.
+      addChild(sheet.rootTopic.children![1]!.children![0]!, 'A considerably longer sub-topic');
+      const { nodes } = layoutSheet(sheet);
+      for (let i = 0; i < nodes.length; i++)
+        for (let j = i + 1; j < nodes.length; j++)
+          expect(touches(nodes[i]!, nodes[j]!), `${dir} ${nodes[i]!.id}/${nodes[j]!.id}`).toBe(
+            false
+          );
+    }
+  });
+});
+
 describe('branch taper', () => {
   it('thins with depth and never falls below a hairline', () => {
     const w = [1, 2, 3, 4, 5].map((d) => branchWidth(d));

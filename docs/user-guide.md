@@ -411,15 +411,6 @@ The Markdown lane is also how AI tools read and write these maps — see
 Honest list of what doesn't work yet, tracked in
 [BACKLOG.md](../BACKLOG.md):
 
-- **Fishbone layouts drop topics below depth 3.** On the bundled
-  `examples/rich.vmm`, all three fishbone variants render 11 of 13 topics —
-  `API` and `Database`, the grandchildren under `Backend`, disappear from the
-  canvas. They're still in the file and still listed in the outline panel;
-  switch to another structure to see them again.
-- **The two timeline variants aren't really timelines.** _Timeline · vertical_
-  lays out pixel-for-pixel identically to _Org chart · down_, and _Timeline ·
-  horizontal_ is identical to _Logic chart · right_. They render every topic
-  correctly — they just aren't distinct chart types yet. _Timeline · capsule_
-  is unaffected.
-
-The other 28 of the 31 gallery layouts render every topic.
+Nothing outstanding here at the moment. Every one of the 31 gallery layouts
+draws every topic in the sheet, and no two of them are the same chart under
+different names.

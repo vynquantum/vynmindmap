@@ -14,15 +14,21 @@ depth is an indent rather than new geometry, and the chain still runs box edge
 to box edge. Every chart type places 100% of the topics; the test in
 `test/layout.test.ts` that exempted fishbone is gone.
 
-## 2. Timeline chart types render as something else
+## 2. Timeline chart types render as something else — fixed
 
-`timeline.v` is literally `vertical(sheet, 'down')` — byte-identical output to
-`org.down` (`app/src/lib/layout.ts`, the `layoutSheet` dispatch). `timeline.h`
-falls through to the default branch and renders as a logic chart.
+`timeline.v` was literally `vertical(sheet, 'down')` — byte-identical output to
+`org.down` — and `timeline.h` fell through to the logic chart. Two gallery cards
+promised a timeline and drew a chart already available under another name.
 
-So two gallery cards promise a timeline and draw a chart already available under
-another name: no axis, no date ordering, no milestone markers. Either give them
-real timeline geometry, or drop the cards so the gallery stops overpromising.
+Both now share one `timeline()` layout, which draws what the gallery icons
+always showed: an axis out of the root, a marker on it per milestone, and stems
+alternating to either side. Sub-topics continue outward in the same column, and
+the slot is as wide as its widest box, so a deep milestone pushes the next one
+along instead of overlapping it. `branchLineWidth` and `branchTaper` apply.
+
+Still not modelled: dates. Milestones are evenly spaced in tree order, not
+positioned by any date field — a topic has nowhere to put one yet. Worth
+revisiting only if someone wants a real scaled axis.
 
 ## 3. Pitch mode (generated slide deck) — decided against
 
