@@ -32,7 +32,7 @@ A map that is presented is a **reveal instrument**, not a wall of text. The rule
 
 - **Rationale**: When a parent branch (e.g., Topic X) is expanded, all of its child points would naturally be visible at the same time. To conceal the individual points and allow step-by-step presentation, an intermediate layer of **bare, expressive EMOJI nodes** (e.g., `## 🌟`, `## ⚡`, `- 💧`, `- ⚛️`) is inserted as parent nodes instead of numbers or bullet points.
 - **Behaviour**:
-  - Main topic branches (e.g. `## 🚀 Topic X`) are set to `collapsed: true`.
+  - Main topic branches (e.g. `## Topic X`) are set to `collapsed: true`. **The branch title carries no decorative emoji** — the same symbol on every branch means nothing, and the emoji layer that follows only reads as meaningful because each emoji stands for a different kind of content. A branch that is genuinely a different *kind* (a nav or reference branch among content branches) may carry one mark; content branches are plain text.
   - Expanding Topic X reveals **only** the emoji parent nodes (which are also `collapsed: true`) — a row of symbols that carries no readable content.
   - The presenter opens each emoji node one by one to reveal the section underneath.
 
@@ -92,7 +92,7 @@ settings: {"wrapText":false,"compactMap":false,"mapPresentation":"underline"}
 
 # System Architecture
 
-## 🚀 Topic X: Core Services <!-- vmm: {"collapsed":true} -->
+## Topic X: Core Services <!-- vmm: {"collapsed":true} -->
 
 - ⚛️ <!-- vmm: {"collapsed":true} -->
   - Authentication Service <!-- vmm: {"collapsed":true,"note":"Presenter note: lead with the token lifetime question."} -->
