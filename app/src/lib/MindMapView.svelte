@@ -11,7 +11,7 @@
 
 <script lang="ts">
   import { tick, untrack } from 'svelte';
-  import type { Sheet, Topic } from '../../../src/index.js';
+  import type { FontStyle, Sheet, Topic } from '../../../src/index.js';
   import {
     addChild,
     addSibling,
@@ -1812,6 +1812,15 @@
     return n.depth === 0 || (boxedLevelOne && n.depth === 1);
   }
 
+  /** Default title alignment. Text drawn on a line reads from the end the line
+   * grows out of, so a column of siblings starts at one x rather than each
+   * title sitting centred in a line of its own length. Anything still drawn as
+   * a box — the root, boxed level one, an explicit shape — stays centred. */
+  function defaultAlign(n: LaidOutNode): FontStyle['align'] {
+    if (!isTextOnLines(sheet) || nodeShape(n) !== 'none') return 'center';
+    return n.side === 'left' ? 'right' : 'left';
+  }
+
   function nodeShape(n: LaidOutNode): string {
     if (n.topic.style?.shape) return n.topic.style.shape;
     // This layout treats every topic as text positioned on a connector line.
@@ -2260,7 +2269,7 @@
 
           {#if n.id !== editingId}
             {@const cy = titleCenterY(n)}
-            {@const ta = titleAnchor(n.topic.style?.font?.align, n.w)}
+            {@const ta = titleAnchor(n.topic.style?.font?.align, n.w, defaultAlign(n))}
             <text
               dominant-baseline="central"
               text-anchor={ta.anchor}

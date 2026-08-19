@@ -567,6 +567,14 @@ describe('title alignment', () => {
     // An unset align is centred, so existing maps render exactly as before.
     expect(titleAnchor(undefined, w)).toEqual(centre);
 
+    // Text drawn on a line hugs the end the line starts from, so siblings that
+    // share a left edge but not a width start their titles at the same x.
+    expect(titleAnchor(undefined, w, 'left')).toEqual(left);
+    expect(titleAnchor(undefined, 300, 'left').x).toBe(left.x);
+    expect(titleAnchor(undefined, w, 'right')).toEqual(right);
+    // An explicit align still wins over the fallback.
+    expect(titleAnchor('center', w, 'left')).toEqual(centre);
+
     // Both insets have to match the padding sizeOf reserved, or a fixed-width
     // topic wraps its text at one width and then paints it at another.
     expect(left.x).toBe(w - right.x);

@@ -371,13 +371,20 @@ export function sizeOf(t: Topic): TopicSize {
  * Where a topic's title sits inside its box. SVG anchors text *at* the given x
  * rather than within a box, so left and right align have to inset by the same
  * padding `sizeOf` reserved when it measured the box.
+ *
+ * `fallback` is the alignment to use when the topic sets none. Boxed topics
+ * centre; a topic drawn as text on a line passes the end its line starts from,
+ * so siblings — whose boxes all share a left edge but not a width — begin at
+ * one x instead of each floating in the middle of its own line.
  */
 export function titleAnchor(
   align: FontStyle['align'],
-  w: number
+  w: number,
+  fallback: FontStyle['align'] = 'center'
 ): { anchor: 'start' | 'middle' | 'end'; x: number } {
-  if (align === 'left') return { anchor: 'start', x: PAD_X / 2 };
-  if (align === 'right') return { anchor: 'end', x: w - PAD_X / 2 };
+  const a = align ?? fallback;
+  if (a === 'left') return { anchor: 'start', x: PAD_X / 2 };
+  if (a === 'right') return { anchor: 'end', x: w - PAD_X / 2 };
   return { anchor: 'middle', x: w / 2 };
 }
 
