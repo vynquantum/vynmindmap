@@ -896,28 +896,36 @@ function fishbone(
       kind: 'straight',
       width: 2
     });
-    // Sub-bones stack outward from the bone. Each connector starts at the
-    // previous box's outer edge, so none of them crosses a box it doesn't touch.
+    // Sub-bones stack outward from the bone, one box per slot, each connector
+    // starting at the previous box's outer edge so none of them crosses a box
+    // it doesn't touch. The walk recurses: reading a single level of children
+    // dropped everything below a sub-cause off the chart without saying so.
+    // Depth only sets the indent, so a deep branch leans further out along the
+    // bone rather than needing geometry of its own.
     let edgeX = cxB;
     let edgeY = cyB + (above ? -bs.h / 2 : bs.h / 2);
-    for (const c of visibleChildren(b)) {
-      const cs = sizeOf(c);
-      const cyC = above ? edgeY - 12 - cs.h / 2 : edgeY + 12 + cs.h / 2;
-      const cxC = cxB - sgn * 26;
-      nodes.push(mkNode(c, cxC - cs.w / 2, cyC - cs.h / 2, cs, 2, 'right', color));
-      edges.push({
-        id: `fb-${c.id}`,
-        x1: edgeX,
-        y1: edgeY,
-        x2: cxC,
-        y2: above ? cyC + cs.h / 2 : cyC - cs.h / 2,
-        color,
-        kind: 'straight',
-        width: 1.5
-      });
-      edgeX = cxC;
-      edgeY = above ? cyC - cs.h / 2 : cyC + cs.h / 2;
-    }
+    const stack = (parent: Topic, depth: number) => {
+      for (const c of visibleChildren(parent)) {
+        const cs = sizeOf(c, depth);
+        const cyC = above ? edgeY - 12 - cs.h / 2 : edgeY + 12 + cs.h / 2;
+        const cxC = cxB - sgn * 26 * (depth - 1);
+        nodes.push(mkNode(c, cxC - cs.w / 2, cyC - cs.h / 2, cs, depth, 'right', color));
+        edges.push({
+          id: `fb-${c.id}`,
+          x1: edgeX,
+          y1: edgeY,
+          x2: cxC,
+          y2: above ? cyC + cs.h / 2 : cyC - cs.h / 2,
+          color,
+          kind: 'straight',
+          width: Math.max(1, 1.5 - (depth - 2) * 0.25)
+        });
+        edgeX = cxC;
+        edgeY = above ? cyC - cs.h / 2 : cyC + cs.h / 2;
+        stack(c, depth + 1);
+      }
+    };
+    stack(b, 2);
   });
   return { nodes, edges };
 }

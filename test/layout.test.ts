@@ -315,15 +315,12 @@ describe('layoutBalanced', () => {
       addChild(a, 'A2');
       addChild(b, 'B1');
       // Depth 3 — a layout that walks a fixed number of levels drops this one.
-      const deep = addChild(a1, 'A1x');
+      addChild(a1, 'A1x');
 
       const placed = new Set(layoutSheet(sheet).nodes.map((n) => n.id));
       const missing = ids(sheet.rootTopic).filter((id) => !placed.has(id));
 
-      // BACKLOG.md §1: fishbone iterates exactly two levels (bones, then causes),
-      // so depth 3 is placed nowhere. Drop this branch when sub-bones land.
-      if (structure.startsWith('fishbone.')) expect(missing, structure).toEqual([deep.id]);
-      else expect(missing, structure).toEqual([]);
+      expect(missing, structure).toEqual([]);
     }
   });
 

@@ -2,18 +2,17 @@
 
 Open work on the Map tab, in rough priority order.
 
-## 1. Fishbone drops everything below depth 3
+## 1. Fishbone drops everything below depth 3 — fixed
 
-`fishbone()` in `app/src/lib/layout.ts` iterates exactly two levels — cause
-categories, then causes — so a third level ("API", "Database" in
-`examples/rich.vmm`) is placed nowhere and silently disappears.
+`fishbone()` iterated exactly two levels — cause categories, then causes — so a
+third level ("API", "Database" in `examples/rich.vmm`) was placed nowhere and
+silently disappeared.
 
-Real Ishikawa diagrams do have sub-causes, so this is a genuine gap, but there
-is no existing pattern in the codebase to copy for sub-bone geometry. Needs a
-design decision on how sub-bones attach before it can be implemented.
-
-Every other chart type now places 100% of the topics; fishbone is the only
-remaining exception.
+The sub-bone walk now recurses. A sub-cause takes the next slot in the same
+outward stack as its parent and indents one step further along the bone, so
+depth is an indent rather than new geometry, and the chain still runs box edge
+to box edge. Every chart type places 100% of the topics; the test in
+`test/layout.test.ts` that exempted fishbone is gone.
 
 ## 2. Timeline chart types render as something else
 
