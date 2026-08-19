@@ -103,7 +103,10 @@ function collectMeta(topic: Topic, withId: boolean): TopicMeta | undefined {
   if (withId) meta.id = topic.id;
   if (topic.markers?.length) meta.markers = topic.markers;
   if (topic.labels?.length) meta.labels = topic.labels;
-  if (plainNote) meta.note = topic.note!.plain;
+  // A plain note is left out here on purpose: `noteLines` writes it as a
+  // blockquote under the topic instead, where it can be read and edited as
+  // text. A note with rich content has no outline form and still rides as an
+  // object below.
   if (topic.collapsed) meta.collapsed = true;
   if (webLink) meta.link = topic.hyperlink!.value;
 
@@ -125,6 +128,21 @@ function collectMeta(topic: Topic, withId: boolean): TopicMeta | undefined {
     meta[key] = value;
   }
   return Object.keys(meta).length ? meta : undefined;
+}
+
+/**
+ * A topic's plain note as Markdown blockquote lines, indented to sit under it.
+ *
+ * A note is prose, sometimes long: as JSON inside the trailing comment it was
+ * unreadable and uneditable in the file, which is where people edit maps. As a
+ * blockquote it reads as a note in any Markdown viewer, keeps its own blank
+ * lines, and — unlike the bare-text form the reader also accepts — cannot be
+ * mistaken for a heading or a list item if it happens to start with `#` or `-`.
+ */
+function noteLines(topic: Topic, indent: string): string[] {
+  const note = topic.note;
+  if (!note?.plain || note.rich) return [];
+  return note.plain.split(/\r?\n/).map((l) => `${indent}>${l ? ` ${l}` : ''}`);
 }
 
 function titleWithMeta(topic: Topic, withIds: ReadonlySet<string>): string {
@@ -293,11 +311,18 @@ export function markdownToSheet(md: string): Sheet {
       continue;
     }
 
-    // Non-structural line: append as a note to the most recent topic.
+    // Non-structural line: append as a note to the most recent topic. A
+    // blockquote is the form this writer emits, so its own indent and marker
+    // come off and the rest is kept verbatim — including a line that is blank
+    // inside the note, and one that would otherwise read as a heading or a
+    // list item. Anything else is taken as note text as it stands, which is
+    // what a hand-written file tends to look like.
     const target = listStack[listStack.length - 1] ?? currentHeading ?? root;
     if (target) {
+      const quote = /^\s*>\s?(.*)$/.exec(raw);
+      const text = quote ? quote[1]! : raw.trim();
       const existing = target.note?.plain;
-      target.note = { plain: existing ? `${existing}\n${raw.trim()}` : raw.trim() };
+      target.note = { plain: existing !== undefined ? `${existing}\n${text}` : text };
     }
   }
 
@@ -375,17 +400,20 @@ export function sheetToMarkdown(sheet: Sheet, opts: ToMarkdownOptions = {}): str
     out.push('---', '');
   }
 
-  out.push(`# ${titleWithMeta(sheet.rootTopic, ids)}`);
+  out.push(`# ${titleWithMeta(sheet.rootTopic, ids)}`, ...noteLines(sheet.rootTopic, ''));
 
+  // A note goes straight after its own topic and before that topic's children,
+  // which is what makes the reader attach it back to the right one.
   const emitList = (topic: Topic, depth: number) => {
     for (const child of topic.children ?? []) {
-      out.push(`${'  '.repeat(depth)}- ${titleWithMeta(child, ids)}`);
+      const indent = '  '.repeat(depth);
+      out.push(`${indent}- ${titleWithMeta(child, ids)}`, ...noteLines(child, `${indent}  `));
       emitList(child, depth + 1);
     }
   };
 
   for (const branch of sheet.rootTopic.children ?? []) {
-    out.push('', `## ${titleWithMeta(branch, ids)}`);
+    out.push('', `## ${titleWithMeta(branch, ids)}`, ...noteLines(branch, ''));
     emitList(branch, 0);
   }
 
@@ -395,7 +423,7 @@ export function sheetToMarkdown(sheet: Sheet, opts: ToMarkdownOptions = {}): str
   if (sheet.floatingTopics?.length) {
     out.push('', FLOATING_MARKER);
     for (const floating of sheet.floatingTopics) {
-      out.push('', `## ${titleWithMeta(floating, ids)}`);
+      out.push('', `## ${titleWithMeta(floating, ids)}`, ...noteLines(floating, ''));
       emitList(floating, 0);
     }
   }

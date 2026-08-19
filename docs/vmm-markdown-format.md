@@ -41,7 +41,10 @@ Rules:
 3. **`## H2`** lines are the **level-1 branches**.
 4. **`-` list items** under a branch are its children; nested lists nest deeper.
 5. Indent nested list items by **2 spaces** per level.
-6. **Paragraphs**: Any regular unformatted text following a heading or list item will be appended to that topic's `note`.
+6. **Notes**: a **blockquote** (`>`) under a heading or list item is that topic's
+   note — that is also the form export writes, so a note is readable and editable
+   in the file. Plain unformatted text works too, but a note line starting with
+   `#` or `-` needs the `>` or it reads as another topic.
 7. The parser is lenient — it also accepts deeper headings (`###`…) or lists at any
    level, and tolerates `*` bullets.
 
@@ -85,16 +88,20 @@ like everything else here.
 Attach a trailing HTML comment to any heading or list item to add metadata:
 
 ```markdown
-## Build <!-- vmm: {"markers":["priority-1"],"note":"Start Monday","collapsed":true} -->
+## Build <!-- vmm: {"markers":["priority-1"],"collapsed":true} -->
 
-Some additional notes can also just be typed as plain text below the heading!
-It will be appended to the topic's note.
+> Start Monday. A note can run over several lines, and keep its own
+>
+> blank lines between paragraphs.
 
 - API <!-- vmm: {"link":"https://api.example.com"} -->
+  > Notes nest with their topic.
 ```
 
 Readable shorthands: `markers` (string[]), `labels` (string[]), `note` (string),
-`collapsed` (boolean), `link` (string URL).
+`collapsed` (boolean), `link` (string URL). A `note` in the comment is still read,
+but export writes plain notes as blockquotes instead — prose belongs in the text,
+not in JSON.
 
 Everything else a topic carries is written verbatim under its own key, so export
 loses nothing: `style`, `image`, `position`, `attachments`, `structureClass`, a

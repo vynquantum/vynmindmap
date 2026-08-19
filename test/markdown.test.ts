@@ -124,6 +124,29 @@ background: {"color":"#eeeeee"}
     const topic = sheet.rootTopic.children![0]!;
     expect(topic.note?.plain).toBe('initial note\nSome extra text\nAnd more text');
   });
+
+  it('writes a note as a blockquote under its topic, and reads it back whole', () => {
+    const sheet = createWorkbook('Plan').sheets[0]!;
+    const branch = addChild(sheet.rootTopic, 'Phase one');
+    const task = addChild(branch, 'Task');
+    // Every hazard a note can carry: a line that reads as a heading, one that
+    // reads as a list item, and a blank line between paragraphs.
+    branch.note = { plain: '# not a heading\n- not a bullet\n\nSecond paragraph.' };
+    task.note = { plain: 'short' };
+
+    const md = sheetToMarkdown(sheet);
+    // Readable and editable in the file rather than buried in the JSON comment.
+    expect(md).toContain('\n> # not a heading\n> - not a bullet\n>\n> Second paragraph.');
+    expect(md).toContain('- Task\n  > short');
+    expect(md).not.toContain('"note"');
+
+    const back = markdownToSheet(md);
+    const backBranch = back.rootTopic.children![0]!;
+    expect(backBranch.note?.plain).toBe(branch.note.plain);
+    // The hazardous lines stayed inside the note instead of becoming topics.
+    expect(backBranch.children!.map((c) => c.title)).toEqual(['Task']);
+    expect(backBranch.children![0]!.note?.plain).toBe('short');
+  });
 });
 
 describe('round-trip: sheet → markdown → sheet', () => {
