@@ -5,10 +5,12 @@ import { fileURLToPath } from 'node:url';
 
 import { addChild, createWorkbook, readVmm, STRUCTURE_IDS } from '../src/index.js';
 import type { Topic } from '../src/index.js';
+import type { LaidOutEdge } from '../app/src/lib/layout.js';
 import {
   layoutBalanced,
   layoutSheet,
   edgePath,
+  taperPath,
   escapeOverlap,
   sizeOf,
   setTextMeasurer,
@@ -644,6 +646,74 @@ describe('branch taper', () => {
     // ...but a sheet asking for a 1px map gets 1px, not the 2px floor.
     expect(branchWidth(1, 1)).toBe(1);
     expect(branchWidth(40, 1)).toBe(1);
+  });
+
+  it('draws a tapered branch as an outline that narrows end to end', () => {
+    // Width across the shape, measured between the two sides at the same point
+    // along it: the outline is the left edge then the right edge reversed, so
+    // the first and last points are the parent end and the middle pair is the
+    // child end.
+    const spans = (d: string) => {
+      const n = d.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+      const pt = (i: number) => [n[i * 2]!, n[i * 2 + 1]!] as const;
+      const last = n.length / 2 - 1;
+      const gap = (a: readonly [number, number], b: readonly [number, number]) =>
+        Math.hypot(a[0] - b[0], a[1] - b[1]);
+      // The two sides meet at the child end, in the middle of the point list.
+      const mid = (last - 1) / 2;
+      return { start: gap(pt(0), pt(last)), end: gap(pt(mid), pt(mid + 1)) };
+    };
+
+    for (const kind of ['straight', 'bezier'] as const) {
+      const e: LaidOutEdge = {
+        id: 'e',
+        x1: 0,
+        y1: 0,
+        x2: 100,
+        y2: 40,
+        color: '#000',
+        kind,
+        width: 5,
+        widthEnd: 3
+      };
+      const { start, end } = spans(taperPath(e));
+      expect(start, kind).toBeCloseTo(5, 1);
+      expect(end, kind).toBeCloseTo(3, 1);
+    }
+
+    // A deep branch is thin at both ends but still a shape with area — the
+    // floor carries over from branchWidth, so it never closes to a line.
+    const deep = spans(
+      taperPath({
+        id: 'e',
+        x1: 0,
+        y1: 0,
+        x2: 60,
+        y2: 0,
+        color: '#000',
+        kind: 'bezier',
+        width: branchWidth(20),
+        widthEnd: branchWidth(21)
+      })
+    );
+    expect(deep.end).toBeGreaterThanOrEqual(2);
+  });
+
+  it('tapers a branch in the map structures and leaves elbows stroked', () => {
+    const sheet = createWorkbook('Root').sheets[0]!;
+    const a = addChild(sheet.rootTopic, 'A');
+    addChild(a, 'B');
+
+    const curved = layoutSheet(sheet).edges.find((e) => e.id.startsWith(a.id + '->'))!;
+    // Ends where its own children leave, so the chain narrows continuously
+    // instead of stepping at every box.
+    expect(curved.width).toBe(branchWidth(2));
+    expect(curved.widthEnd).toBe(branchWidth(3));
+
+    // Turning the taper off leaves one flat width and nothing to shape.
+    sheet.settings = { ...sheet.settings, branchTaper: false };
+    const flat = layoutSheet(sheet).edges.find((e) => e.id.startsWith(a.id + '->'))!;
+    expect(flat.widthEnd).toBeUndefined();
   });
 });
 

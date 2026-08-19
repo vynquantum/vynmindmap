@@ -38,6 +38,9 @@ export interface LaidOutEdge {
   color: string;
   kind: 'bezier' | 'elbow-h' | 'elbow-v' | 'straight' | 'underline';
   width?: number;
+  /** Width at the child end, when the branch narrows along its length. Absent
+   * means one width end to end. See `taperPath`. */
+  widthEnd?: number;
 }
 
 export interface GridLine {
@@ -679,6 +682,14 @@ function buildEdges(sheet: Sheet, nodes: LaidOutNode[], kind: LaidOutEdge['kind'
       const width =
         cn.topic.style?.lineWidth ??
         (taper ? branchWidth(cn.depth, baseWidth) : baseWidth);
+      // A tapered branch is drawn as a shape rather than a stroke, running from
+      // the width it left the parent at to the width its own children will
+      // leave at — so the chain narrows continuously instead of stepping at
+      // every box. A topic with an explicit line width keeps that width flat.
+      const widthEnd =
+        taper && cn.topic.style?.lineWidth === undefined
+          ? branchWidth(cn.depth + 1, baseWidth)
+          : undefined;
       if (n.side === 'down' || n.side === 'up' || cn.side === 'down' || cn.side === 'up') {
         const down = cn.y >= n.y;
         edges.push({
@@ -710,7 +721,8 @@ function buildEdges(sheet: Sheet, nodes: LaidOutNode[], kind: LaidOutEdge['kind'
           y2: cn.y + cn.h,
           color,
           kind: styleKind(sheet, 'bezier'),
-          width
+          width,
+          widthEnd
         });
         edges.push({
           id: `${n.id}->${cn.id}-line`,
@@ -732,7 +744,8 @@ function buildEdges(sheet: Sheet, nodes: LaidOutNode[], kind: LaidOutEdge['kind'
           y2: cn.y + cn.h / 2,
           color,
           kind,
-          width
+          width,
+          widthEnd
         });
       }
     }
@@ -1386,6 +1399,62 @@ export function edgePath(e: LaidOutEdge): string {
   }
   const mx = (e.x1 + e.x2) / 2;
   return `M ${e.x1} ${e.y1} C ${mx} ${e.y1}, ${mx} ${e.y2}, ${e.x2} ${e.y2}`;
+}
+
+const r2 = (v: number) => Math.round(v * 100) / 100;
+
+/**
+ * A branch drawn as a closed outline that narrows along its length, from
+ * `width` at the parent end to `widthEnd` at the child end.
+ *
+ * A stroked path is one width from end to end, so a taper can only step once
+ * per level and every joint shows. Offsetting the centreline by half the width
+ * *at that point* gives the continuous narrowing a drawn branch has, which is
+ * the difference between a map that looks drawn and one that looks plotted.
+ *
+ * Only the curved and straight kinds are shaped this way: offsetting an elbow's
+ * right angle is fiddly, and a right-angled chart reads as a wiring diagram
+ * anyway. Both widths come from `branchWidth`, so the floor carries over and the
+ * narrow end never thins to nothing.
+ */
+export function taperPath(e: LaidOutEdge, steps = 16): string {
+  const w1 = e.width ?? 2.5;
+  const w2 = e.widthEnd ?? w1;
+  const mx = (e.x1 + e.x2) / 2;
+  // A straight edge is the same cubic with its handles on the line, so one
+  // sampler covers both kinds. It only needs its two ends, since the normal
+  // along a straight run never changes.
+  const curved = e.kind === 'bezier';
+  const c1x = curved ? mx : e.x1 + (e.x2 - e.x1) / 3;
+  const c1y = curved ? e.y1 : e.y1 + (e.y2 - e.y1) / 3;
+  const c2x = curved ? mx : e.x1 + (2 * (e.x2 - e.x1)) / 3;
+  const c2y = curved ? e.y2 : e.y1 + (2 * (e.y2 - e.y1)) / 3;
+  const n = curved ? steps : 1;
+
+  const left: string[] = [];
+  const right: string[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const u = 1 - t;
+    const bx = u * u * u * e.x1 + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * e.x2;
+    const by = u * u * u * e.y1 + 3 * u * u * t * c1y + 3 * u * t * t * c2y + t * t * t * e.y2;
+    let dx = 3 * u * u * (c1x - e.x1) + 6 * u * t * (c2x - c1x) + 3 * t * t * (e.x2 - c2x);
+    let dy = 3 * u * u * (c1y - e.y1) + 6 * u * t * (c2y - c1y) + 3 * t * t * (e.y2 - c2y);
+    let len = Math.hypot(dx, dy);
+    // The tangent vanishes where both handles sit on an endpoint. Falling back
+    // to the chord keeps the outline from collapsing to a spike there.
+    if (len < 1e-6) {
+      dx = e.x2 - e.x1;
+      dy = e.y2 - e.y1;
+      len = Math.hypot(dx, dy) || 1;
+    }
+    const h = (w1 + (w2 - w1) * t) / 2 / len;
+    const ox = -dy * h;
+    const oy = dx * h;
+    left.push(`${r2(bx + ox)} ${r2(by + oy)}`);
+    right.push(`${r2(bx - ox)} ${r2(by - oy)}`);
+  }
+  return `M ${left.join(' L ')} L ${right.reverse().join(' L ')} Z`;
 }
 
 /** Brace path for a summary, bulging toward the summary node. */

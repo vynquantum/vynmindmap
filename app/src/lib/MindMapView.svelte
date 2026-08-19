@@ -39,6 +39,7 @@
   import {
     layoutSheet,
     edgePath,
+    taperPath,
     escapeOverlap,
     summaryPath,
     clampTopicMinHeight,
@@ -52,6 +53,7 @@
     viewRect,
     type Layout,
     type LaidOutNode,
+    type LaidOutEdge,
     type Rect
   } from './layout.js';
   import { isBoxedLevelOne, isTextOnLines } from './mapAppearance.js';
@@ -554,6 +556,15 @@
    * stretching to where the node used to be. Edge ids are `parent->child`. */
   function edgeDragged(id: string): boolean {
     return !!dragId && (id.startsWith(`${dragId}->`) || id.endsWith(`->${dragId}`));
+  }
+
+  /**
+   * Whether a branch is drawn as a filled shape narrowing along its length
+   * rather than a stroked line. Only the kinds `taperPath` can offset qualify;
+   * an elbow keeps its stroke and steps per level as before.
+   */
+  function isTapered(e: LaidOutEdge): boolean {
+    return e.widthEnd != null && (e.kind === 'bezier' || e.kind === 'straight');
   }
 
   function onContainerPointerUp() {
@@ -2193,14 +2204,18 @@
 
       {#each visibleEdges as e (e.id)}
         {#if !edgeDragged(e.id)}
-          <path
-            d={edgePath(e)}
-            fill="none"
-            stroke={e.color}
-            stroke-width={e.width ?? 2.5}
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
+          {#if isTapered(e)}
+            <path d={taperPath(e)} fill={e.color} stroke="none" />
+          {:else}
+            <path
+              d={edgePath(e)}
+              fill="none"
+              stroke={e.color}
+              stroke-width={e.width ?? 2.5}
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          {/if}
         {/if}
       {/each}
 

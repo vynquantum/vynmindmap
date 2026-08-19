@@ -1013,7 +1013,7 @@
           checked={sheet.settings?.branchTaper !== false}
           onchange={(e) => setBranchTaper(e.currentTarget.checked)}
         />
-        <span title="Branches leave the root at the line width above and thin as they divide"
+        <span title="Branches leave the root at the line width above and narrow as they divide"
           >Taper Branches</span
         >
       </label>

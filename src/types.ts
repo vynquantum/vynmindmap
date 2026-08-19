@@ -218,8 +218,9 @@ export interface SheetSettings {
    * line width of their own start from this. */
   branchLineWidth?: number;
   /** Thin each branch as it divides, from `branchLineWidth` at the root toward
-   * a hairline it never crosses. Defaults to true; set false for one flat
-   * width everywhere. */
+   * a hairline it never crosses. Curved and straight branches narrow smoothly
+   * along their length; elbowed ones step once per level. Defaults to true; set
+   * false for one flat width everywhere. */
   branchTaper?: boolean;
   /** Default font family for topics without a topic-specific override. */
   globalFont?: string;
