@@ -85,9 +85,12 @@
     typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
   const measured = new Map<string, number>();
   if (measureCtx) {
-    setTextMeasurer((text, size, bold, family) => {
+    setTextMeasurer((text, size, weight, family) => {
       const stack = family ?? sheet.settings?.globalFont ?? getComputedStyle(document.body).fontFamily;
-      const font = `${bold ? 'bold ' : ''}${size}px ${stack}`;
+      // `weight` is a CSS weight, so it goes into the font string as-is. Testing
+      // it for truthiness instead would measure every topic bold, since '400' is
+      // a non-empty string.
+      const font = `${weight} ${size}px ${stack}`;
       const key = `${font}\u0000${text}`;
       let w = measured.get(key);
       if (w === undefined) {
@@ -1958,14 +1961,20 @@
   function markerIcon(id: string): string {
     return MARKER_ICONS[id] ?? '●';
   }
-  /** Notes render under the title, so the title block sits above them rather
-   * than in the middle of the box. */
-  /** Where the title's middle line sits inside the box. Centred normally; a
-   * title drawn on a line drops toward it, since the box is only scaffolding
-   * there and a centred title reads as floating above an unrelated rule. */
+  /**
+   * Where the title's middle line sits inside the box. Notes render under the
+   * title, so the title block sits above them rather than in the middle of the
+   * box.
+   *
+   * A title drawn on a line drops toward it, since the box is only scaffolding
+   * there and a centred title reads as floating above an unrelated rule — but
+   * only when nothing sits between the two. With notes below it the title has
+   * its own block to head, and dropping it would crowd the notes onto the rule.
+   */
   function titleCenterY(n: LaidOutNode): number {
     const mid = (n.h - n.noteLines.length * NOTE_LINE_H) / 2;
-    return isTextOnLines(sheet) && nodeShape(n) === 'none' ? mid + LINE_HUG : mid;
+    const hugs = isTextOnLines(sheet) && nodeShape(n) === 'none' && !n.noteLines.length;
+    return hugs ? mid + LINE_HUG : mid;
   }
   function badges(t: Topic): string {
     // Badges are editing affordances, not content: while presenting they only
