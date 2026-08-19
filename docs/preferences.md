@@ -36,32 +36,45 @@ A map that is presented is a **reveal instrument**, not a wall of text. The rule
   - Expanding Topic X reveals **only** the emoji parent nodes (which are also `collapsed: true`) — a row of symbols that carries no readable content.
   - The presenter opens each emoji node one by one to reveal the section underneath.
 
-### 3.2 The chain — hides the *points* (required for presentation maps)
+### 3.2 The placeholder layer — hides the *points* (required for presentation maps)
 
-The emoji layer alone is not enough. Once a section node is opened, its points are **siblings**, so all of them appear at once and the room reads to the end of the section while the presenter is still on the first line. The reveal is dead.
+The emoji layer alone is not enough. Once a section node is opened, its points are **siblings**, so all
+of them appear at once and the room reads to the end of the section while the presenter is still on the
+first line. The reveal is dead.
 
-So inside a section, **points are chained, not listed**: each point is the *child* of the point before it, every one `collapsed: true`.
+So inside a section, **every point sits behind its own placeholder node** — a plain number (or a bare
+emoji), `collapsed: true`, with the point itself as its only child.
 
 ```markdown
 - 1️⃣ <!-- vmm: {"collapsed":true} -->
   - The sentence you did not choose <!-- vmm: {"collapsed":true,"note":"…"} -->
-    - Something ordinary went wrong recently <!-- vmm: {"collapsed":true} -->
-      - ✋ Say it out loud. Now. <!-- vmm: {"collapsed":true,"note":"…"} -->
-        - Did you choose that sentence? <!-- vmm: {"collapsed":true,"note":"…"} -->
-          - 💡 Old — my life is decided by what happens to me
+    - 1 <!-- vmm: {"collapsed":true} -->
+      - Something ordinary went wrong recently
+    - 2 <!-- vmm: {"collapsed":true} -->
+      - ✋ Say it out loud. Now. <!-- vmm: {"note":"…"} -->
+    - 3 <!-- vmm: {"collapsed":true} -->
+      - Did you choose that sentence? <!-- vmm: {"note":"…"} -->
 ```
 
-- **Opening a point reveals exactly one new line** — never the list. The last point in a chain carries no `collapsed` flag; it has nothing left to open.
-- **The order of the chain is the order of delivery.** Below the emoji layer a presentation map is a script, so nesting encodes *what comes next*, not taxonomy. Sibling grouping is deliberately given up to buy the reveal.
-- **Collapsing the section node folds the whole staircase in one click.**
-- **Cost, accepted on purpose**: a chain of *n* points is *n* levels deep, so long sections drift right across the canvas (`map.right`). Presenter mode zooms to each topic, so this is a panning cost, not a legibility one. Keep sections to roughly 6–12 points; a section that runs much longer is usually two sections.
-- **When to skip the chain**: reference material the presenter reads privately and never projects (setup checklists, driving instructions, glossaries) stays a flat sibling list — chaining it only makes it slower to read.
+- **Opening a section reveals a row of placeholders and nothing readable.** The audience can count what
+  is coming; they cannot read a word of it. The presenter opens one, teaches it, closes it, opens the
+  next.
+- **Prefer numbers to emoji below the section level.** They restart at 1 in each section, so they double
+  as the presenter's position — *4 of 9* says how much section is left. Reserve the expressive emoji for
+  the branch layer (§3.1), where each one stands for a different kind of content.
+- **Do not chain the points instead** (point 1 holding point 2 holding point 3). It reveals one line at a
+  time, which sounds better, but each section becomes as deep as it is long — a fourteen-point section is
+  fourteen levels deep and marches off the right of the canvas, and the presenter cannot see where they
+  are in it. The placeholder layer keeps the section flat and readable while hiding exactly as much.
+- **When to skip placeholders**: reference material the presenter reads privately and never projects
+  (setup checklists, driving instructions, glossaries) stays a flat sibling list — hiding it only makes
+  it slower to read.
 
 ---
 
 ## 4. Child Node Content Structure
 Under each collapsed emoji parent node:
-- **Topic Title & Content**: Place the actual topic title as the single child of the emoji node, then chain the section's points beneath it (§3.2).
+- **Topic Title & Content**: Place the actual topic title as the single child of the emoji node, then one numbered placeholder per point beneath it (§3.2).
 - **Presenter Notes**: Everything the presenter needs and the audience must not see — exact wording, tempo, timings, warnings — goes in the node's `note` (`<!-- vmm: {"note":"…"} -->`), never in visible node text. A note is invisible to the room, so it is the safe layer.
 - **Metadata is inline**: the `<!-- vmm: … -->` comment must sit **on the node's own line**. On a line of its own it is parsed as a paragraph and becomes literal note text.
 
@@ -83,27 +96,27 @@ settings: {"wrapText":false,"compactMap":false,"mapPresentation":"underline"}
 
 - ⚛️ <!-- vmm: {"collapsed":true} -->
   - Authentication Service <!-- vmm: {"collapsed":true,"note":"Presenter note: lead with the token lifetime question."} -->
-    - OAuth2 & JWT session management <!-- vmm: {"collapsed":true} -->
+    - 1 <!-- vmm: {"collapsed":true} -->
+      - OAuth2 & JWT session management
+    - 2 <!-- vmm: {"collapsed":true} -->
       - Rate limiting per API key
 
 - ⚡ <!-- vmm: {"collapsed":true} -->
   - Database Layer <!-- vmm: {"collapsed":true} -->
-    - PostgreSQL primary cluster <!-- vmm: {"collapsed":true} -->
+    - 1 <!-- vmm: {"collapsed":true} -->
+      - PostgreSQL primary cluster
+    - 2 <!-- vmm: {"collapsed":true} -->
       - Redis read-through caching
-
-- 💧 <!-- vmm: {"collapsed":true} -->
-  - Message Queue <!-- vmm: {"collapsed":true} -->
-    - Kafka event streaming <!-- vmm: {"collapsed":true} -->
-      - Asynchronous job processing
 
 ## 🛡️ Topic Y: Security & Infrastructure <!-- vmm: {"collapsed":true} -->
 
 - 🔑 <!-- vmm: {"collapsed":true} -->
   - Identity Access Management <!-- vmm: {"collapsed":true} -->
-    - Role-based access control (RBAC)
+    - 1 <!-- vmm: {"collapsed":true} -->
+      - Role-based access control (RBAC)
 ```
 
-Read the indentation as the reveal order: the emoji nodes appear together, and every point after that is opened one at a time.
+Read it as three layers: the emoji nodes appear together, the numbers under a section appear together, and only the line inside a number is readable — one at a time.
 
 ---
 

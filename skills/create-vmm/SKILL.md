@@ -181,9 +181,9 @@ floating topic, usually with a `position` in its comment.
 
 If the map will be shown to a room, build it so nothing is readable before it is
 taught. Everything starts `"collapsed":true`; a bare-emoji layer hides the
-branches; and inside a section the points are **chained** — each point is the
-child of the one before it, so opening a point reveals exactly one new line
-instead of the whole list. Presenter-only detail (wording, timings, warnings)
+branches; and inside a section **each point sits behind its own numbered
+placeholder node**, so opening a section shows `1 2 3` and nothing readable —
+the presenter opens one, teaches it, closes it, opens the next. Presenter-only detail (wording, timings, warnings)
 goes in `note`, which the audience never sees. Full rules and an example:
 `docs/preferences.md` §3.
 
