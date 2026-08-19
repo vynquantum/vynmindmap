@@ -582,6 +582,30 @@ describe('text measurement', () => {
     setTextMeasurer();
     expect(sizeOf(t).w).toBe(estimated);
   });
+
+  it('wraps where the text is measured to run out, not at a character count', () => {
+    const t: Topic = { id: 'w', title: 'aaaa bbbb cccc', children: [] };
+    // Fits on one line under the character estimate.
+    expect(sizeOf(t).lines).toEqual(['aaaa bbbb cccc']);
+
+    // Same title, glyphs wide enough that the third word no longer fits.
+    setTextMeasurer((text) => text.length * 20);
+    expect(sizeOf(t).lines).toEqual(['aaaa bbbb', 'cccc']);
+
+    setTextMeasurer();
+  });
+
+  it('measures a title in the font its depth is painted in', () => {
+    const t: Topic = { id: 'd', title: 'Heading', children: [] };
+    setTextMeasurer((text, size) => text.length * size);
+    // The root is painted at 15px, the body at 13px, so their boxes differ.
+    expect(sizeOf(t, 0).w).toBeGreaterThan(sizeOf(t, 2).w);
+    // An explicit size overrides the depth default at every depth.
+    const fixed: Topic = { ...t, style: { font: { size: 13 } } };
+    expect(sizeOf(fixed, 0).w).toBe(sizeOf(fixed, 2).w);
+
+    setTextMeasurer();
+  });
 });
 
 describe('title alignment', () => {

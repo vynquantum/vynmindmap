@@ -44,7 +44,9 @@
     clampTopicMinHeight,
     clampTopicWidth,
     NOTE_LINE_H,
+    NOTE_FONT_SIZE,
     setTextMeasurer,
+    titleFont,
     touches,
     titleAnchor,
     viewRect,
@@ -2311,13 +2313,13 @@
           {#if n.id !== editingId}
             {@const cy = titleCenterY(n)}
             {@const ta = titleAnchor(n.topic.style?.font?.align, n.w, defaultAlign(n))}
+            {@const tf = titleFont(n.topic, n.depth)}
             <text
               dominant-baseline="central"
               text-anchor={ta.anchor}
-              font-family={n.topic.style?.font?.family ?? sheet.settings?.globalFont ?? 'inherit'}
-              font-size={n.topic.style?.font?.size ?? (n.depth === 0 ? 15 : 13)}
-              font-weight={n.topic.style?.font?.weight ??
-                (n.depth === 0 ? '700' : n.depth === 1 ? '600' : '400')}
+              font-family={tf.family ?? sheet.settings?.globalFont ?? 'inherit'}
+              font-size={tf.size}
+              font-weight={tf.weight}
               font-style={n.topic.style?.font?.style ?? 'normal'}
               text-decoration={n.topic.style?.font?.decoration ?? 'none'}
               fill={textFill(n)}
@@ -2331,7 +2333,7 @@
                 dominant-baseline="central"
                 text-anchor={ta.anchor}
                 font-family={sheet.settings?.globalFont ?? 'inherit'}
-                font-size="11"
+                font-size={NOTE_FONT_SIZE}
                 fill={textFill(n)}
                 opacity="0.75"
               >

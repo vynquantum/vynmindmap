@@ -125,16 +125,36 @@ let wrapTitles = true;
  * a fill) runs past it too. `setTextMeasurer` lets the app swap in the real
  * thing so a topic ends where its text ends.
  */
-let measureLine: (text: string, size: number, bold: boolean, family?: string) => number =
+let measureLine: (text: string, size: number, weight: string, family?: string) => number =
   estimateLine;
 
-function estimateLine(text: string, size: number, bold: boolean): number {
-  return text.length * CHAR_W * (size / 13) * (bold ? 1.05 : 1);
+function estimateLine(text: string, size: number, weight: string): number {
+  const heavy = weight === 'bold' || Number(weight) >= 600;
+  return text.length * CHAR_W * (size / 13) * (heavy ? 1.05 : 1);
 }
 
 /** Install a real text measurer, or pass nothing to fall back to the estimate. */
 export function setTextMeasurer(fn?: typeof measureLine | null): void {
   measureLine = fn ?? estimateLine;
+}
+
+/**
+ * The font a title is painted with. The root and the first level are larger and
+ * heavier than the rest, so measuring every topic at the body font sized their
+ * boxes too small — masked, until now, by the character-count estimate running
+ * equally too wide. The view renders from this same helper, so the measured
+ * font and the painted font cannot drift apart again.
+ */
+export function titleFont(
+  t: Topic,
+  depth: number
+): { size: number; weight: string; family?: string } {
+  const f = t.style?.font;
+  return {
+    size: f?.size ?? (depth === 0 ? 15 : 13),
+    weight: f?.weight ?? (depth === 0 ? '700' : depth === 1 ? '600' : '400'),
+    family: f?.family
+  };
 }
 
 /** Reset the knobs from a sheet's settings. Call once, before placement. */
@@ -310,27 +330,35 @@ export interface TopicSize {
   noteLines: string[];
 }
 
-/** Greedy word wrap, honoring explicit newlines and hard-breaking long words. */
-function wrap(text: string, maxChars: number): string[] {
+/**
+ * Greedy word wrap against a pixel budget, honoring explicit newlines and
+ * hard-breaking long words.
+ *
+ * The budget is pixels rather than characters because a proportional font fits
+ * far more `i` than `W` on one line: counting characters breaks a narrow title
+ * early and leaves the rest of the box empty, and overflows a wide one.
+ */
+function wrap(text: string, maxW: number, width: (s: string) => number): string[] {
   const lines: string[] = [];
   for (const raw of text.split('\n')) {
-    if (raw.length <= maxChars) {
+    if (width(raw) <= maxW) {
       lines.push(raw);
       continue;
     }
     let cur = '';
     for (let word of raw.split(/ +/)) {
-      while (word.length > maxChars) {
+      while (width(word) > maxW) {
         // A single over-long word: flush and hard-break it.
         if (cur) {
           lines.push(cur);
           cur = '';
         }
-        lines.push(word.slice(0, maxChars));
-        word = word.slice(maxChars);
+        const head = headFitting(word, maxW, width);
+        lines.push(head);
+        word = word.slice(head.length);
       }
       if (!cur) cur = word;
-      else if (cur.length + 1 + word.length <= maxChars) cur += ' ' + word;
+      else if (width(cur + ' ' + word) <= maxW) cur += ' ' + word;
       else {
         lines.push(cur);
         cur = word;
@@ -341,35 +369,40 @@ function wrap(text: string, maxChars: number): string[] {
   return lines.length ? lines : [''];
 }
 
+/** Longest prefix of `word` that fits `maxW`, never shorter than one character
+ * so a box narrower than a single glyph still terminates. */
+function headFitting(word: string, maxW: number, width: (s: string) => number): string {
+  let n = 1;
+  while (n < word.length && width(word.slice(0, n + 1)) <= maxW) n++;
+  return word.slice(0, n);
+}
+
 /** Note lines are smaller than the title and capped, so one long note can't
  * stretch a topic past the rest of the map. */
 export const NOTE_LINE_H = 15;
+/** Painted note size; the view renders at this too, so notes wrap where they
+ * are drawn to wrap. */
+export const NOTE_FONT_SIZE = 11;
 const NOTE_MAX_LINES = 4;
 
 /**
  * Measure a topic box: wraps the title (explicit newlines + greedy word wrap)
  * to at most MAX_W, and grows the box height to fit all lines.
  */
-export function sizeOf(t: Topic): TopicSize {
-  const size = t.style?.font?.size ?? 13;
-  // Wrapping still budgets in characters, so it keeps its own estimate even
-  // when a real measurer is installed.
-  const cw = CHAR_W * (size / 13) * (t.style?.font?.weight === 'bold' ? 1.05 : 1);
+export function sizeOf(t: Topic, depth = 1): TopicSize {
+  const { size, weight, family } = titleFont(t, depth);
+  const titleW = (s: string) => measureLine(s, size, weight, family);
   // Automatic topics stop expanding at MAX_W. A user-specified width is a
   // layout preference: it controls wrapping and is retained in the document.
   const requestedWidth = t.style?.width;
   const fixedWidth = Number.isFinite(requestedWidth) ? clampTopicWidth(requestedWidth!) : undefined;
-  // Wrapping off: an infinite line budget, so `wrap` only honors the explicit
+  // Wrapping off: an infinite budget, so `wrap` only honors the explicit
   // newlines already in the title.
-  const maxChars = wrapTitles
-    ? Math.max(4, Math.floor(((fixedWidth ?? MAX_W) - PAD_X) / cw))
-    : Infinity;
+  const budget = wrapTitles ? (fixedWidth ?? MAX_W) - PAD_X : Infinity;
 
-  const lines = wrap(t.title ?? '', maxChars);
+  const lines = wrap(t.title ?? '', budget, titleW);
 
-  const bold = t.style?.font?.weight === 'bold';
-  const family = t.style?.font?.family;
-  const textW = lines.reduce((m, l) => Math.max(m, measureLine(l, size, bold, family)), 0);
+  const textW = lines.reduce((m, l) => Math.max(m, titleW(l)), 0);
   const lineH = Math.max(18, size + 5);
   const natural = Math.max(MIN_W, Math.min(wrapTitles ? MAX_W : MAX_MANUAL_W, textW + PAD_X));
   // Uniform length only ever widens: the shared width is the widest natural
@@ -382,7 +415,10 @@ export function sizeOf(t: Topic): TopicSize {
 
   const note = showNotes ? (t.note?.plain ?? '').trim() : '';
   const noteLines = note
-    ? wrap(note, Math.max(4, Math.floor((w - PAD_X) / (CHAR_W * 0.85)))).slice(0, NOTE_MAX_LINES)
+    ? wrap(note, w - PAD_X, (s) => measureLine(s, NOTE_FONT_SIZE, '400', family)).slice(
+        0,
+        NOTE_MAX_LINES
+      )
     : [];
 
   const minHeight = Number.isFinite(t.style?.minHeight) ? t.style!.minHeight! : 0;
@@ -489,7 +525,7 @@ function placeH(
   cursor: Cursor,
   nodes: LaidOutNode[]
 ): number {
-  const s = sizeOf(t);
+  const s = sizeOf(t, depth);
   const boxLeft = dir > 0 ? nearX : nearX - s.w;
   const farX = dir > 0 ? nearX + s.w : nearX - s.w;
   const kids = visibleChildren(t);
@@ -518,7 +554,7 @@ function placeV(
   cursor: Cursor,
   nodes: LaidOutNode[]
 ): number {
-  const s = sizeOf(t);
+  const s = sizeOf(t, depth);
   const boxTop = dir > 0 ? nearY : nearY - s.h;
   const farY = dir > 0 ? nearY + s.h : nearY - s.h;
   const kids = visibleChildren(t);
@@ -548,7 +584,7 @@ const colorFor = (i: number, palette: readonly string[]) => palette[i % palette.
 function horizontal(sheet: Sheet, mode: 'balanced' | 'right' | 'left'): LaidOutNode[] {
   const nodes: LaidOutNode[] = [];
   const root = sheet.rootTopic;
-  const rootS = sizeOf(root);
+  const rootS = sizeOf(root, 0);
   const kids = visibleChildren(root);
   const palette = paletteForSheet(sheet);
 
@@ -579,7 +615,7 @@ function horizontal(sheet: Sheet, mode: 'balanced' | 'right' | 'left'): LaidOutN
 function vertical(sheet: Sheet, dir: 'down' | 'up'): LaidOutNode[] {
   const nodes: LaidOutNode[] = [];
   const root = sheet.rootTopic;
-  const rootS = sizeOf(root);
+  const rootS = sizeOf(root, 0);
   const d: 1 | -1 = dir === 'down' ? 1 : -1;
   const kids = visibleChildren(root);
   const palette = paletteForSheet(sheet);
@@ -819,7 +855,7 @@ function fishbone(
   const nodes: LaidOutNode[] = [];
   const edges: LaidOutEdge[] = [];
   const root = sheet.rootTopic;
-  const rootS = sizeOf(root);
+  const rootS = sizeOf(root, 0);
   const sgn = dir === 'right' ? 1 : -1;
   nodes.push(mkNode(root, -rootS.w / 2, -rootS.h / 2, rootS, 0, 'root', rootColorForSheet(sheet)));
 
@@ -894,7 +930,7 @@ function matrix(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
   const cols = visibleChildren(root);
   const gap = 12;
   const indent = 20;
-  const rootS = sizeOf(root);
+  const rootS = sizeOf(root, 0);
   nodes.push(mkNode(root, 0, 0, rootS, 0, 'down', rootColorForSheet(sheet)));
   const headerY = rootS.h + 20;
 
@@ -970,7 +1006,7 @@ function grid(sheet: Sheet): { nodes: LaidOutNode[]; gridLines: GridLine[] } {
   const lines: GridLine[] = [];
   const root = sheet.rootTopic;
   const kids = visibleChildren(root);
-  const rootS = sizeOf(root);
+  const rootS = sizeOf(root, 0);
   const cols = Math.max(1, Math.ceil(Math.sqrt(kids.length)));
   const nRows = Math.ceil(kids.length / cols);
   const gapX = 18;
