@@ -146,7 +146,8 @@ verbatim, so a file from a newer build doesn't lose settings on re-export. A
 | `coloredBranches`         | boolean                                                                | Each top-level branch takes a color from the theme palette.                  |
 | `rainbowBranches`         | boolean                                                                | Cycle branch colors across the whole palette.                                |
 | `branchColor`             | color string                                                           | Single branch color, used when `coloredBranches` is off.                     |
-| `branchLineWidth`         | number                                                                 | Default branch line width.                                                   |
+| `branchLineWidth`         | number                                                                 | Width a branch leaves the root at, before any taper.                         |
+| `branchTaper`             | boolean                                                                | Thin each branch as it divides (default true); false draws one flat width.   |
 | `branchStyle`             | `curve` \| `straight` \| `elbow`                                       | Connector geometry; each structure family has its own default.               |
 | `globalFont`              | font family string                                                     | Default font for topics without their own.                                   |
 | `autoColorFloating`       | boolean                                                                | Give floating topics a palette color instead of gray.                        |

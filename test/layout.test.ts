@@ -241,7 +241,8 @@ describe('layoutBalanced', () => {
       mapPresentation: 'underline',
       coloredBranches: false,
       branchColor: '#123456',
-      branchLineWidth: 4
+      branchLineWidth: 4,
+      branchTaper: false
     };
     const a = addChild(sheet.rootTopic, 'A');
     addChild(a, 'A detail');
@@ -250,6 +251,14 @@ describe('layoutBalanced', () => {
     expect(layout.nodes.find((n) => n.depth === 0)!.color).toBe('#075985');
     expect(layout.edges.every((e) => e.color === '#123456' && e.width === 4)).toBe(true);
     expect(layout.edges.some((e) => e.id.endsWith('-line'))).toBe(true);
+
+    // Width and taper are separate controls: turning the taper back on keeps 4
+    // as the width the branch leaves the root at, and thins it from there.
+    sheet.settings.branchTaper = true;
+    const tapered = layoutSheet(sheet);
+    const from = (id: string) => tapered.edges.find((e) => e.id.startsWith(id + '->'))!;
+    expect(from(sheet.rootTopic.id).width).toBe(4);
+    expect(from(a.id).width!).toBeLessThan(4);
   });
 
   it('draws boundaries and summaries in every chart type, not just the tree-like ones', () => {
@@ -562,6 +571,15 @@ describe('branch taper', () => {
     for (let i = 1; i < w.length; i++) expect(w[i]!).toBeLessThan(w[i - 1]!);
     // A deep map still draws a visible line rather than fading to nothing.
     expect(branchWidth(40)).toBeGreaterThanOrEqual(2);
+  });
+
+  it("starts from the sheet's width and never thins past it", () => {
+    // A thicker root taper still lands on the same hairline floor...
+    expect(branchWidth(1, 9)).toBe(9);
+    expect(branchWidth(40, 9)).toBe(2);
+    // ...but a sheet asking for a 1px map gets 1px, not the 2px floor.
+    expect(branchWidth(1, 1)).toBe(1);
+    expect(branchWidth(40, 1)).toBe(1);
   });
 });
 

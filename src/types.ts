@@ -214,8 +214,13 @@ export interface SheetSettings {
   coloredBranches?: boolean;
   /** Single branch color when coloredBranches is disabled. */
   branchColor?: string;
-  /** Default line width for branches without a topic-specific override. */
+  /** Width a branch leaves the root at, before any taper. Topics without a
+   * line width of their own start from this. */
   branchLineWidth?: number;
+  /** Thin each branch as it divides, from `branchLineWidth` at the root toward
+   * a hairline it never crosses. Defaults to true; set false for one flat
+   * width everywhere. */
+  branchTaper?: boolean;
   /** Default font family for topics without a topic-specific override. */
   globalFont?: string;
   /** Node presentation, deliberately separate from chart structure. */

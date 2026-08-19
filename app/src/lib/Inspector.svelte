@@ -676,6 +676,11 @@
     else settingsOf().branchLineWidth = Number(v);
     markDirty();
   }
+  function setBranchTaper(v: boolean) {
+    if (v) delete sheet.settings?.branchTaper;
+    else settingsOf().branchTaper = false;
+    markDirty();
+  }
   function setColoredBranches(v: boolean) {
     settingsOf().coloredBranches = v;
     markDirty();
@@ -1001,6 +1006,16 @@
           <option value="">Default</option>
           {#each LINE_WIDTHS as width (width)}<option value={width}>{width} px</option>{/each}
         </select>
+      </label>
+      <label class="checkline">
+        <input
+          type="checkbox"
+          checked={sheet.settings?.branchTaper !== false}
+          onchange={(e) => setBranchTaper(e.currentTarget.checked)}
+        />
+        <span title="Branches leave the root at the line width above and thin as they divide"
+          >Taper Branches</span
+        >
       </label>
       <label class="stack"
         >Branch Style

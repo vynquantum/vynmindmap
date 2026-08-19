@@ -452,14 +452,19 @@ export function titleAnchor(
 }
 
 /**
- * Stroke width for the branch arriving at a topic at `depth`. A branch leaves
- * the root thick and thins as it divides, which is what reads as "drawn" rather
- * than "plotted" — a single width for every link makes a map look like a wiring
- * diagram. The taper decays toward a hairline floor so deep maps never vanish.
- * A sheet that sets `branchLineWidth` opts out and gets that flat width.
+ * Stroke width for the branch arriving at a topic at `depth`, starting from
+ * `base` at the root. A branch leaves the root thick and thins as it divides,
+ * which is what reads as "drawn" rather than "plotted" — a single width for
+ * every link makes a map look like a wiring diagram.
+ *
+ * The decay is toward a floor rather than a subtraction per level, so it
+ * approaches the hairline and never reaches it: a branch forty levels deep is
+ * still drawn. A `base` already at or under the floor keeps its own width as
+ * the floor, so asking for a 1px map gets a 1px map rather than a 2px one.
  */
-export function branchWidth(depth: number): number {
-  const w = BRANCH_FLOOR + (BRANCH_W - BRANCH_FLOOR) * Math.pow(0.58, Math.max(0, depth - 1));
+export function branchWidth(depth: number, base = BRANCH_W): number {
+  const floor = Math.min(BRANCH_FLOOR, base);
+  const w = floor + (base - floor) * Math.pow(0.58, Math.max(0, depth - 1));
   return Math.round(w * 10) / 10;
 }
 
@@ -660,13 +665,20 @@ function placeFloating(topic: Topic, index: number, nodes: LaidOutNode[], color:
 function buildEdges(sheet: Sheet, nodes: LaidOutNode[], kind: LaidOutEdge['kind']): LaidOutEdge[] {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const edges: LaidOutEdge[] = [];
+  const baseWidth = sheet.settings?.branchLineWidth ?? BRANCH_W;
+  const taper = sheet.settings?.branchTaper !== false;
   for (const n of nodes) {
     for (const child of visibleChildren(n.topic)) {
       const cn = byId.get(child.id);
       if (!cn) continue;
       const color = cn.topic.style?.lineColor ?? cn.color;
+      // `branchLineWidth` sets how thick a branch leaves the root; `branchTaper`
+      // decides whether it thins on the way out. They are separate settings so
+      // that picking a width doesn't silently flatten the map — which is what
+      // happened while the width doubled as the opt-out.
       const width =
-        cn.topic.style?.lineWidth ?? sheet.settings?.branchLineWidth ?? branchWidth(cn.depth);
+        cn.topic.style?.lineWidth ??
+        (taper ? branchWidth(cn.depth, baseWidth) : baseWidth);
       if (n.side === 'down' || n.side === 'up' || cn.side === 'down' || cn.side === 'up') {
         const down = cn.y >= n.y;
         edges.push({
