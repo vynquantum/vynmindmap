@@ -1758,6 +1758,8 @@
   const showBranchCount = $derived(sheet.settings?.showBranchCount !== false);
 
   const SUMMARY_STROKE = '#94a3b8';
+  /** Pixels a title drops toward the line it is drawn on. */
+  const LINE_HUG = 4;
 
   // Embedded image resources → data URLs (cached; cleared when resources change).
   const imgCache = new Map<string, string>();
@@ -1928,8 +1930,12 @@
   }
   /** Notes render under the title, so the title block sits above them rather
    * than in the middle of the box. */
+  /** Where the title's middle line sits inside the box. Centred normally; a
+   * title drawn on a line drops toward it, since the box is only scaffolding
+   * there and a centred title reads as floating above an unrelated rule. */
   function titleCenterY(n: LaidOutNode): number {
-    return (n.h - n.noteLines.length * NOTE_LINE_H) / 2;
+    const mid = (n.h - n.noteLines.length * NOTE_LINE_H) / 2;
+    return isTextOnLines(sheet) && nodeShape(n) === 'none' ? mid + LINE_HUG : mid;
   }
   function badges(t: Topic): string {
     // Badges are editing affordances, not content: while presenting they only
@@ -2148,7 +2154,14 @@
 
       {#each visibleEdges as e (e.id)}
         {#if !edgeDragged(e.id)}
-          <path d={edgePath(e)} fill="none" stroke={e.color} stroke-width={e.width ?? 2.5} />
+          <path
+            d={edgePath(e)}
+            fill="none"
+            stroke={e.color}
+            stroke-width={e.width ?? 2.5}
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         {/if}
       {/each}
 

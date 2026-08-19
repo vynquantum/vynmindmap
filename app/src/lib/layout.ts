@@ -90,6 +90,9 @@ let LEVEL_GAP = SPACING.level;
 const CHAR_W = 7.6;
 const PAD_X = 26;
 const PAD_Y = 8;
+/** Branch stroke at the root, and the hairline it tapers toward. */
+const BRANCH_W = 5;
+const BRANCH_FLOOR = 2;
 const MIN_W = 56;
 const MAX_W = 260;
 const MAX_MANUAL_W = 800;
@@ -388,6 +391,19 @@ export function titleAnchor(
   return { anchor: 'middle', x: w / 2 };
 }
 
+/**
+ * Stroke width for the branch arriving at a topic at `depth`. A branch leaves
+ * the root thick and thins as it divides, which is what reads as "drawn" rather
+ * than "plotted" — a single width for every link makes a map look like a wiring
+ * diagram. `base` is the widest stroke (the sheet's `branchLineWidth`); the
+ * taper decays toward a hairline floor so deep maps never vanish. A sheet that
+ * sets `branchLineWidth` opts out and gets that flat width everywhere.
+ */
+export function branchWidth(depth: number): number {
+  const w = BRANCH_FLOOR + (BRANCH_W - BRANCH_FLOOR) * Math.pow(0.58, Math.max(0, depth - 1));
+  return Math.round(w * 10) / 10;
+}
+
 /** Back-compat width-only measure. */
 export function widthOf(t: Topic): number {
   return sizeOf(t).w;
@@ -590,7 +606,8 @@ function buildEdges(sheet: Sheet, nodes: LaidOutNode[], kind: LaidOutEdge['kind'
       const cn = byId.get(child.id);
       if (!cn) continue;
       const color = cn.topic.style?.lineColor ?? cn.color;
-      const width = cn.topic.style?.lineWidth ?? sheet.settings?.branchLineWidth ?? 2.5;
+      const width =
+        cn.topic.style?.lineWidth ?? sheet.settings?.branchLineWidth ?? branchWidth(cn.depth);
       if (n.side === 'down' || n.side === 'up' || cn.side === 'down' || cn.side === 'up') {
         const down = cn.y >= n.y;
         edges.push({

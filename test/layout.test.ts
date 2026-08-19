@@ -11,6 +11,7 @@ import {
   edgePath,
   escapeOverlap,
   sizeOf,
+  branchWidth,
   titleAnchor,
   touches,
   viewRect
@@ -551,6 +552,18 @@ describe('flexible floating topic', () => {
     sheet.settings = { flexibleFloatingTopic: true };
     const on = layoutSheet(sheet);
     expect(overlaps(rect(on, sheet.rootTopic.id), rect(on, 'park'))).toBe(false);
+  });
+});
+
+describe('branch taper', () => {
+  it('thins with depth and never falls below a hairline', () => {
+    const w = [1, 2, 3, 4, 5].map((d) => branchWidth(d));
+
+    // Thickest where the branch leaves the root, thinner at every division.
+    expect(w[0]).toBe(5);
+    for (let i = 1; i < w.length; i++) expect(w[i]!).toBeLessThan(w[i - 1]!);
+    // A deep map still draws a visible line rather than fading to nothing.
+    expect(branchWidth(40)).toBeGreaterThanOrEqual(2);
   });
 });
 
