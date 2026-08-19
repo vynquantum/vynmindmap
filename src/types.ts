@@ -235,6 +235,9 @@ export interface SheetSettings {
   uniformTopicLength?: boolean;
   /** Show each topic's note under its title instead of only the 📝 badge. */
   displayAllNotes?: boolean;
+  /** Lines of a shown note painted before the rest is cut off with an ellipsis.
+   * Defaults to 4; raise it for maps whose notes carry the detail. */
+  noteLines?: number;
   /** Badge a collapsed branch with the number of topics folded under it,
    * counting every level rather than just its direct children. Defaults to
    * true; set false to keep the plain '+' button. */

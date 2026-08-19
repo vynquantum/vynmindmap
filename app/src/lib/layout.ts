@@ -104,6 +104,11 @@ const MARGIN = 56;
 const FLOAT_COLOR = '#7a8699';
 const SUMMARY_COLOR = '#64748b';
 
+/** Lines of a note painted under the title before the rest is cut, unless the
+ * sheet sets `noteLines`. Four is about a sentence and a half — enough to read
+ * the note at a glance without a topic turning into a paragraph. */
+export const NOTE_LINES_DEFAULT = 4;
+
 /**
  * Per-sheet measurement knobs, applied by `applySettings` before any placement
  * runs. They live here rather than as parameters because `sizeOf` is called
@@ -116,6 +121,7 @@ const SUMMARY_COLOR = '#64748b';
 let uniformW = 0;
 let showNotes = false;
 let wrapTitles = true;
+let noteMaxLines = NOTE_LINES_DEFAULT;
 
 /**
  * Width of one already-wrapped line of title text.
@@ -169,6 +175,10 @@ function applySettings(sheet: Sheet): void {
 
   showNotes = sheet.settings?.displayAllNotes === true;
   wrapTitles = sheet.settings?.wrapText !== false;
+  const noteSetting = sheet.settings?.noteLines;
+  noteMaxLines = Number.isFinite(noteSetting)
+    ? Math.max(1, Math.round(noteSetting as number))
+    : NOTE_LINES_DEFAULT;
   // Measured with the knob off so the widest topic is its own natural width,
   // not a previous sheet's uniform width fed back in.
   uniformW = 0;
@@ -386,8 +396,6 @@ export const NOTE_LINE_H = 15;
 /** Painted note size; the view renders at this too, so notes wrap where they
  * are drawn to wrap. */
 export const NOTE_FONT_SIZE = 11;
-const NOTE_MAX_LINES = 4;
-
 /**
  * Measure a topic box: wraps the title (explicit newlines + greedy word wrap)
  * to at most MAX_W, and grows the box height to fit all lines.
@@ -407,7 +415,22 @@ export function sizeOf(t: Topic, depth = 1): TopicSize {
 
   const textW = lines.reduce((m, l) => Math.max(m, titleW(l)), 0);
   const lineH = Math.max(18, size + 5);
-  const natural = Math.max(MIN_W, Math.min(wrapTitles ? MAX_W : MAX_MANUAL_W, textW + PAD_X));
+
+  const note = showNotes ? (t.note?.plain ?? '').trim() : '';
+  const noteW = (s: string) => measureLine(s, NOTE_FONT_SIZE, '400', family);
+  // A note wraps to the box the title sized, so a long note on a short topic
+  // used to fall into a tall narrow column and then get cut. Wrapping it first
+  // at the widest a topic may be, and taking the widest line it actually needs,
+  // lets the box grow sideways for the note before it grows downward — as far
+  // as MAX_W and no further, so one note still can't stretch past the map.
+  const noteNatural = note
+    ? wrap(note, MAX_W - PAD_X, noteW).reduce((m, l) => Math.max(m, noteW(l)), 0) + PAD_X
+    : 0;
+  const natural = Math.max(
+    MIN_W,
+    Math.min(wrapTitles ? MAX_W : MAX_MANUAL_W, textW + PAD_X),
+    Math.min(MAX_W, noteNatural)
+  );
   // Uniform length only ever widens: the shared width is the widest natural
   // width on the sheet, so no title has to re-wrap to fit it.
   // With wrapping off a requested width can no longer make the text re-flow, so
@@ -416,13 +439,11 @@ export function sizeOf(t: Topic, depth = 1): TopicSize {
     ? (fixedWidth ?? Math.max(natural, uniformW))
     : Math.max(fixedWidth ?? 0, natural, uniformW);
 
-  const note = showNotes ? (t.note?.plain ?? '').trim() : '';
-  const noteLines = note
-    ? wrap(note, w - PAD_X, (s) => measureLine(s, NOTE_FONT_SIZE, '400', family)).slice(
-        0,
-        NOTE_MAX_LINES
-      )
-    : [];
+  const wrapped = note ? wrap(note, w - PAD_X, noteW) : [];
+  const noteLines = wrapped.slice(0, noteMaxLines);
+  // A cut note says that it was cut. Ending mid-sentence with nothing to show
+  // for it reads as the whole note, which is how a truncated note misleads.
+  if (wrapped.length > noteLines.length) noteLines[noteLines.length - 1] += '…';
 
   const minHeight = Number.isFinite(t.style?.minHeight) ? t.style!.minHeight! : 0;
   const h = Math.max(
@@ -680,8 +701,7 @@ function buildEdges(sheet: Sheet, nodes: LaidOutNode[], kind: LaidOutEdge['kind'
       // that picking a width doesn't silently flatten the map — which is what
       // happened while the width doubled as the opt-out.
       const width =
-        cn.topic.style?.lineWidth ??
-        (taper ? branchWidth(cn.depth, baseWidth) : baseWidth);
+        cn.topic.style?.lineWidth ?? (taper ? branchWidth(cn.depth, baseWidth) : baseWidth);
       // A tapered branch is drawn as a shape rather than a stroke, running from
       // the width it left the parent at to the width its own children will
       // leave at — so the chain narrows continuously instead of stepping at
@@ -988,9 +1008,7 @@ function timeline(sheet: Sheet, dir: 'h' | 'v'): { nodes: LaidOutNode[]; edges: 
   const stroke = (depth: number) =>
     sheet.settings?.branchTaper === false ? base : branchWidth(depth, base);
 
-  nodes.push(
-    mkNode(root, -rootS.w / 2, -rootS.h / 2, rootS, 0, 'root', rootColorForSheet(sheet))
-  );
+  nodes.push(mkNode(root, -rootS.w / 2, -rootS.h / 2, rootS, 0, 'root', rootColorForSheet(sheet)));
 
   const palette = paletteForSheet(sheet);
   const halfRoot = (horiz ? rootS.w : rootS.h) / 2;

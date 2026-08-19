@@ -140,6 +140,7 @@ verbatim, so a file from a newer build doesn't lose settings on re-export. A
 | `compactMap`              | boolean                                                                | Tighten the gaps between topics and levels.                                  |
 | `uniformTopicLength`      | boolean                                                                | Widen every topic to the widest one, so titles line up in columns.           |
 | `displayAllNotes`         | boolean                                                                | Show each note under its title instead of only the 📝 badge.                 |
+| `noteLines`               | number                                                                 | Lines of a shown note before the rest is cut with an ellipsis (default 4).   |
 | `mapPresentation`         | `boxed` \| `underline`                                                 | Boxed topics, or bare text on an underline.                                  |
 | `boxedLevelOne`           | boolean                                                                | With `underline`, keep the root and its branches boxed.                      |
 | `defaultShape`            | `rounded` \| `rect` \| `ellipse` \| `underline` \| `capsule` \| `none` | Shape for topics without their own.                                          |

@@ -194,7 +194,12 @@ the Map tab.
 All in the Style tab's last section:
 
 - **Note** — long-form text attached to a topic; shows a small badge on the
-  node. Turn on _Display All Notes_ (Map tab) to render them inline.
+  node. The editor grows to the note, so a long one is read without scrolling a
+  three-line window. Turn on _Display All Notes_ (Map tab) to render notes on
+  the map: a long note widens its topic before it lengthens it, and _Note Lines_
+  sets how much of it is shown before the rest is cut with an ellipsis. In an
+  exported `.md` a note is a `>` blockquote under its topic, so it can be
+  written and edited there too.
 - **Link** — one of four kinds: a **web** URL, a local **file** path, another
   **topic** in the map, or an **email** address.
 - **Labels** — short tags rendered under the title.

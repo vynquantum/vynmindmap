@@ -401,6 +401,33 @@ describe('map display settings', () => {
     expect(shown.h).toBeGreaterThan(plain.h);
   });
 
+  it('widens a topic for a long note, and marks what it had to cut', () => {
+    const { sheet, narrow } = sample();
+    const paragraph = Array(40).fill('word').join(' ');
+    narrow.note = { plain: paragraph };
+    sheet.settings = { displayAllNotes: true };
+
+    const short = layoutSheet(sheet).nodes.find((n) => n.id === narrow.id)!;
+    // A long note grows the box sideways rather than down a narrow column.
+    const bare = structuredClone(sheet);
+    bare.rootTopic.children![0]!.note = null;
+    const unnoted = layoutSheet(bare).nodes.find((n) => n.id === narrow.id)!;
+    expect(short.w).toBeGreaterThan(unnoted.w);
+    expect(short.w).toBeLessThanOrEqual(260);
+
+    // More note than fits says so, instead of stopping mid-sentence as if that
+    // were the whole note.
+    expect(short.noteLines).toHaveLength(4);
+    expect(short.noteLines.at(-1)!.endsWith('\u2026')).toBe(true);
+
+    // The cut is a sheet setting, and a note that fits keeps its last line whole.
+    sheet.settings = { displayAllNotes: true, noteLines: 12 };
+    const more = layoutSheet(sheet).nodes.find((n) => n.id === narrow.id)!;
+    expect(more.noteLines.length).toBeGreaterThan(4);
+    expect(more.noteLines.at(-1)!.endsWith('\u2026')).toBe(false);
+    expect(more.h).toBeGreaterThan(short.h);
+  });
+
   it('keeps a long title on one line, and widens the topic, when wrapping is off', () => {
     const wb = createWorkbook('Root');
     const sheet = wb.sheets[0]!;
@@ -592,13 +619,22 @@ describe('timeline', () => {
         (dir === 'timeline.h' ? n.y + n.h / 2 : n.x + n.w / 2) - axisAt;
       const stops = layout.nodes.filter((n) => n.depth === 1);
       expect(stops.length, dir).toBe(4);
-      expect(stops.some((n) => across(n) < 0), dir).toBe(true);
-      expect(stops.some((n) => across(n) > 0), dir).toBe(true);
+      expect(
+        stops.some((n) => across(n) < 0),
+        dir
+      ).toBe(true);
+      expect(
+        stops.some((n) => across(n) > 0),
+        dir
+      ).toBe(true);
 
       // Every topic gets a marker or a connector — nothing floats unattached.
       for (const n of layout.nodes) {
         if (n.depth === 0) continue;
-        expect(layout.edges.some((e) => e.id === `tl-${n.id}`), `${dir} ${n.id}`).toBe(true);
+        expect(
+          layout.edges.some((e) => e.id === `tl-${n.id}`),
+          `${dir} ${n.id}`
+        ).toBe(true);
       }
     }
   });

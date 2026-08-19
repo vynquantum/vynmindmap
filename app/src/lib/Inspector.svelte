@@ -676,6 +676,11 @@
     else settingsOf().branchLineWidth = Number(v);
     markDirty();
   }
+  function setNoteLines(v: string) {
+    if (v === '') delete sheet.settings?.noteLines;
+    else settingsOf().noteLines = Number(v);
+    markDirty();
+  }
   function setBranchTaper(v: boolean) {
     if (v) delete sheet.settings?.branchTaper;
     else settingsOf().branchTaper = false;
@@ -732,6 +737,25 @@
     if (i >= 0) arr.splice(i, 1);
     else arr.push(id);
     markDirty();
+  }
+  /**
+   * Grow a textarea to the text inside it, up to a cap.
+   * A note can run to paragraphs, and reading one through a three-line window
+   * meant scrolling a box inside a scrolling panel. It now opens to its content
+   * and only scrolls past the cap, where growing further would push the fields
+   * under it off the panel. A height dragged by hand wins: once it differs from
+   * the one this set, it stops resizing under the user.
+   */
+  function autogrow(el: HTMLTextAreaElement) {
+    let mine = '';
+    const fit = () => {
+      if (mine && el.style.height !== mine) return;
+      el.style.height = 'auto';
+      mine = el.style.height = `${Math.min(el.scrollHeight + 2, 360)}px`;
+    };
+    fit();
+    el.addEventListener('input', fit);
+    return { destroy: () => el.removeEventListener('input', fit) };
   }
   function setNote(v: string) {
     if (topic) {
@@ -1103,6 +1127,22 @@
       {@render toggleRow('Display All Notes', flag('displayAllNotes'), (v) =>
         setFlag('displayAllNotes', v)
       )}
+      {#if flag('displayAllNotes')}
+        <label class="stack"
+          >Note Lines
+          <select
+            value={sheet.settings?.noteLines ?? ''}
+            onchange={(e) => setNoteLines(e.currentTarget.value)}
+          >
+            <option value="">Default (4)</option>
+            {#each [2, 3, 4, 6, 8, 12] as n (n)}<option value={n}>{n} lines</option>{/each}
+          </select>
+        </label>
+        <p class="hint">
+          How much of a long note a topic shows before the rest is cut off with an ellipsis. A note
+          widens its topic before it lengthens it.
+        </p>
+      {/if}
       {@render toggleRow('Branch Count', sheet.settings?.showBranchCount !== false, (v) =>
         setFlag('showBranchCount', v)
       )}
@@ -1445,13 +1485,18 @@
       {@render sectionHeader('content', 'Note · link · labels · image')}
       {#if open.content}
         <div class="body">
-          <label
-            >Note
-            <textarea
-              rows="3"
-              value={topic.note?.plain ?? ''}
-              oninput={(e) => setNote(e.currentTarget.value)}></textarea>
-          </label>
+          <!-- Keyed so selecting another topic re-measures: the same textarea
+               with a new note in it would otherwise keep the old one's height. -->
+          {#key topic.id}
+            <label
+              >Note
+              <textarea
+                rows="3"
+                use:autogrow
+                value={topic.note?.plain ?? ''}
+                oninput={(e) => setNote(e.currentTarget.value)}></textarea>
+            </label>
+          {/key}
           <label
             >Link
             <input
