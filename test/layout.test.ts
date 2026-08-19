@@ -11,6 +11,7 @@ import {
   edgePath,
   escapeOverlap,
   sizeOf,
+  setTextMeasurer,
   branchWidth,
   titleAnchor,
   touches,
@@ -564,6 +565,22 @@ describe('branch taper', () => {
     for (let i = 1; i < w.length; i++) expect(w[i]!).toBeLessThan(w[i - 1]!);
     // A deep map still draws a visible line rather than fading to nothing.
     expect(branchWidth(40)).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('text measurement', () => {
+  it('sizes a topic from measured glyphs, and falls back to the estimate', () => {
+    const t = createWorkbook('lllllllll').sheets[0]!.rootTopic;
+    // Nine narrow glyphs: the character-count estimate is far wider than the
+    // text really is, which is exactly the overshoot a real measurer removes.
+    const estimated = sizeOf(t).w;
+    expect(estimated).toBeGreaterThan(90);
+
+    setTextMeasurer(() => 40);
+    expect(sizeOf(t).w).toBe(66); // measured text + the box's own padding
+
+    setTextMeasurer();
+    expect(sizeOf(t).w).toBe(estimated);
   });
 });
 

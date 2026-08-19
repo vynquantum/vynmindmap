@@ -114,6 +114,29 @@ let uniformW = 0;
 let showNotes = false;
 let wrapTitles = true;
 
+/**
+ * Width of one already-wrapped line of title text.
+ *
+ * The default multiplies a character count by an average glyph width, which is
+ * all a headless layout (tests, CLI export) can do without a font engine. It
+ * overshoots real proportional text badly — every `i`, `l`, `t` and space is
+ * far narrower than the average — so a box measured this way runs well past
+ * the end of its own title, and anything drawn across that box (an underline,
+ * a fill) runs past it too. `setTextMeasurer` lets the app swap in the real
+ * thing so a topic ends where its text ends.
+ */
+let measureLine: (text: string, size: number, bold: boolean, family?: string) => number =
+  estimateLine;
+
+function estimateLine(text: string, size: number, bold: boolean): number {
+  return text.length * CHAR_W * (size / 13) * (bold ? 1.05 : 1);
+}
+
+/** Install a real text measurer, or pass nothing to fall back to the estimate. */
+export function setTextMeasurer(fn?: typeof measureLine | null): void {
+  measureLine = fn ?? estimateLine;
+}
+
 /** Reset the knobs from a sheet's settings. Call once, before placement. */
 function applySettings(sheet: Sheet): void {
   const density = sheet.settings?.compactMap === true ? 0.5 : 1;
@@ -329,6 +352,8 @@ const NOTE_MAX_LINES = 4;
  */
 export function sizeOf(t: Topic): TopicSize {
   const size = t.style?.font?.size ?? 13;
+  // Wrapping still budgets in characters, so it keeps its own estimate even
+  // when a real measurer is installed.
   const cw = CHAR_W * (size / 13) * (t.style?.font?.weight === 'bold' ? 1.05 : 1);
   // Automatic topics stop expanding at MAX_W. A user-specified width is a
   // layout preference: it controls wrapping and is retained in the document.
@@ -342,12 +367,11 @@ export function sizeOf(t: Topic): TopicSize {
 
   const lines = wrap(t.title ?? '', maxChars);
 
-  const longest = lines.reduce((m, l) => Math.max(m, l.length), 0);
+  const bold = t.style?.font?.weight === 'bold';
+  const family = t.style?.font?.family;
+  const textW = lines.reduce((m, l) => Math.max(m, measureLine(l, size, bold, family)), 0);
   const lineH = Math.max(18, size + 5);
-  const natural = Math.max(
-    MIN_W,
-    Math.min(wrapTitles ? MAX_W : MAX_MANUAL_W, longest * cw + PAD_X)
-  );
+  const natural = Math.max(MIN_W, Math.min(wrapTitles ? MAX_W : MAX_MANUAL_W, textW + PAD_X));
   // Uniform length only ever widens: the shared width is the widest natural
   // width on the sheet, so no title has to re-wrap to fit it.
   // With wrapping off a requested width can no longer make the text re-flow, so
@@ -395,9 +419,8 @@ export function titleAnchor(
  * Stroke width for the branch arriving at a topic at `depth`. A branch leaves
  * the root thick and thins as it divides, which is what reads as "drawn" rather
  * than "plotted" — a single width for every link makes a map look like a wiring
- * diagram. `base` is the widest stroke (the sheet's `branchLineWidth`); the
- * taper decays toward a hairline floor so deep maps never vanish. A sheet that
- * sets `branchLineWidth` opts out and gets that flat width everywhere.
+ * diagram. The taper decays toward a hairline floor so deep maps never vanish.
+ * A sheet that sets `branchLineWidth` opts out and gets that flat width.
  */
 export function branchWidth(depth: number): number {
   const w = BRANCH_FLOOR + (BRANCH_W - BRANCH_FLOOR) * Math.pow(0.58, Math.max(0, depth - 1));

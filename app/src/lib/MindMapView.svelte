@@ -44,6 +44,7 @@
     clampTopicMinHeight,
     clampTopicWidth,
     NOTE_LINE_H,
+    setTextMeasurer,
     touches,
     titleAnchor,
     viewRect,
@@ -69,6 +70,33 @@
     selectedId?: string | null;
     presenterMode?: boolean;
   } = $props();
+
+  // Real glyph widths for the font the SVG actually paints with. Without this
+  // the layout falls back to a character-count estimate, which overshoots
+  // proportional text — so a topic's box, and the underline drawn the width of
+  // it, run well past the end of the title. Reading globalFont here also makes
+  // a font change re-measure, since the layout below depends on it.
+  // ponytail: the cache is keyed by font+text and simply dropped once it gets
+  // large; a real LRU would only matter for a map with tens of thousands of
+  // distinct titles.
+  const measureCtx =
+    typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+  const measured = new Map<string, number>();
+  if (measureCtx) {
+    setTextMeasurer((text, size, bold, family) => {
+      const stack = family ?? sheet.settings?.globalFont ?? getComputedStyle(document.body).fontFamily;
+      const font = `${bold ? 'bold ' : ''}${size}px ${stack}`;
+      const key = `${font}\u0000${text}`;
+      let w = measured.get(key);
+      if (w === undefined) {
+        if (measured.size > 4000) measured.clear();
+        measureCtx.font = font;
+        w = measureCtx.measureText(text).width;
+        measured.set(key, w);
+      }
+      return w;
+    });
+  }
 
   // Layout recomputes whenever the (proxied) sheet mutates.
   const layout: Layout = $derived(layoutSheet(sheet));
